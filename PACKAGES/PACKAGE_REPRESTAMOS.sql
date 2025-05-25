@@ -6800,7 +6800,7 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
                      PR_PKG_REPRESTAMOS.Reenviar_Correo_Api(pIdReprestamo, vCanal(x).VALOR, vCanal(x).NOMBRES, vCanal(x).APELLIDOS, vSubject, 'TXT',vMensaje, pRespuesta);            
                      IF pRespuesta IS NULL THEN
                         pRespuesta := 'Notificacion Enviada';
-                     END IF;/*/
+                     END IF;*/
                  END IF;                 
                  DBMS_OUTPUT.PUT_LINE (vMensaje);
              END LOOP;
@@ -7058,12 +7058,12 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
                COMMIT;
         END IF;
            -- UPDATE PR.PR_SOLICITUD_REPRESTAMO S SET S.TIPO_CREDITO = PR.PR_PKG_REPRESTAMOS.F_OBTENER_NUEVO_CREDITO (pIdReprestamo) WHERE S.ID_REPRESTAMO = pIdReprestamo;
-        /*IF pIdReprestamo IS NOT NULL AND  vCorreo IS NOT NULL THEN
+        IF pIdReprestamo IS NOT NULL AND  vCorreo IS NOT NULL THEN
         
         INSERT INTO PR.PR_CANALES_REPRESTAMO ( CODIGO_EMPRESA, ID_REPRESTAMO, CANAL, VALOR, ADICIONADO_POR, FECHA_ADICION )
             VALUES ( PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo,2/*Obtener el valor de la tabla parametro, vCorreo, pUsuario, SYSDATE);
             COMMIT;
-        END IF; */
+        END IF;
     COMMIT;
         
     EXCEPTION WHEN OTHERS THEN
