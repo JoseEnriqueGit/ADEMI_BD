@@ -55,9 +55,4 @@ CREATE TABLE CD_PRODUCTO_X_EMPRESA (
         PRIMARY KEY (COD_EMPRESA, COD_PRODUCTO)
 );
 
-/* ==========================================================
-   ÍNDICES ADICIONALES (si los necesitas, añádelos aquí)
-   Ejemplo:
-   -- CREATE INDEX IDX_CD_PROD_EMP_CARTERA
-   --     ON CD_PRODUCTO_X_EMPRESA (COD_CARTERA);
-   ========================================================== */
+-- Datos actuales de la tabla
