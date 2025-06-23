@@ -27,7 +27,6 @@ BaseData AS (
     LEFT JOIN HasCryStatus HCS ON S.ID_REPRESTAMO = HCS.ID_REPRESTAMO
     LEFT JOIN PR.PR_CREDITOS C ON S.NO_CREDITO = C.NO_CREDITO AND S.CODIGO_EMPRESA = C.CODIGO_EMPRESA
     WHERE
-        --SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
         SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = 'MAMATOS'
         AND P.ID_EMPLEADO = A.GERENTE
         AND P.ESTA_ACTIVO = 'S'
@@ -37,11 +36,13 @@ EfectividadData AS (
         (SELECT COUNT(DISTINCT ID_REPRESTAMO)
          FROM BaseData
          WHERE CodigoEstadoActual = 'CRD'
-           AND FechaDesembolso >= TRUNC(SYSDATE, 'MM') AND FechaDesembolso < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+           AND FechaDesembolso >= TO_DATE('01/05/2025', 'DD/MM/YYYY')
+           AND FechaDesembolso < ADD_MONTHS(TO_DATE('01/05/2025', 'DD/MM/YYYY'), 1)
         ) AS CantidadDesembolsados,
         (SELECT COUNT(DISTINCT ID_REPRESTAMO)
          FROM BaseData
-         WHERE FECHA_PROCESO >= TRUNC(SYSDATE, 'MM') AND FECHA_PROCESO < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+         WHERE FECHA_PROCESO >= TO_DATE('01/05/2025', 'DD/MM/YYYY')
+           AND FECHA_PROCESO < ADD_MONTHS(TO_DATE('01/05/2025', 'DD/MM/YYYY'), 1)
         ) AS CantidadPreaprobados
     FROM DUAL
 )
@@ -58,7 +59,7 @@ SELECT
 FROM BaseData WHERE CodigoEstadoActual = 'CRD'
 UNION ALL
 SELECT
-    'Efectividad (Mes Actual)' AS CARD_TITLE,
+    'Efectividad (Mes de Prueba)' AS CARD_TITLE, -- Título ajustado para claridad
     CASE
         WHEN CantidadPreaprobados = 0 THEN '0.00%'
         ELSE TO_CHAR(ROUND((CantidadDesembolsados / CantidadPreaprobados) * 100, 2), 'FM990.00') || '%'
