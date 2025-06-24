@@ -1,157 +1,214 @@
-WITH LatestBitacora AS (
-    SELECT B.ID_REPRESTAMO,
-           B.CODIGO_ESTADO,
-           ROW_NUMBER() OVER (PARTITION BY B.ID_REPRESTAMO
-                              ORDER BY B.ID_BITACORA DESC, B.FECHA_ADICION DESC) AS rn
-    FROM   PR.PR_BITACORA_REPRESTAMO B
-),
-HasCryStatus AS (
-    SELECT DISTINCT ID_REPRESTAMO
-    FROM   PR.PR_BITACORA_REPRESTAMO
-    WHERE  CODIGO_ESTADO = 'CRY'
-),
-BaseData AS (
-    SELECT  S.ID_REPRESTAMO,
-            R.MTO_PREAPROBADO,
-            R.FECHA_PROCESO,
-            C.MONTO_DESEMBOLSADO,
-            C.F_PRIMER_DESEMBOLSO                    AS FechaDesembolso,
-            LB.CODIGO_ESTADO                        AS CodigoEstadoActual,
-            CASE
-                 WHEN LB.CODIGO_ESTADO = 'CRD' THEN
-                      CASE WHEN HCS.ID_REPRESTAMO IS NOT NULL
-                           THEN 'Digital (con firma)'
-                           ELSE 'Sucursal (tradicional)'
-                      END
-            END                                     AS CanalDesembolsoDeterminado
-    FROM       PA.EMPLEADOS               P
-    JOIN       PA.AGENCIA                 A  ON TO_NUMBER(P.COD_EMPRESA)       = A.COD_EMPRESA
-                                            AND TO_NUMBER(P.COD_AGENCIA_LABORA)= A.COD_AGENCIA
-    JOIN       PR.PR_SOLICITUD_REPRESTAMO S  ON TO_NUMBER(P.COD_EMPRESA)       = S.CODIGO_EMPRESA
-                                            AND TO_NUMBER(P.COD_AGENCIA_LABORA)= S.CODIGO_AGENCIA
-    JOIN       PR.PR_REPRESTAMOS          R  ON R.ID_REPRESTAMO               = S.ID_REPRESTAMO
-                                            AND R.CODIGO_EMPRESA              = S.CODIGO_EMPRESA
-    JOIN       LatestBitacora             LB ON LB.ID_REPRESTAMO              = S.ID_REPRESTAMO
-                                            AND LB.rn                         = 1
-    LEFT JOIN  HasCryStatus               HCS ON HCS.ID_REPRESTAMO            = S.ID_REPRESTAMO
-    LEFT JOIN  PR.PR_CREDITOS             C   ON C.NO_CREDITO                 = S.NO_CREDITO
-                                            AND C.CODIGO_EMPRESA              = S.CODIGO_EMPRESA
-    WHERE  SUBSTR(P.EMAIL1,1,INSTR(P.EMAIL1,'@')-1) = 'MAMATOS'  -- ¿ cambiar a V('APP_USER')
-      AND  P.ID_EMPLEADO = A.GERENTE
-      AND  P.ESTA_ACTIVO = 'S'
-),
-EfectividadMes AS (
+WITH latest_bitacora AS (
     SELECT
-        (SELECT COUNT(DISTINCT ID_REPRESTAMO)
-         FROM   BaseData
-         WHERE  CodigoEstadoActual = 'CRD'
-           AND  FechaDesembolso   >= TRUNC(SYSDATE,'MM')
-           AND  FechaDesembolso   <  ADD_MONTHS(TRUNC(SYSDATE,'MM'),1)
-        ) AS DesembolsadosMes,
-        (SELECT COUNT(DISTINCT ID_REPRESTAMO)
-         FROM   BaseData
-         WHERE  FECHA_PROCESO     >= TRUNC(SYSDATE,'MM')
-           AND  FECHA_PROCESO     <  ADD_MONTHS(TRUNC(SYSDATE,'MM'),1)
-        ) AS PreaprobadosMes
-    FROM dual
+        b.id_represtamo,
+        b.codigo_estado,
+        b.observaciones,
+        b.adicionado_por,
+        b.fecha_adicion,
+        ROW_NUMBER() OVER(
+            PARTITION BY
+                b.id_represtamo
+            ORDER BY
+                b.id_bitacora DESC,
+                b.fecha_adicion DESC
+        ) AS rn
+    FROM
+        pr.pr_bitacora_represtamo b
+), has_cry_status AS (
+    SELECT DISTINCT
+        id_represtamo
+    FROM
+        pr.pr_bitacora_represtamo
+    WHERE
+        codigo_estado = 'CRY'
+), base_data AS (
+    SELECT
+        s.id_represtamo,
+        r.mto_preaprobado,
+        r.fecha_proceso,
+        c.monto_desembolsado,
+        c.f_primer_desembolso AS fecha_desembolso,
+        lb.codigo_estado AS codigo_estado_actual,
+        CASE
+            WHEN lb.codigo_estado = 'CRD' THEN CASE
+                WHEN hcs.id_represtamo IS NOT NULL THEN 'Digital (con firma)'
+                ELSE 'Sucursal (tradicional)'
+            END
+        END AS canal_desembolso_determinado
+    FROM
+        pa.empleados p
+    JOIN pa.agencia a
+        ON TO_NUMBER(p.cod_empresa) = a.cod_empresa AND TO_NUMBER(p.cod_agencia_labora) = a.cod_agencia
+    JOIN pr.pr_solicitud_represtamo s
+        ON TO_NUMBER(p.cod_empresa) = s.codigo_empresa AND TO_NUMBER(p.cod_agencia_labora) = s.codigo_agencia
+    JOIN pr.pr_represtamos r
+        ON r.id_represtamo = s.id_represtamo AND r.codigo_empresa = s.codigo_empresa
+    JOIN latest_bitacora lb
+        ON lb.id_represtamo = s.id_represtamo AND lb.rn = 1
+    LEFT JOIN has_cry_status hcs
+        ON hcs.id_represtamo = s.id_represtamo
+    LEFT JOIN pr.pr_creditos c
+        ON c.no_credito = s.no_credito AND c.codigo_empresa = s.codigo_empresa
+    WHERE
+        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
+        SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'MAMATOS'
+        AND p.id_empleado = a.gerente
+        AND p.esta_activo = 'S'
+        AND (
+            :P133_FROM_DATE IS NULL
+            OR r.fecha_proceso >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
+        )
+        AND (
+            :P133_TO_DATE IS NULL
+            OR r.fecha_proceso <= TRUNC(CAST(:P133_TO_DATE AS DATE))
+        )
+), efectividad_rango AS (
+    SELECT
+        (
+            SELECT
+                COUNT(DISTINCT id_represtamo)
+            FROM
+                base_data
+            WHERE
+                codigo_estado_actual = 'CRD'
+        ) AS desembolsados_r,
+        (
+            SELECT
+                COUNT(DISTINCT id_represtamo)
+            FROM
+                base_data
+        ) AS preaprobados_r
+    FROM
+        dual
 )
-SELECT *
-FROM (
-    SELECT 'Total Preaprobados'                   CARD_TITLE,
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)) CARD_TEXT,
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MTO_PREAPROBADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,''')        CARD_SUBTEXT,
-           'fa-file-invoice-dollar'               CARD_ICON,
-           'u-color-1'                            CARD_COLOR,
-           1                                       order_col
-    FROM   BaseData
-    UNION ALL
-    SELECT 'Total Desembolsos',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MONTO_DESEMBOLSADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-check-circle',
-           'u-color-5',
-           2
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'CRD'
-    UNION ALL
-    SELECT 'Efectividad (Mes Actual)',
-           CASE
-               WHEN PreaprobadosMes = 0
-               THEN '0.00%'
-               ELSE TO_CHAR(TRUNC((DesembolsadosMes/PreaprobadosMes)*100,2),'FM990.00')||'%'
-           END,
-           'Des: '||DesembolsadosMes||' / Pre: '||PreaprobadosMes,
-           'fa-percent',
-           'u-color-10',
-           3
-    FROM   EfectividadMes
-    UNION ALL
-    SELECT 'Desembolsos Firma Electrónica',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MONTO_DESEMBOLSADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-mobile-alt',
-           'u-color-15',
-           4
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'CRD'
-      AND  CanalDesembolsoDeterminado = 'Digital (con firma)'
-    UNION ALL
-    SELECT 'Desembolsos Tradicionales',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MONTO_DESEMBOLSADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-building',
-           'u-color-16',
-           5
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'CRD'
-      AND  CanalDesembolsoDeterminado = 'Sucursal (tradicional)'
-    UNION ALL
-    SELECT 'Créditos Cancelados',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MTO_PREAPROBADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-times-circle-o',
-           'u-color-7',
-           6
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'CC'
-    UNION ALL
-    SELECT 'Link Vencido',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MTO_PREAPROBADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-chain-broken',
-           'u-color-8',
-           7
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'AN'
-    UNION ALL
-    SELECT 'Créditos Anulados',
-           TO_CHAR(COUNT(DISTINCT ID_REPRESTAMO)),
-           'Monto RD$ '||
-           TO_CHAR(NVL(SUM(MTO_PREAPROBADO),0),
-                   'FM9G999G999G990D00',
-                   'NLS_NUMERIC_CHARACTERS=''.,'''),
-           'fa-ban',
-           'u-color-9',
-           8
-    FROM   BaseData
-    WHERE  CodigoEstadoActual = 'CRN'
-)
-ORDER BY order_col;
+SELECT
+    *
+FROM
+    (
+        SELECT
+            'Total Preaprobados' AS card_title,
+            TO_CHAR(COUNT(DISTINCT id_represtamo)) AS card_text,
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(mto_preaprobado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ) AS card_subtext,
+            'fa-file-invoice-dollar' AS card_icon,
+            'u-color-1' AS card_color,
+            1 AS order_col
+        FROM
+            base_data
+        UNION ALL
+        SELECT
+            'Total Desembolsos',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(monto_desembolsado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-check-circle',
+            'u-color-5',
+            2
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'CRD'
+        UNION ALL
+        SELECT
+            'Efectividad (Rango)',
+            CASE
+                WHEN preaprobados_r = 0 THEN '0.00%'
+                ELSE TO_CHAR(TRUNC((desembolsados_r / preaprobados_r) * 100, 2), 'FM990.00') || '%'
+            END,
+            'Des: ' || desembolsados_r || ' / Pre: ' || preaprobados_r,
+            'fa-percent',
+            'u-color-10',
+            3
+        FROM
+            efectividad_rango
+        UNION ALL
+        SELECT
+            'Desembolsos Firma Electrónica',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(monto_desembolsado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-mobile-alt',
+            'u-color-15',
+            4
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'CRD'
+            AND canal_desembolso_determinado = 'Digital (con firma)'
+        UNION ALL
+        SELECT
+            'Desembolsos Tradicionales',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(monto_desembolsado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-building',
+            'u-color-16',
+            5
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'CRD'
+            AND canal_desembolso_determinado = 'Sucursal (tradicional)'
+        UNION ALL
+        SELECT
+            'Créditos Cancelados',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(mto_preaprobado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-times-circle-o',
+            'u-color-7',
+            6
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'CC'
+        UNION ALL
+        SELECT
+            'Link Vencido',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(mto_preaprobado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-chain-broken',
+            'u-color-8',
+            7
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'AN'
+        UNION ALL
+        SELECT
+            'Créditos Anulados',
+            TO_CHAR(COUNT(DISTINCT id_represtamo)),
+            'Monto RD$ ' || TO_CHAR(
+                NVL(SUM(mto_preaprobado), 0),
+                'FM9G999G999G990D00',
+                'NLS_NUMERIC_CHARACTERS=''.,'''
+            ),
+            'fa-ban',
+            'u-color-9',
+            8
+        FROM
+            base_data
+        WHERE
+            codigo_estado_actual = 'CRN'
+    )
+ORDER BY
+    order_col;
