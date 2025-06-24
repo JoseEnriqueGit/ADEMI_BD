@@ -1,0 +1,162 @@
+COD_CAT_PRODUCTO,COD_PRODUCTO,COD_MONEDA,DESCRIPCION,COD_EMPRESA,DETALLE,CLTE_PROSPECTO,NOM_FILTRO,NOM_IMAGEN,ABREVIATURA,REQUERIMIENTOS,COD_PRODUCTO_SB,TIPO_PERSONA,TIPO_INSTRUMENTO_SB
+CC,100,1,CC Personal Normal,1,,,,,CC01,,211,F,211
+CC,101,1,CC Personal Microempresa,1,,,,,CC01,,211,F,211
+CC,102,1,CC Comercial Tipo A,1,,,,,CC01,,211,J,211
+CC,103,1,CC Comercial Tipo B,1,,,,,CC01,,212,J,212
+CC,104,1,CC Comercial Persona Fisica,1,,,,,CC01,,211,F,211
+CC,105,1,CC Comercial Tipo Empresarial Oferta,1,,,,,CC01,,211,J,211
+IT,150,1,Titulos en Moneda Nacional DOP,1,,,,,IV001,,,A,
+CC,200,1,Cuenta de Ahorro Normal Pesos (P.Fisica),1,,,,,CC02,,213,F,213
+CC,201,1,Cuenta de Ahorro Normal Pesos (P.Juridica),1,,,,,CC02,,213,J,213
+CC,202,1,Cuenta de Ahorro Programado Mi Inicial Pesos (P.Fisica),1,,,,,CC02,,216,F,216
+CC,203,1,Cuenta de Ahorro Mi Inicial Te Reto por un Sueño,1,,,,,CC02,,213,F,213
+CC,204,1,Cuenta de Nomina Automatica/Empresas Pesos (P.Fisica),1,,,,,CC02,,213,F,213
+CC,205,1,Cuenta de Nomina Automatica/Empresas Pesos (P.Juridica),1,,,,,CC02,,213,J,213
+CC,206,1,Cuenta de Ahorro Infantil Pesos (P.Fisica),1,,,,,CC02,,213,F,213
+CC,207,1,Cuenta de Nomina Empleados Ademi Pesos (P.Fisica),1,,,,,CC02,,213,F,213
+CC,208,1,Cuenta de Ahorro Preferente Pesos (P.Fisica),1,,,,,CC02,,213,F,213
+CC,209,1,Cuenta de Ahorro  Preferente Pesos (P.Juridica),1,,,,,CC02,,213,J,213
+CC,210,1,Cuenta de Ahorro Digital Pesos (P.Fisica),1,,,,,,,CC02,F,213
+CC,220,2,Cuenta de Ahorro en Dolares (P.Fisica),1,,,,,CC02,,213,F,213
+CC,221,2,Cuenta de Ahorro en Dolares (P.Juridica),1,,,,,CC02,,213,J,213
+CC,222,2,Cuenta de Ahorro Preferente en Dolares (P.Fisica),1,,,,,CC02,,213,F,213
+CC,223,2,Cuenta de Ahorro  Preferente en Dolares (P.Juridica),1,,,,,CC02,,213,J,213
+CD,300,1,Certificados financieros Pagadero pesos (P.Fisica),1,,,,,CD01,,221,F,221
+CD,301,1,Certificados financieros Pagadero pesos (P.Juridica),1,,,,,CD01,,221,J,221
+CD,302,1,Certificados financieros Capitalizable pesos  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,303,1,Certificados financieros Capitalizable pesos  (P.Juridica),1,,,,,CD01,,221,J,221
+CD,304,1,Certificados A Plazos pagadero pesos  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,305,1,Certificados A Plazos pagadero pesos  (P.Juridica),1,,,,,CD01,,221,J,221
+CD,306,1,Certificados A Plazos pagadero pesos  (P.Juridica),1,,,,,CD01,,221,J,221
+CD,307,1,Certificados A Plazos pagadero pesos  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,320,2,Certificados financieros Pagadero Dólares  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,321,2,Certificados financieros Pagadero Dólares  (P.Juridica),1,,,,,CD01,,221,J,221
+CD,322,2,Certificados financieros Capitalizable Dólares  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,323,2,Certificados financieros Capitalizable Dólares  (P.Juridica),1,,,,,CD01,,221,J,221
+CD,350,1,Certificados financieros Pagadero pesos Empleados  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,351,1,Certificados financieros Capitalizable pesos Empleados  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,352,1,Certificados A Plazos pagadero pesos Empleados  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,353,2,Certificados financieros Pagadero Dólares Empleados  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,354,2,Certificados financieros Capitalizable Dólares Empleados  (P.Fisica),1,,,,,CD01,,221,F,221
+CD,370,1, Bonos Corporativo Pesos (1er. Emision),1,,,,,BN01,,251,A,251
+CD,371,1, Bonos Corporativo Pesos (2da. Emision),1,,,,,BN01,,,A,251
+CD,380,1,Acciones en pesos,1,,,,,AC01,,291,A,291
+CC,381,1,GENERICO **** CAMBIAR ****,1,,,,,,,,,
+TC,401,1,TC PESOS,1,,,,,TC01,,171,A,171
+TC,4011,1,TC PESOS,1,,,,,TC01,,,A,
+TC,402,1,VISA DEBITO EMPLEADOS,1,,,,,TC01,,,A,
+TC,403,3,TC EUROS,1,,,,,TC01,,,A,
+TC,4033,3,TC EUROS,1,,,,,TC01,,,A,
+TC,407,1,VISA FLOTILLA COMBUSTIBLE CLIENTE,1,,,,,TC01,,134,F,134
+TC,4071,1,VISA FLOTILLA COMBUSTIBLE CLIENTE,1,,,,,TC01,,174,F,174
+TC,408,1,VISA DEBITO CLIENTES,1,,,,,TC01,,,A,
+TC,409,1,VISA DEBITO EMPRESARIAL,1,,,,,TC01,,,A,
+TC,410,1,VISA CLASICA INT. STAFF,1,,,,,TC01,,171,F,171
+TC,4101,1,VISA CLASICA INT. STAFF,1,,,,,TC01,,171,F,171
+TC,4102,2,VISA CLASICA INT. STAFF,1,,,,,TC01,,,F,
+TC,415,1,VISA CLASICA INTERNACIONAL,1,,,,,TC01,,171,F,171
+TC,4151,1,VISA CLASICA INTERNACIONAL,1,,,,,TC01,,171,F,171
+TC,4152,2,VISA CLASICA INTERNACIONAL,1,,,,,TC01,,,F,
+TC,418,1,VISA CLASICA INT. OFERTA NEG. 1,1,,,,,TC01,,171,A,171
+TC,4181,1,VISA CLASICA INT. OFERTA NEG. 1,1,,,,,TC01,,171,A,171
+TC,4182,2,VISA CLASICA INT. OFERTA NEG. 1,1,,,,,TC01,,,A,
+TC,420,1,VISA CLASICA LOCAL STAFF,1,,,,,TC01,,171,F,171
+TC,4201,1,VISA CLASICA LOCAL STAFF,1,,,,,TC01,,171,F,171
+TC,425,1,VISA CLASICA LOCAL,1,,,,,TC01,,171,F,171
+TC,4251,1,VISA CLASICA LOCAL,1,,,,,TC01,,171,F,171
+TC,428,1,VISA CLASICA LOCAL OFERTA NEG. 1,1,,,,,TC01,,171,A,171
+TC,4281,1,VISA CLASICA LOCAL OFERTA NEG. 1,1,,,,,TC01,,171,A,171
+TC,430,1,VISA CLASICA LOCAL HIPEROLE EMPLEADO,1,,,,,TC01,,171,F,171
+TC,4301,1,VISA CLASICA LOCAL HIPEROLE EMPLEADO,1,,,,,TC01,,171,F,171
+TC,435,1,VISA CLASICA LOCAL HIPEROLE CLIENTES,1,,,,,TC01,,171,F,171
+TC,4351,1,VISA CLASICA LOCAL HIPEROLE CLIENTES,1,,,,,TC01,,171,F,171
+TC,440,1,VISA GOLD INT. - STAFF,1,,,,,TC01,,172,F,172
+TC,4401,1,VISA GOLD INT. - STAFF,1,,,,,TC01,,172,F,172
+TC,4402,2,VISA GOLD INT. - STAFF,1,,,,,TC01,,,F,
+TC,445,1,VISA GOLD INTERNACIONAL,1,,,,,TC01,,172,F,172
+TC,4451,1,VISA GOLD INTERNACIONAL,1,,,,,TC01,,172,F,172
+TC,4452,2,VISA GOLD INTERNACIONAL,1,,,,,TC01,,,F,
+TC,448,1,VISA GOLD INT. OFERTA NEG. 1,1,,,,,TC01,,172,A,172
+TC,4481,1,VISA GOLD INT. OFERTA NEG. 1,1,,,,,TC01,,172,A,172
+TC,4482,2,VISA GOLD INT. OFERTA NEG. 1,1,,,,,TC01,,,A,
+TC,450,1,VISA FLEXIBLE EMPLEADOS,1,,,,,TC01,,171,F,171
+TC,4501,1,VISA FLEXIBLE EMPLEADOS,1,,,,,TC01,,171,F,171
+TC,453,1,VISA BLUE COUNTRY MINORISTA,1,,,,,TC01,,171,F,171
+TC,4531,1,VISA BLUE COUNTRY MINORISTA,1,,,,,TC01,,171,F,171
+TC,455,1,VISA FLEXIBLE CLIENTES,1,,,,,TC01,,171,F,171
+TC,4551,1,VISA FLEXIBLE CLIENTES,1,,,,,TC01,,171,F,171
+TC,458,1,VISA FLEXIBLE OFERTA,1,,,,,TC01,,171,F,171
+TC,4581,1,VISA FLEXIBLE OFERTA,1,,,,,TC01,,171,F,171
+TC,460,1,VISA EMPRESARIAL FLOTILLA STAFF,1,,,,,TC01,,132,J,132
+TC,4601,1,VISA EMPRESARIAL FLOTILLA STAFF,1,,,,,TC01,,132,J,132
+TC,461,1,VISA EMP. LOCAL FLOTILLA STAFF,1,,,,,TC01,,134,J,134
+TC,4611,1,VISA EMP. LOCAL FLOTILLA STAFF,1,,,,,TC01,,134,J,134
+TC,464,1,VISA BLUE COUNTRY MAYORISTA,1,,,,,TC01,,132,J,132
+TC,4641,1,VISA BLUE COUNTRY MAYORISTA,1,,,,,TC01,,132,J,132
+TC,471,1,VISA EMPRESARIAL  INVERSIONES TITANIO FLOTILLA,1,,,,,TC01,,131,J,131
+TC,4711,1,VISA EMPRESARIAL  INVERSIONES TITANIO FLOTILLA,1,,,,,TC01,,134,J,134
+TC,475,1,VISA EXPENDIO DE COMBUSTIBLE,1,,,,,TC01,,134,J,134
+TC,4751,1,VISA EXPENDIO DE COMBUSTIBLE,1,,,,,TC01,,132,J,132
+TC,476,1,VISA EMPRESARIAL PLUS INTERNACIONAL STAFF,1,,,,,TC01,,132,J,132
+TC,4761,1,VISA EMPRESARIAL PLUS INTERNACIONAL STAFF,1,,,,,TC01,,132,J,132
+TC,4762,2,VISA EMPRESARIAL PLUS INTERNACIONAL STAFF ,1,,,,,TC01,,,J,
+TC,479,1,VISA EMPRESARIAL PLUS INTERNACIONAL ,1,,,,,TC01,,132,J,132
+TC,4791,1,VISA EMPRESARIAL PLUS INTERNACIONAL ,1,,,,,TC01,,132,J,132
+TC,4792,2,VISA EMPRESARIAL PLUS INTERNACIONAL  ,1,,,,,TC01,,,J,
+TC,480,1,VISA EMPRESARIAL INTERNACIONAL STAFF,1,,,,,TC01,,131,J,131
+TC,4801,1,VISA EMPRESARIAL INTERNACIONAL STAFF,1,,,,,TC01,,132,J,132
+TC,4802,2,VISA EMPRESARIAL INTERNACIONAL STAFF,1,,,,,TC01,,,J,
+TC,485,1,VISA EMPRESARIAL,1,,,,,TC01,,132,J,132
+TC,4851,1,VISA EMPRESARIAL,1,,,,,TC01,,132,J,132
+TC,4852,2,VISA EMPRESARIAL,1,,,,,TC01,,,J,
+TC,488,1,VISA EMPRESARIAL INTERNACIONAL. OFERTA NEG. 1,1,,,,,TC01,,132,J,132
+TC,4881,1,VISA EMPRESARIAL INTERNACIONAL. OFERTA NEG. 1,1,,,,,TC01,,132,J,132
+TC,4882,2,VISA EMPRESARIAL INTERNACIONAL. OFERTA NEG. 1,1,,,,,TC01,,,J,
+TC,490,1,VISA EMPRESARIAL LOCAL STAFF,1,,,,,TC01,,131,J,131
+TC,4901,1,VISA EMPRESARIAL LOCAL STAFF,1,,,,,TC01,,132,J,132
+TC,491,1,VISA EMPRESARIAL LOCAL 007 STAFF,1,,,,,TC01,,132,J,132
+TC,4911,1,VISA EMPRESARIAL LOCAL 007 STAFF,1,,,,,TC01,,132,J,132
+TC,493,1,VISA EMPRESARIAL MYPYME GND,1,,,,,TC01,,132,J,132
+TC,4931,1,VISA EMPRESARIAL MYPYME GND,1,,,,,TC01,,132,J,132
+TC,495,1,VISA EMPRESARIAL LOCAL,1,,,,,TC01,,132,J,132
+TC,4951,1,VISA EMPRESARIAL LOCAL,1,,,,,TC01,,132,J,132
+TC,496,1,VISA EMPRESARIAL LOCAL 007 CLIENTE,1,,,,,TC01,,132,J,132
+TC,4961,1,VISA EMPRESARIAL LOCAL 007 CLIENTE,1,,,,,TC01,,132,J,132
+TC,498,1,VISA EMPRESARIAL LOCAL OFERTA NEG. 1,1,,,,,TC01,,132,J,132
+TC,4981,1,VISA EMPRESARIAL LOCAL OFERTA NEG. 1,1,,,,,TC01,,132,J,132
+PR,500,1,Créditos comerciales en pesos,1,,,,,PR01,,112,A,112
+PR,501,2,Créditos comerciales en dólares,1,,,,,PR01,,112,A,112
+CC,502,3,Cuenta Especial para Agentes de Cambio EUR,1,,,,,CC02,,,J,
+PR,503,1,Créditos consumo en pesos,1,,,,,PR01,,161,A,161
+PR,504,1,Créditos Hipotecarios en pesos,1,,,,,PR01,,181,A,181
+PR,505,2,Créditos Hipotecarios en dólares,1,,,,,PR01,,181,A,181
+PR,506,2,Créditos consumo en dolares,1,,,,,PR01,,161,A,161
+DI,600,1,Subaplicación Mercado Libre de Divisas DOP,1,,,,,DI01,,,A,
+DI,601,2,Subaplicación Mercado Libre de Divisas USD,1,,,,,DI01,,,A,
+DI,602,3,Subaplicación Mercado Libre de Divisas EUR,1,,,,,DI01,,,A,
+CI,651,1,Subaplicaci¿¿n Comercio Internacional DOP,1,,,,,CI01,,,A,
+CI,652,2,Subaplicaci¿¿n Comercio Internacional USD,1,,,,,CI01,,,A,
+GT,700,1,Garantias de Participaci¿¿n y Cumplimiento DOP,1,,,,,GT001,,,A,
+GT,701,2,Garantias de Participaci¿¿n y Cumplimiento USD,1,,,,,GT002,,,A,
+CV,800,1,Subaplicaci¿¿n Custodias Generales DOP,1,,,,,CV01,,,A,
+CV,801,2,Subaplicaci¿¿n Custodias Generales USD,1,,,,,CV02,,,A,
+CV,802,1,Subaplicaci¿¿n Custodias Pr¿¿stamos DOP,1,,,,,CV01,,,A,
+CV,803,2,Subaplicaci¿¿n Custodias Pr¿¿stamos Dolares,1,,,,,CV02,,,A,
+AB,850,1,Subaplicaci¿¿n de Aceptaci¿¿n Bancarias DOP,1,,,,,AB001,,,A,
+AB,851,2,Subaplicaci¿¿n de Aceptaci¿¿n Bancaria USD,1,,,,,AB002,,,A,
+AC,888,1,Acciones,1,Acciones Emitidas,,,,AC01,,,,
+CG,900,1,SUBAPLICACION GENERAL DE CONTABILIDAD DOP,1,,,,,CG01,,,A,
+BA,901,1,Subaplicaci¿¿n General de Bancos DOP,1,,,,,BA01,,,A,
+CJ,902,1,Subaplicación General de Cajas DOP,1,,,,,CJ01,,,A,
+IV,903,1,Subaplicaci¿¿n de Activos Fijos e Inventarios DOP,1,,,,,IV001,,,A,
+CJ,904,2,Subaplicación General de Cajas US,1,,,,,CJ01,,,A,
+DF,910,1,Lineas de Credito Moneda Nacional,1,,,,,,,111,,111
+DF,911,2,Lineas de Credito Moneda Extranjera,1,,,,,,,111,,111
+FI,915,1,Operaciones de Financiamientos en DOP,1,,,,,PRFI,,915,A,
+FI,916,2,Operaciones de Financiamientos en Moneda Extranjera,1,,,,,PRFI,,916,A,
+FI,917,1,Lineas de Creditos Finanaciamientos Obt. en Pesos,1,,,,,PRFI,,917,A,
+FI,918,2,Lineas de Creditos en Moneda Extranjera,1,,,,,PRFI,,918,A,
+FI,919,1,Creditos Interbancarios  en Pesos,1,,,,,PRFI,,919,A,
+CJ,920,3,Subaplicación General de Cajas EUR,1,,,,,CJ01,,,A,
+CC,930,1,DOP. Deposito a cuenta Transnetwork DOP,1,,,,,CC01,,211,F,211
+CC,932,2,USD. Deposito a cuenta Transnetwork USD,1,,,,,CC02,,213,F,213
