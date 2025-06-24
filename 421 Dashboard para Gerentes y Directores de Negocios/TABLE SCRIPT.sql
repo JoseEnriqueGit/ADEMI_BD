@@ -1,96 +1,109 @@
-WITH LatestBitacora AS (
+WITH latest_bitacora AS (
     SELECT
-        B.ID_REPRESTAMO,
-        B.CODIGO_ESTADO,
-        B.OBSERVACIONES,
-        B.ADICIONADO_POR,
-        B.FECHA_ADICION,
-        ROW_NUMBER() OVER(PARTITION BY B.ID_REPRESTAMO ORDER BY B.ID_BITACORA DESC, B.FECHA_ADICION DESC) AS rn
+        b.id_represtamo,
+        b.codigo_estado,
+        b.observaciones,
+        b.adicionado_por,
+        b.fecha_adicion,
+        ROW_NUMBER() OVER(
+            PARTITION BY
+                b.id_represtamo
+            ORDER BY
+                b.id_bitacora DESC,
+                b.fecha_adicion DESC
+        ) AS rn
     FROM
-        PR.PR_BITACORA_REPRESTAMO B
-), HasCryStatus AS (
+        pr.pr_bitacora_represtamo b
+), has_cry_status AS (
     SELECT DISTINCT
-        ID_REPRESTAMO
+        id_represtamo
     FROM
-        PR.PR_BITACORA_REPRESTAMO
+        pr.pr_bitacora_represtamo
     WHERE
-        CODIGO_ESTADO = 'CRY'
+        codigo_estado = 'CRY'
 )
 SELECT
-    R.FECHA_PROCESO,
-    S.ID_REPRESTAMO,
-    R.CODIGO_CLIENTE,
-    S.NOMBRES || ' ' || S.APELLIDOS AS Cliente,
-    S.IDENTIFICACION,
-    A_CANAL.VALOR AS Celular,
-    R.NO_CREDITO AS "Credito_Anterior",
-    R.MTO_PREAPROBADO,
-    (TC.TIPO_CREDITO || ' - ' || TC.DESCRIPCION) AS "Tipo_Credito",
-    PR.PR_PKG_REPRESTAMOS.F_OBT_DESCRIPCION_ESTADO(LB.CODIGO_ESTADO) AS Estado,
-    C.F_PRIMER_DESEMBOLSO AS "Fecha_Desembolso",
-    C.MONTO_DESEMBOLSADO,
+    r.fecha_proceso AS "Fecha de Proceso",
+    s.id_represtamo AS "ID Représtamo",
+    r.codigo_cliente AS "Código Cliente",
+    s.nombres || ' ' || s.apellidos AS "Cliente",
+    s.identificacion AS "Identificación",
+    a_canal.valor AS "Celular",
+    r.no_credito AS "Crédito Anterior",
+    s.no_credito AS "Crédito Nuevo",
+    r.mto_preaprobado AS "Monto Preaprobado",
+    tc.tipo_credito || ' - ' || tc.descripcion AS "Tipo de Crédito",
+    pr.pr_pkg_represtamos.f_obt_descripcion_estado(lb.codigo_estado) AS "Estado",
+    c.f_primer_desembolso AS "Fecha de Desembolso",
+    c.monto_desembolsado AS "Monto Desembolsado",
     CASE
-        WHEN R.ID_CARGA_DIRIGIDA IS NOT NULL THEN 'Carga Dirigida'
-        WHEN R.ID_REPRE_CAMPANA_ESPECIALES IS NOT NULL THEN 'Campañas Especiales'
-        ELSE 'Represtamo Digital'
-    END AS "Tipo_Prestamo",
+        WHEN r.id_carga_dirigida IS NOT NULL THEN 'Carga Dirigida'
+        WHEN r.id_repre_campana_especiales IS NOT NULL THEN 'Campañas Especiales'
+        ELSE 'Représtamo Digital'
+    END AS "Tipo de Préstamo",
     CASE
-        WHEN S.EMAIL IS NULL THEN 'No'
-        ELSE 'Si'
-    END AS "Correo_Electronico",
+        WHEN s.email IS NULL THEN 'No'
+        ELSE 'Sí'
+    END AS "Correo Electrónico",
     CASE
-        WHEN LB.CODIGO_ESTADO = 'CRD' THEN
-            CASE
-                WHEN HCS.ID_REPRESTAMO IS NOT NULL THEN 'Digital (con firma)'
-                ELSE 'Sucursal (tradicional)'
-            END
-        ELSE NULL
-    END AS "Canal_Desembolso_Determinado",
-    NVL(C.CODIGO_AGENCIA, H.CODIGO_AGENCIA) AS "Codigo_Sucursal",
-    AG.DESCRIPCION AS "Oficina",
-    PA.OBT_DESC_ZONA(1, AG.COD_ZONA) AS "Zona",
-    NVL(C.CODIGO_EJECUTIVO, H.CODIGO_EJECUTIVO) AS "Codigo_Oficial",
-    PA.OBT_NOMBRE_EMPLEADO(
-        NVL(C.CODIGO_EMPRESA, H.CODIGO_EMPRESA),
-        NVL(C.CODIGO_EJECUTIVO, H.CODIGO_EJECUTIVO)
+        WHEN lb.codigo_estado = 'CRD' THEN CASE
+            WHEN hcs.id_represtamo IS NOT NULL THEN 'Digital (con firma)'
+            ELSE 'Sucursal (tradicional)'
+        END
+    END AS "Tipo de Desembolso",
+    NVL(c.codigo_agencia, h.codigo_agencia) AS "Código Sucursal",
+    ag.descripcion AS "Oficina",
+    pa.obt_desc_zona(1, ag.cod_zona) AS "Zona",
+    NVL(c.codigo_ejecutivo, h.codigo_ejecutivo) AS "Código Oficial",
+    pa.obt_nombre_empleado(
+        NVL(c.codigo_empresa, h.codigo_empresa),
+        NVL(c.codigo_ejecutivo, h.codigo_ejecutivo)
     ) AS "Oficial"
 FROM
-    PA.EMPLEADOS P
-JOIN PA.AGENCIA A_EMP
-    ON TO_NUMBER(P.COD_EMPRESA) = A_EMP.COD_EMPRESA AND TO_NUMBER(P.COD_AGENCIA_LABORA) = A_EMP.COD_AGENCIA
-JOIN PR.PR_SOLICITUD_REPRESTAMO S
-    ON TO_NUMBER(P.COD_EMPRESA) = S.CODIGO_EMPRESA AND TO_NUMBER(P.COD_AGENCIA_LABORA) = S.CODIGO_AGENCIA
-JOIN PR.PR_REPRESTAMOS R
-    ON S.ID_REPRESTAMO = R.ID_REPRESTAMO AND S.CODIGO_EMPRESA = R.CODIGO_EMPRESA
-JOIN LatestBitacora LB
-    ON S.ID_REPRESTAMO = LB.ID_REPRESTAMO AND LB.rn = 1
-LEFT JOIN HasCryStatus HCS
-    ON S.ID_REPRESTAMO = HCS.ID_REPRESTAMO
-LEFT JOIN PR.PR_CREDITOS C
-    ON R.NO_CREDITO = C.NO_CREDITO AND R.CODIGO_EMPRESA = C.CODIGO_EMPRESA
-LEFT JOIN PR.PR_CREDITOS_HI H
-    ON R.NO_CREDITO = H.NO_CREDITO AND R.CODIGO_EMPRESA = H.CODIGO_EMPRESA
-LEFT JOIN PA.AGENCIA AG
-    ON AG.COD_EMPRESA = R.CODIGO_EMPRESA AND AG.COD_AGENCIA = NVL(C.CODIGO_AGENCIA, H.CODIGO_AGENCIA)
-LEFT JOIN PR.PR_TIPO_CREDITO TC
-    ON TC.TIPO_CREDITO = NVL(S.TIPO_CREDITO, NVL(C.TIPO_CREDITO, H.TIPO_CREDITO)) AND TC.CODIGO_EMPRESA = R.CODIGO_EMPRESA
-LEFT JOIN PR.PR_CANALES_REPRESTAMO A_CANAL
-    ON R.ID_REPRESTAMO = A_CANAL.ID_REPRESTAMO AND A_CANAL.CANAL = 1
+    pa.empleados p
+JOIN pa.agencia a_emp
+    ON TO_NUMBER(p.cod_empresa) = a_emp.cod_empresa AND TO_NUMBER(p.cod_agencia_labora) = a_emp.cod_agencia
+JOIN pr.pr_solicitud_represtamo s
+    ON TO_NUMBER(p.cod_empresa) = s.codigo_empresa AND TO_NUMBER(p.cod_agencia_labora) = s.codigo_agencia
+JOIN pr.pr_represtamos r
+    ON r.id_represtamo = s.id_represtamo AND r.codigo_empresa = s.codigo_empresa
+JOIN latest_bitacora lb
+    ON lb.id_represtamo = s.id_represtamo AND lb.rn = 1
+LEFT JOIN has_cry_status hcs
+    ON hcs.id_represtamo = s.id_represtamo
+LEFT JOIN pr.pr_creditos c
+    ON c.no_credito = r.no_credito AND c.codigo_empresa = r.codigo_empresa
+LEFT JOIN pr.pr_creditos_hi h
+    ON h.no_credito = r.no_credito AND h.codigo_empresa = r.codigo_empresa
+LEFT JOIN pa.agencia ag
+    ON ag.cod_empresa = r.codigo_empresa AND ag.cod_agencia = NVL(c.codigo_agencia, h.codigo_agencia)
+LEFT JOIN pr.pr_tipo_credito tc
+    ON tc.tipo_credito = NVL(s.tipo_credito, NVL(c.tipo_credito, h.tipo_credito)) AND tc.codigo_empresa = r.codigo_empresa
+LEFT JOIN pr.pr_canales_represtamo a_canal
+    ON a_canal.id_represtamo = r.id_represtamo AND a_canal.canal = 1
 WHERE
     -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
-    SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = 'MAMATOS'
-    AND P.ID_EMPLEADO = A_EMP.GERENTE
-    AND P.ESTA_ACTIVO = 'S'
+    SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'MAMATOS'
+    AND p.id_empleado = a_emp.gerente
+    AND p.esta_activo = 'S'
     AND NOT EXISTS (
         SELECT
             1
         FROM
-            PR_CARGA_DIRECCIONADA CD
+            pr_carga_direccionada cd
         WHERE
-            CD.NO_CREDITO = R.NO_CREDITO
-            AND CD.ESTADO = 'F'
-            AND TRUNC(CD.FECHA_ADICION) = TRUNC(R.FECHA_ADICION)
+            cd.no_credito = r.no_credito
+            AND cd.estado = 'F'
+            AND TRUNC(cd.fecha_adicion) = TRUNC(r.fecha_adicion)
+    )
+    AND (
+        :P133_FROM_DATE IS NULL
+        OR r.fecha_proceso >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
+    )
+    AND (
+        :P133_TO_DATE IS NULL
+        OR r.fecha_proceso <= TRUNC(CAST(:P133_TO_DATE AS DATE))
     )
 ORDER BY
-    LB.FECHA_ADICION DESC,
-    S.ID_REPRESTAMO DESC;
+    r.fecha_proceso DESC,
+    s.id_represtamo DESC;
