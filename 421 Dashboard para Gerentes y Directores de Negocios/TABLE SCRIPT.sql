@@ -2,8 +2,6 @@ WITH latest_bitacora AS (
     SELECT
         b.id_represtamo,
         b.codigo_estado,
-        b.observaciones,
-        b.adicionado_por,
         b.fecha_adicion,
         ROW_NUMBER() OVER(
             PARTITION BY
@@ -23,7 +21,7 @@ WITH latest_bitacora AS (
         codigo_estado = 'CRY'
 )
 SELECT
-    r.fecha_proceso AS "Fecha de Proceso",
+    lb.fecha_adicion AS "FECHA_ESTADO",
     s.id_represtamo AS "ID Représtamo",
     r.codigo_cliente AS "Código Cliente",
     s.nombres || ' ' || s.apellidos AS "Cliente",
@@ -98,12 +96,20 @@ WHERE
     )
     AND (
         :P133_FROM_DATE IS NULL
-        OR r.fecha_proceso >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
+        OR lb.fecha_adicion >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
     )
     AND (
         :P133_TO_DATE IS NULL
-        OR r.fecha_proceso <= TRUNC(CAST(:P133_TO_DATE AS DATE))
+        OR lb.fecha_adicion <= TRUNC(CAST(:P133_TO_DATE AS DATE))
+    )
+    AND (
+        :P133_ESTADO IS NULL OR lb.codigo_estado IN (
+            SELECT
+                column_value
+            FROM
+                TABLE(apex_string.split(:P133_ESTADO, ','))
+        )
     )
 ORDER BY
-    r.fecha_proceso DESC,
+    lb.fecha_adicion DESC,
     s.id_represtamo DESC;
