@@ -25,7 +25,7 @@ WITH latest_bitacora AS (
     SELECT
         s.id_represtamo,
         r.mto_preaprobado,
-        r.fecha_proceso,
+        lb.fecha_adicion AS fecha_estado,
         c.monto_desembolsado,
         c.f_primer_desembolso AS fecha_desembolso,
         lb.codigo_estado AS codigo_estado_actual,
@@ -56,11 +56,11 @@ WITH latest_bitacora AS (
         AND p.esta_activo = 'S'
         AND (
             :P133_FROM_DATE IS NULL
-            OR r.fecha_proceso >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
+            OR lb.fecha_adicion >= TRUNC(CAST(:P133_FROM_DATE AS DATE))
         )
         AND (
             :P133_TO_DATE IS NULL
-            OR r.fecha_proceso <= TRUNC(CAST(:P133_TO_DATE AS DATE))
+            OR lb.fecha_adicion <= TRUNC(CAST(:P133_TO_DATE AS DATE))
         )
 ), efectividad_rango AS (
     SELECT
@@ -116,10 +116,10 @@ FROM
             codigo_estado_actual = 'CRD'
         UNION ALL
         SELECT
-            'Efectividad (Rango)',
+            'Efectividad',
             CASE
                 WHEN preaprobados_r = 0 THEN '0.00%'
-                ELSE TO_CHAR(TRUNC((desembolsados_r / preaprobados_r) * 100, 2), 'FM990.00') || '%'
+                ELSE TO_CHAR(TRUNC(desembolsados_r / preaprobados_r * 100, 2), 'FM990.00') || '%'
             END,
             'Des: ' || desembolsados_r || ' / Pre: ' || preaprobados_r,
             'fa-percent',
@@ -146,7 +146,7 @@ FROM
             AND canal_desembolso_determinado = 'Digital (con firma)'
         UNION ALL
         SELECT
-            'Desembolsos Tradicionales',
+            'Desembolsos Firma Tradicional',
             TO_CHAR(COUNT(DISTINCT id_represtamo)),
             'Monto RD$ ' || TO_CHAR(
                 NVL(SUM(monto_desembolsado), 0),
