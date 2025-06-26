@@ -48,8 +48,8 @@ WITH latest_bitacora AS (
     LEFT JOIN pr.pr_creditos c
         ON c.no_credito = s.no_credito AND c.codigo_empresa = s.codigo_empresa
     WHERE
-        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
         SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'MAMATOS'
+        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
         AND p.id_empleado = a.gerente
         AND p.esta_activo = 'S'
         AND (
@@ -62,8 +62,20 @@ WITH latest_bitacora AS (
         )
 ), efectividad_rango AS (
     SELECT
-        (SELECT COUNT(DISTINCT id_represtamo) FROM base_data WHERE codigo_estado_actual = 'CRD') AS desembolsados_r,
-        (SELECT COUNT(DISTINCT id_represtamo) FROM base_data) AS preaprobados_r
+        (
+            SELECT
+                COUNT(DISTINCT id_represtamo)
+            FROM
+                base_data
+            WHERE
+                codigo_estado_actual = 'CRD'
+        ) AS desembolsados_r,
+        (
+            SELECT
+                COUNT(DISTINCT id_represtamo)
+            FROM
+                base_data
+        ) AS preaprobados_r
     FROM
         dual
 )
@@ -73,29 +85,74 @@ SELECT
     card_subtext,
     card_icon,
     card_color,
+    card_modifiers,
     card_link,
     order_col
 FROM
     (
         SELECT
             'Total Preaprobados' AS card_title,
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data) AS card_text,
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(mto_preaprobado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data) AS card_subtext,
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+            ) AS card_text,
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(mto_preaprobado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+            ) AS card_subtext,
             'fa-file-invoice-dollar' AS card_icon,
             'u-color-1' AS card_color,
-            'javascript:apex.item("P133_ESTADO").setValue(''' || (SELECT LISTAGG(column_value, ',') WITHIN GROUP(ORDER BY NULL) FROM TABLE(pr.pr_pkg_represtamos.f_obt_valor_parametros('ESTADOS_PREAPROBADOS'))) || ''');apex.event.trigger("#TABLE_133","apexrefresh");' AS card_link,
+            NULL AS card_modifiers,
+            'javascript:apex.item("P133_TIPO_DESEMBOLSO").setValue(null);apex.item("P133_ESTADO").setValue(''' || (
+                SELECT
+                    LISTAGG(column_value, ',') WITHIN GROUP(
+                        ORDER BY
+                            NULL
+                    )
+                FROM
+                    TABLE(pr.pr_pkg_represtamos.f_obt_valor_parametros('ESTADOS_PREAPROBADOS'))
+            ) || ''');apex.event.trigger("#TABLE_133","apexrefresh");' AS card_link,
             1 AS order_col
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
             'Total Desembolsos',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'CRD'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(monto_desembolsado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'CRD'),
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(monto_desembolsado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+            ),
             'fa-check-circle',
             'u-color-5',
-            'javascript:apex.item("P133_ESTADO").setValue(''CRD'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            NULL,
+            'javascript:apex.item("P133_TIPO_DESEMBOLSO").setValue(null);apex.item("P133_ESTADO").setValue(''CRD'');apex.event.trigger("#TABLE_133","apexrefresh");',
             2
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
             'Efectividad (Rango)',
@@ -106,59 +163,165 @@ FROM
             'Des: ' || desembolsados_r || ' / Pre: ' || preaprobados_r,
             'fa-percent',
             'u-color-10',
+            NULL,
             'javascript:void(0);',
             3
-        FROM efectividad_rango
+        FROM
+            efectividad_rango
         UNION ALL
         SELECT
             'Desembolsos Firma Electrónica',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'CRD' AND canal_desembolso_determinado = 'Digital (con firma)'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(monto_desembolsado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'CRD' AND canal_desembolso_determinado = 'Digital (con firma)'),
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+                    AND canal_desembolso_determinado = 'Digital (con firma)'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(monto_desembolsado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+                    AND canal_desembolso_determinado = 'Digital (con firma)'
+            ),
             'fa-mobile-alt',
             'u-color-15',
-            'javascript:apex.item("P133_ESTADO").setValue(''CRD'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            'card-desembolso' AS card_modifiers,
+            'javascript:apex.item("P133_ESTADO").setValue(null);apex.item("P133_TIPO_DESEMBOLSO").setValue(''Digital (con firma)'');apex.event.trigger("#TABLE_133","apexrefresh");',
             4
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
-            'Desembolsos Tradicionales',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'CRD' AND canal_desembolso_determinado = 'Sucursal (tradicional)'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(monto_desembolsado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'CRD' AND canal_desembolso_determinado = 'Sucursal (tradicional)'),
+            'Desembolsos firma Tradicional',
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+                    AND canal_desembolso_determinado = 'Sucursal (tradicional)'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(monto_desembolsado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRD'
+                    AND canal_desembolso_determinado = 'Sucursal (tradicional)'
+            ),
             'fa-building',
             'u-color-16',
-            'javascript:apex.item("P133_ESTADO").setValue(''CRD'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            'card-desembolso' AS card_modifiers,
+            'javascript:apex.item("P133_ESTADO").setValue(null);apex.item("P133_TIPO_DESEMBOLSO").setValue(''Sucursal (tradicional)'');apex.event.trigger("#TABLE_133","apexrefresh");',
             5
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
             'Créditos Cancelados',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'CC'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(mto_preaprobado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'CC'),
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CC'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(mto_preaprobado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CC'
+            ),
             'fa-times-circle-o',
             'u-color-7',
-            'javascript:apex.item("P133_ESTADO").setValue(''CC'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            NULL,
+            'javascript:apex.item("P133_TIPO_DESEMBOLSO").setValue(null);apex.item("P133_ESTADO").setValue(''CC'');apex.event.trigger("#TABLE_133","apexrefresh");',
             6
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
             'Link Vencido',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'AN'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(mto_preaprobado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'AN'),
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'AN'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(mto_preaprobado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'AN'
+            ),
             'fa-chain-broken',
             'u-color-8',
-            'javascript:apex.item("P133_ESTADO").setValue(''AN'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            NULL,
+            'javascript:apex.item("P133_TIPO_DESEMBOLSO").setValue(null);apex.item("P133_ESTADO").setValue(''AN'');apex.event.trigger("#TABLE_133","apexrefresh");',
             7
-        FROM DUAL
+        FROM
+            DUAL
         UNION ALL
         SELECT
             'Créditos Anulados',
-            (SELECT TO_CHAR(COUNT(DISTINCT id_represtamo)) FROM base_data WHERE codigo_estado_actual = 'CRN'),
-            (SELECT 'Monto RD$ ' || TO_CHAR(NVL(SUM(mto_preaprobado), 0), 'FM9G999G999G990D00', 'NLS_NUMERIC_CHARACTERS=''.,''') FROM base_data WHERE codigo_estado_actual = 'CRN'),
+            (
+                SELECT
+                    TO_CHAR(COUNT(DISTINCT id_represtamo))
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRN'
+            ),
+            (
+                SELECT
+                    'Monto RD$ ' || TO_CHAR(
+                        NVL(SUM(mto_preaprobado), 0),
+                        'FM9G999G999G990D00',
+                        'NLS_NUMERIC_CHARACTERS=''.,'''
+                    )
+                FROM
+                    base_data
+                WHERE
+                    codigo_estado_actual = 'CRN'
+            ),
             'fa-ban',
             'u-color-9',
-            'javascript:apex.item("P133_ESTADO").setValue(''CRN'');apex.event.trigger("#TABLE_133","apexrefresh");',
+            NULL,
+            'javascript:apex.item("P133_TIPO_DESEMBOLSO").setValue(null);apex.item("P133_ESTADO").setValue(''CRN'');apex.event.trigger("#TABLE_133","apexrefresh");',
             8
-        FROM DUAL
+        FROM
+            DUAL
     )
 ORDER BY
     order_col;
