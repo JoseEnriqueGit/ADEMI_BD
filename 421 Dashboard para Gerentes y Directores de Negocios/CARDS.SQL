@@ -23,42 +23,50 @@ WITH latest_bitacora AS (
     SELECT
         s.id_represtamo,
         r.mto_preaprobado,
-        r.fecha_proceso, -- Usamos la fecha de proceso de la tabla principal
+        r.fecha_proceso,
         c.monto_desembolsado,
         c.f_primer_desembolso AS fecha_desembolso,
-        r.estado AS codigo_estado_actual, -- << CAMBIO CLAVE: Se usa R.ESTADO como la fuente de verdad
+        r.estado AS codigo_estado_actual,
         CASE
-            WHEN r.estado = 'CRD' THEN -- Usamos R.ESTADO para la lógica
-                CASE
-                    WHEN hcs.id_represtamo IS NOT NULL THEN 'Digital (con firma)'
-                    ELSE 'Sucursal (tradicional)'
-                END
+            WHEN r.estado = 'CRD' THEN CASE
+                WHEN hcs.id_represtamo IS NOT NULL THEN 'Digital (con firma)'
+                ELSE 'Sucursal (tradicional)'
+            END
         END AS canal_desembolso_determinado
     FROM
-        pa.empleados p
-    JOIN pa.agencia a
-        ON TO_NUMBER(p.cod_empresa) = a.cod_empresa AND TO_NUMBER(p.cod_agencia_labora) = a.cod_agencia
-    JOIN pr.pr_solicitud_represtamo s
-        ON TO_NUMBER(p.cod_empresa) = s.codigo_empresa AND TO_NUMBER(p.cod_agencia_labora) = s.codigo_agencia
-    JOIN pr.pr_represtamos r
+        pr.pr_represtamos r
+    LEFT JOIN pr.pr_solicitud_represtamo s
         ON r.id_represtamo = s.id_represtamo AND r.codigo_empresa = s.codigo_empresa
-    LEFT JOIN latest_bitacora lb -- Ahora es LEFT JOIN por si un registro no tiene bitácora aún
-        ON lb.id_represtamo = s.id_represtamo AND lb.rn = 1
-    LEFT JOIN has_cry_status hcs
-        ON hcs.id_represtamo = s.id_represtamo
     LEFT JOIN pr.pr_creditos c
-        ON c.no_credito = s.no_credito AND c.codigo_empresa = s.codigo_empresa
+        ON c.no_credito = r.no_credito AND c.codigo_empresa = r.codigo_empresa
+    LEFT JOIN pa.agencia ag
+        ON ag.cod_empresa = r.codigo_empresa AND ag.cod_agencia = c.codigo_agencia
+    JOIN pa.empleados p
+        ON ag.gerente = p.id_empleado AND ag.cod_empresa = TO_NUMBER(p.cod_empresa)
+    LEFT JOIN latest_bitacora lb
+        ON lb.id_represtamo = r.id_represtamo AND lb.rn = 1
+    LEFT JOIN has_cry_status hcs
+        ON hcs.id_represtamo = r.id_represtamo
     WHERE
-        SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'BMELLA'
-        AND p.id_empleado = a.gerente
+        SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'MAMATOS'
         AND p.esta_activo = 'S'
+        AND NOT EXISTS (
+            SELECT
+                1
+            FROM
+                pr_carga_direccionada cd
+            WHERE
+                cd.no_credito = r.no_credito
+                AND cd.estado = 'F'
+                AND TRUNC(cd.fecha_adicion) = TRUNC(r.fecha_adicion)
+        )
         AND (
             :P133_FROM_DATE IS NULL
-            OR r.fecha_proceso >= TRUNC(CAST(:P133_FROM_DATE AS DATE)) -- Filtro sobre la fecha de proceso
+            OR lb.fecha_adicion >= TRUNC(TO_DATE(:P133_FROM_DATE, 'DD/MM/YYYY HH24:MI:SS'))
         )
         AND (
             :P133_TO_DATE IS NULL
-            OR r.fecha_proceso < TRUNC(CAST(:P133_TO_DATE AS DATE)) + 1 -- Filtro sobre la fecha de proceso
+            OR lb.fecha_adicion < TRUNC(TO_DATE(:P133_TO_DATE, 'DD/MM/YYYY HH24:MI:SS')) + 1
         )
 ), efectividad_rango AS (
     SELECT
