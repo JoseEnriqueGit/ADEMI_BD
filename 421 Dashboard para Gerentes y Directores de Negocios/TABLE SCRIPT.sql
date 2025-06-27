@@ -68,8 +68,8 @@ WITH latest_bitacora AS (
     LEFT JOIN pr.pr_tipo_credito tc ON tc.tipo_credito = NVL(s.tipo_credito, NVL(c.tipo_credito, h.tipo_credito)) AND tc.codigo_empresa = r.codigo_empresa
     LEFT JOIN pr.pr_canales_represtamo a_canal ON a_canal.id_represtamo = r.id_represtamo AND a_canal.canal = 1
     WHERE
-        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
         SUBSTR(p.email1, 1, INSTR(p.email1,'@')-1) = 'MAMATOS'
+        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
         AND p.id_empleado = a_emp.gerente
         AND p.esta_activo = 'S'
         AND NOT EXISTS (
@@ -79,8 +79,8 @@ WITH latest_bitacora AS (
                 AND  cd.estado          = 'F'
                 AND  TRUNC(cd.fecha_adicion) = TRUNC(r.fecha_adicion)
             )
-        AND ( :P133_FROM_DATE IS NULL OR lb.fecha_adicion >= TRUNC(CAST(:P133_FROM_DATE AS DATE)) )
-        AND ( :P133_TO_DATE   IS NULL OR lb.fecha_adicion <= TRUNC(CAST(:P133_TO_DATE   AS DATE)) )
+        AND ( :P133_FROM_DATE IS NULL OR lb.fecha_adicion >= TRUNC(TO_DATE(:P133_FROM_DATE, 'DD/MM/YYYY HH24:MI:SS')) )
+        AND ( :P133_TO_DATE   IS NULL OR lb.fecha_adicion <  TRUNC(TO_DATE(:P133_TO_DATE, 'DD/MM/YYYY HH24:MI:SS')) + 1 )
 )
 SELECT
     "FECHA_ESTADO",

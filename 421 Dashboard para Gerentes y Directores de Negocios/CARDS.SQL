@@ -155,7 +155,7 @@ FROM
             DUAL
         UNION ALL
         SELECT
-            'Efectividad (Rango)',
+            'Efectividad',
             CASE
                 WHEN preaprobados_r = 0 THEN '0.00%'
                 ELSE TO_CHAR(TRUNC(desembolsados_r / preaprobados_r * 100, 2), 'FM990.00') || '%'
