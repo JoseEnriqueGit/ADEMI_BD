@@ -66,8 +66,8 @@ WITH latest_bitacora AS (
     LEFT JOIN latest_bitacora lb ON lb.id_represtamo = r.id_represtamo AND lb.rn = 1
     LEFT JOIN has_cry_status hcs ON hcs.id_represtamo = r.id_represtamo
     WHERE
-        -- SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
-        SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'MAMATOS'
+        --SUBSTR(P.EMAIL1, 1, INSTR(P.EMAIL1, '@') - 1) = V('APP_USER')
+        SUBSTR(p.email1, 1, INSTR(p.email1, '@') - 1) = 'vcasilla'
         AND p.esta_activo = 'S'
         AND NOT EXISTS (
             SELECT 1
