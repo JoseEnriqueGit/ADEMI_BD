@@ -13830,11 +13830,16 @@ PROCEDURE P_SPLIT_CHAMPION_CHALLENGER(
     -- Definición del tipo para el registro de un candidato
     TYPE type_candidate_rec IS RECORD (
         id_represtamo         NUMBER,
+        nombre_cliente        VARCHAR(100),
+        identificacion        VARCHAR(30),
         cod_cliente           NUMBER,
         no_credito_original   NUMBER,
         mto_preaprobado       NUMBER,
         tipo_credito          NUMBER,
-        xcore_global          NUMBER
+        xcore_global          NUMBER,
+        oficina               VARCHAR(50),
+        zona                  VARCHAR(50),
+        oficial               VARCHAR(50)
     );
     -- Definición del tipo para la colección (array) de candidatos
     TYPE type_candidate_tbl IS TABLE OF type_candidate_rec;
@@ -13844,13 +13849,25 @@ PROCEDURE P_SPLIT_CHAMPION_CHALLENGER(
     v_challenger_count   NUMBER;
     v_total_candidates   NUMBER := 0;
     v_previous_runs      NUMBER;
+    
 BEGIN
+--    SELECT 
+--        r.id_represtamo, r.codigo_cliente, r.no_credito, r.mto_preaprobado,
+--        s.tipo_credito, r.xcore_global
+--    BULK COLLECT INTO v_candidates
+--    FROM pr_represtamos r
+--    JOIN pr_solicitud_represtamo s ON r.id_represtamo = s.id_represtamo
+--    WHERE r.estado = 'NP';
+    
     SELECT 
-        r.id_represtamo, r.codigo_cliente, r.no_credito, r.mto_preaprobado,
-        s.tipo_credito, r.xcore_global
+        r.id_represtamo, pa.obt_nombre_persona(r.codigo_cliente)AS "nombre_cliente", s.identificacion, r.codigo_cliente, r.no_credito, r.mto_preaprobado,
+        s.tipo_credito, r.xcore_global, ag.descripcion AS "Oficina", pa.obt_desc_zona(1, ag.cod_zona) AS "Zona", 
+        pa.obt_nombre_empleado(c.codigo_empresa, c.codigo_ejecutivo) AS "Oficial"
     BULK COLLECT INTO v_candidates
-    FROM pr_represtamos r
-    JOIN pr_solicitud_represtamo s ON r.id_represtamo = s.id_represtamo
+    FROM pr.pr_represtamos r
+    JOIN pr.pr_solicitud_represtamo s ON r.id_represtamo = s.id_represtamo
+    JOIN pr.pr_creditos c ON c.no_credito = r.no_credito
+    JOIN pa.agencia ag ON ag.cod_agencia = c.codigo_agencia
     WHERE r.estado = 'NP';
 
     v_total_candidates := v_candidates.COUNT;
@@ -13882,11 +13899,13 @@ BEGIN
           AND no_credito_original = v_candidates(i).no_credito_original;
           
         IF i <= v_challenger_count THEN
+            --vStep := PR.PR_PKG_REPRESTAMOS.f_Step_Actual('CHCH', v_candidates(i).id_represtamo);  
+
             -- Es un CHALLENGER: Cambiar estado a CHCH
             P_Generar_Bitacora(
                 pIdReprestamo  => v_candidates(i).id_represtamo,
                 pEstado        => 'CHCH',
-                pObservaciones => 'Asignado al grupo Challenger.',
+                pObservaciones => 'Asignado al grupo Challenger. Lote ID: ' || p_id_lote,
                 pUsuario       => 'JOB_CHAMPION_CHALLENGE',
                 pCanal         => NULL,
                 pStep          => NULL
@@ -13898,24 +13917,24 @@ BEGIN
             
             -- Registrar en el LOG como Challenger
             INSERT INTO PR.PR_CHAMPION_CHALLENGE_LOG (
-                id_lote, id_represtamo, cod_cliente, no_credito_original, fecha_proceso,
+                id_lote, id_represtamo, nombre_cliente, identificacion, cod_cliente, no_credito_original, fecha_proceso,
                 nombre_campana, xcore_al_preaprobar, monto_preaprobado,
-                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado
+                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado, oficina, zona, oficial
             ) VALUES (
-                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).cod_cliente, v_candidates(i).no_credito_original, SYSDATE,
+                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).nombre_cliente, v_candidates(i).identificacion, v_candidates(i).cod_cliente, v_candidates(i).no_credito_original, SYSDATE,
                 p_nombre_campana, v_candidates(i).xcore_global, v_candidates(i).mto_preaprobado,
-                v_candidates(i).tipo_credito, 'CHALLENGER', NULL, v_previous_runs + 1
+                v_candidates(i).tipo_credito, 'CHALLENGER', NULL, v_previous_runs + 1, v_candidates(i).oficina, v_candidates(i).zona, v_candidates(i).oficial
             );
         ELSE
             -- Es un CHAMPION: Se queda en NP, solo se registra en el log
             INSERT INTO PR.PR_CHAMPION_CHALLENGE_LOG (
-                id_lote, id_represtamo, cod_cliente, no_credito_original, fecha_proceso,
+                id_lote, id_represtamo, nombre_cliente, identificacion, cod_cliente, no_credito_original, fecha_proceso,
                 nombre_campana, xcore_al_preaprobar, monto_preaprobado,
-                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado
+                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado, oficina, zona, oficial
             ) VALUES (
-                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).cod_cliente, v_candidates(i).no_credito_original, SYSDATE,
+                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).nombre_cliente, v_candidates(i).identificacion, v_candidates(i).cod_cliente, v_candidates(i).no_credito_original, SYSDATE,
                 p_nombre_campana, v_candidates(i).xcore_global, v_candidates(i).mto_preaprobado,
-                v_candidates(i).tipo_credito, 'CHAMPION', 'SMS', v_previous_runs + 1
+                v_candidates(i).tipo_credito, 'CHAMPION', 'SMS', v_previous_runs + 1, v_candidates(i).oficina, v_candidates(i).zona, v_candidates(i).oficial
             );
         END IF;
     END LOOP;

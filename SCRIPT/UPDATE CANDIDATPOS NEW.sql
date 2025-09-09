@@ -36,19 +36,6 @@ BEGIN
                 ORDER BY cred.f_primer_desembolso DESC
             ) cred
             WHERE ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-            SELECT cred.monto_credito
-            FROM (
-                SELECT cred.monto_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
         )
     WHERE log.id_lote = v_ultimo_lote
         AND log.grupo_asignado = 'CHAMPION'
@@ -94,19 +81,6 @@ BEGIN
                 ORDER BY cred.f_primer_desembolso DESC
             ) cred
             WHERE ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-            SELECT cred.monto_credito
-            FROM (
-                SELECT cred.monto_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
         )
     WHERE log.id_lote = v_ultimo_lote
         AND log.grupo_asignado = 'CHAMPION'
@@ -144,15 +118,6 @@ BEGIN
               AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
               AND cred.no_credito != log.no_credito
               AND ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-        SELECT cred.monto_credito
-        FROM pr_creditos cred
-        WHERE cred.codigo_cliente = log.cod_cliente
-            AND cred.estado = 'D'
-            AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-            AND cred.no_credito != log.no_credito
-            AND ROWNUM = 1
         )
     WHERE log.id_lote = v_ultimo_lote
         AND log.grupo_asignado = 'CHALLENGER'

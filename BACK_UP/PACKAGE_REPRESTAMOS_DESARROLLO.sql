@@ -7221,7 +7221,7 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
         IF pIdReprestamo IS NOT NULL AND F_Validar_Telefono(v_Telefono_Celular) IS NOT NULL THEN
         
         INSERT INTO PR.PR_CANALES_REPRESTAMO ( CODIGO_EMPRESA, ID_REPRESTAMO, CANAL, VALOR, ADICIONADO_POR, FECHA_ADICION )
-               VALUES ( PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo,1/*Obtener el valor de la tabla parametro*/, F_Validar_Telefono(v_Telefono_Celular), pUsuario, SYSDATE);
+               VALUES ( PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo,3/*Obtener el valor de la tabla parametro*/, F_Validar_Telefono(v_Telefono_Celular), pUsuario, SYSDATE);
                COMMIT;
         END IF;
 
@@ -7373,7 +7373,7 @@ BEGIN
 
     IF pIdReprestamo IS NOT NULL AND F_Validar_Telefono(v_Telefono_Celular) IS NOT NULL THEN
         INSERT INTO PR.PR_CANALES_REPRESTAMO (CODIGO_EMPRESA, ID_REPRESTAMO, CANAL, VALOR, ADICIONADO_POR, FECHA_ADICION)
-        VALUES (PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo, 1, F_Validar_Telefono(v_Telefono_Celular), pUsuario, SYSDATE);
+        VALUES (PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo, 4, F_Validar_Telefono(v_Telefono_Celular), pUsuario, SYSDATE);
     END IF;
 
     COMMIT;
@@ -10966,10 +10966,6 @@ END F_HORARIO_VALIDO_NOTIFICACION;
         utilizando Fud del credito actual para generar el nuevo crédito y nueva Fud*/
         pFecha_Calendario     DATE := pa.fecha_actual_calendario ('PR', 1, 0);
         
-        
-        
-        vIdDocsReutilizar   VARCHAR2(100);   --NUEVA VARIABLE
-        
         --Obtiene los datos de la solicitud del représtamo
         CURSOR c_repre (Empresap NUMBER, pid_represtamop NUMBER)
         IS
@@ -11519,15 +11515,8 @@ END F_HORARIO_VALIDO_NOTIFICACION;
                          p_depura (pError);
                           DBMS_OUTPUT.put_line (pError);
                     END IF;                
+                   
                     
-                    IF PR.PR_PKG_REPRESTAMOS.F_VALIDAR_TIPO_REPRESTAMO(pNum_Represtamo) THEN
-                        vIdDocsReutilizar := PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CODIGOS_DOCUMENTOS_REUTILIZAR');
-                    
-                    ELSE
-                        vIdDocsReutilizar := NULL;
-                    
-                    END IF;
-
                             vIdTipoDocumento := '450'; -- CONSULTA LEXIS NEXIS SROBLES 28/11/2023
                             vDocumento := 'LEXISNEXIS';
                             vCodigoReferencia := '1:'||vRow_Repre.identificacion||':'||vpNOCREDITOGenerado||':'||vRow_Repre.no_credito||':LEXISNEXIS'|| ':' || vid_tempfudGenerado;
@@ -11542,12 +11531,8 @@ END F_HORARIO_VALIDO_NOTIFICACION;
                                 pFormatoDocumento   => 'PDF',
                                 pNombreArchivo      => vNombreArchivo || '.pdf',
                                 pEstado             => 'R',
-                                pIdDocsReutilizar   => vIdDocsReutilizar,
                                 pRespuesta          => pError);
-                                
                              COMMIT;
-                       
-                       
                        PR_PKG_REPRESTAMOS.p_generar_bitacora ( pNum_Represtamo, NULL, 'CRS', NULL, 'Credito solicitado', USER);           
                          ELSE
                          pError := 'Linea ' || $$plsql_line || ' No se ha insertado correctamente la URL del reporte vTipoID: '||vTipoID ||
@@ -11586,41 +11571,36 @@ END F_HORARIO_VALIDO_NOTIFICACION;
                        END;
                 END IF;
                 
-            --ACTUALIZACION DEL CAMPO NOTIF_DIGITAL  EN TEL PERSONA
+               --ACTUALIZACION DEL CAMPO NOTIF_DIGITAL  EN TEL PERSONA
 
-            SELECT VALOR INTO vCtelefono
-              FROM PR_CANALES_REPRESTAMO
-             WHERE CANAL = 1
-               AND ID_REPRESTAMO = vRow_Repre.id_represtamo;
-
-            -- SELECT CODIGO_AGENCIA INTO COD_AGENCIA ...
-            -- SELECT COUNT(*) INTO vSubqueryResult FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('SUCURSALES_PILOTO_FIRMA')) t ...
-            -- vSucursal := PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('SUCURSALES_PILOTO_FIRMA');
-
-            FOR A IN ACTUALIZA_TELEFONO LOOP
-                -- Habilitar notificación digital en cualquier sucursal
-                -- solo cuando el crédito es < RD$100,000.00 y el canal (celular) coincide.
-                IF NVL(pMtoPrestamo, 0) < 100000 THEN
-                    IF A.TELEFONO = vCtelefono AND A.TIP_TELEFONO = 'C' THEN
-                        UPDATE PA.TEL_PERSONAS
-                           SET NOTIF_DIGITAL = 'S'
-                         WHERE COD_PERSONA = vRow_Repre.codigo_cliente
-                           AND TIP_TELEFONO = 'C'
-                           AND COD_AREA || NUM_TELEFONO = vCtelefono;
-                    ELSE
+              SELECT VALOR into vCtelefono FROM PR_CANALES_REPRESTAMO WHERE CANAL = 1 AND ID_REPRESTAMO = vRow_Repre.id_represtamo;
+              SELECT CODIGO_AGENCIA INTO COD_AGENCIA FROM PA.CLIENTES_B2000 WHERE COD_CLIENTE =  vRow_Repre.codigo_cliente;
+              
+              SELECT COUNT(*)
+              INTO vSubqueryResult
+              FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('SUCURSALES_PILOTO_FIRMA')) t
+              WHERE t.COLUMN_VALUE = COD_AGENCIA;
+              vSucursal := PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('SUCURSALES_PILOTO_FIRMA') ;
+              
+                FOR A IN ACTUALIZA_TELEFONO LOOP
+                    IF vSubqueryResult > 0  OR  vSucursal IS NULL THEN
+                        IF A.TELEFONO = vCtelefono AND A.TIP_TELEFONO = 'C' THEN
+                            UPDATE PA.TEL_PERSONAS
+                            SET NOTIF_DIGITAL = 'S'
+                            WHERE TIP_TELEFONO = 'C' AND COD_AREA || NUM_TELEFONO = vCtelefono AND COD_PERSONA = vRow_Repre.codigo_cliente;
+                        ELSIF A.TELEFONO <> vCtelefono THEN
                         --DBMS_OUTPUT.PUT_LINE ( 'VALIDO QUE LOS CANALES SEAN DISTINTOS '  );
-                        UPDATE PA.TEL_PERSONAS
-                           SET NOTIF_DIGITAL = 'N'
-                         WHERE COD_PERSONA = vRow_Repre.codigo_cliente
-                           AND (COD_AREA || NUM_TELEFONO) <> vCtelefono;
-                    END IF;
-                ELSE
+                            UPDATE PA.TEL_PERSONAS
+                            SET NOTIF_DIGITAL = 'N'
+                            WHERE COD_AREA || NUM_TELEFONO <> vCtelefono AND COD_PERSONA = vRow_Repre.codigo_cliente;
+                        END IF;
+                    ELSE
                     --DBMS_OUTPUT.PUT_LINE ( 'VALIDO QUE NO ESTA EN LA SUCURSAL HABILITAD '  );
-                    UPDATE PA.TEL_PERSONAS
-                       SET NOTIF_DIGITAL = 'N'
-                     WHERE COD_PERSONA = vRow_Repre.codigo_cliente;
-                END IF;
-            END LOOP;
+                        UPDATE PA.TEL_PERSONAS
+                        SET NOTIF_DIGITAL = 'N'
+                        WHERE COD_PERSONA = vRow_Repre.codigo_cliente;
+                    END IF;
+                END LOOP;
             
             /*FOR A IN ACTUALIZA_TELEFONO LOOP
             
@@ -13840,371 +13820,6 @@ EXCEPTION
         p_otros_ingresos := NULL;
         p_rel_cuota_exced_fam := NULL;
         p_ventas_mensual := NULL;   
-   END P_CARGAR_DATOS_FEC_NUEVO;   
-PROCEDURE P_SPLIT_CHAMPION_CHALLENGER(
-    p_id_lote            IN NUMBER,
-    p_nombre_campana     IN VARCHAR2,
-    p_challenger_ratio   IN NUMBER DEFAULT 0.40,
-    p_error              OUT VARCHAR2
-) IS
-    -- Definición del tipo para el registro de un candidato
-    TYPE type_candidate_rec IS RECORD (
-        id_represtamo         NUMBER,
-        nombre_cliente        VARCHAR(100),
-        identificacion        VARCHAR(30),
-        cod_cliente           NUMBER,
-        no_credito            NUMBER,
-        mto_preaprobado       NUMBER,
-        tipo_credito          NUMBER,
-        xcore_global          NUMBER,
-        oficina               VARCHAR(50),
-        zona                  VARCHAR(50),
-        oficial               VARCHAR(50)
-    );
-    -- Definición del tipo para la colección (array) de candidatos
-    TYPE type_candidate_tbl IS TABLE OF type_candidate_rec;
-    v_candidates         type_candidate_tbl;
-
-    -- Variables internas
-    v_challenger_count   NUMBER;
-    v_total_candidates   NUMBER := 0;
-    v_previous_runs      NUMBER;
-    
-BEGIN
-    SELECT 
-        r.id_represtamo, pa.obt_nombre_persona(r.codigo_cliente)AS "nombre_cliente", s.identificacion, r.codigo_cliente, r.no_credito, r.mto_preaprobado,
-        s.tipo_credito, r.xcore_global, ag.descripcion AS "Oficina", pa.obt_desc_zona(1, ag.cod_zona) AS "Zona", 
-        pa.obt_nombre_empleado(c.codigo_empresa, c.codigo_ejecutivo) AS "Oficial"
-    BULK COLLECT INTO v_candidates
-    FROM pr.pr_represtamos r
-    JOIN pr.pr_solicitud_represtamo s ON r.id_represtamo = s.id_represtamo
-    JOIN pr.pr_creditos c ON c.no_credito = r.no_credito
-    JOIN pa.agencia ag ON ag.cod_agencia = c.codigo_agencia
-    WHERE r.estado = 'NP';
-
-    v_total_candidates := v_candidates.COUNT;
-    IF v_total_candidates = 0 THEN
-        p_error := 'No hay candidatos en estado NP para procesar.';
-        RETURN;
-    END IF;
-    
-    v_challenger_count := TRUNC(v_total_candidates * p_challenger_ratio);
-
-    FOR i IN 1..v_total_candidates LOOP
-        DECLARE
-            j           INTEGER := TRUNC(DBMS_RANDOM.VALUE(i, v_total_candidates + 1));
-            temp_rec    type_candidate_rec;
-        BEGIN
-            temp_rec          := v_candidates(i);
-            v_candidates(i)   := v_candidates(j);
-            v_candidates(j)   := temp_rec;
-        END;
-    END LOOP;
-    
-    -- 4. Procesar la colección ya mezclada
-    FOR i IN 1..v_total_candidates LOOP
-        -- Contar cuántas veces este cliente/crédito original ya existe en el log
-        SELECT COUNT(*)
-        INTO v_previous_runs
-        FROM PR.PR_CHAMPION_CHALLENGE_LOG
-        WHERE cod_cliente = v_candidates(i).cod_cliente
-          AND no_credito = v_candidates(i).no_credito;
-          
-        IF i <= v_challenger_count THEN
-            -- Es un CHALLENGER: Cambiar estado a CHCH (AHORA LCC)
-            P_Generar_Bitacora(
-                pIdReprestamo  => v_candidates(i).id_represtamo,
-                pEstado        => 'LCC',
-                pObservaciones => 'Asignado al grupo Challenger. Lote ID: ' || p_id_lote,
-                pUsuario       => 'JOB_CHAMPION_CHALLENGE',
-                pCanal         => NULL,
-                pStep          => NULL
-            );
-            
-            -- Registrar en el LOG como Challenger
-            INSERT INTO PR.PR_CHAMPION_CHALLENGE_LOG (
-                id_lote, id_represtamo, nombre_cliente, identificacion, cod_cliente, no_credito, fecha_proceso,
-                nombre_campana, xcore_al_preaprobar, monto_preaprobado,
-                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado, oficina, zona, oficial
-            ) VALUES (
-                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).nombre_cliente, v_candidates(i).identificacion, v_candidates(i).cod_cliente, v_candidates(i).no_credito, SYSDATE,
-                p_nombre_campana, v_candidates(i).xcore_global, v_candidates(i).mto_preaprobado,
-                v_candidates(i).tipo_credito, 'CHALLENGER', NULL, v_previous_runs + 1, v_candidates(i).oficina, v_candidates(i).zona, v_candidates(i).oficial
-            );
-        ELSE
-            -- Es un CHAMPION: Se queda en NP, solo se registra en el log
-            INSERT INTO PR.PR_CHAMPION_CHALLENGE_LOG (
-                id_lote, id_represtamo, nombre_cliente, identificacion, cod_cliente, no_credito, fecha_proceso,
-                nombre_campana, xcore_al_preaprobar, monto_preaprobado,
-                tipo_credito, grupo_asignado, canal_notificacion, veces_procesado, oficina, zona, oficial
-            ) VALUES (
-                p_id_lote, v_candidates(i).id_represtamo, v_candidates(i).nombre_cliente, v_candidates(i).identificacion, v_candidates(i).cod_cliente, v_candidates(i).no_credito, SYSDATE,
-                p_nombre_campana, v_candidates(i).xcore_global, v_candidates(i).mto_preaprobado,
-                v_candidates(i).tipo_credito, 'CHAMPION', 'SMS', v_previous_runs + 1, v_candidates(i).oficina, v_candidates(i).zona, v_candidates(i).oficial
-            );
-        END IF;
-    END LOOP;
-
-    p_error := 'Proceso de división finalizado. Total: ' || v_total_candidates || 
-               '. Challengers: ' || v_challenger_count || 
-               '. Champions: ' || (v_total_candidates - v_challenger_count);
-EXCEPTION
-    WHEN OTHERS THEN
-        p_error := 'ERROR en P_SPLIT_CHAMPION_CHALLENGER: ' || SQLERRM;
-END P_SPLIT_CHAMPION_CHALLENGER;
-PROCEDURE P_EJECUTAR_CAMPANA_CHALLENGE(
-    p_error OUT VARCHAR2
-) IS
-    v_nombre_campana VARCHAR2(100) := 'Campaña ' || TO_CHAR(SYSDATE, 'YYYY-MM');
-    v_id_lote        NUMBER;
-BEGIN
-
-    SELECT PR.PR_LOTE_ID_SEC.NEXTVAL INTO v_id_lote FROM DUAL;
-    
-    P_SPLIT_CHAMPION_CHALLENGER(
-        p_id_lote => v_id_lote,
-        p_nombre_campana => v_nombre_campana,
-        p_challenger_ratio => 0.40,
-        p_error => p_error
-    );
-    
-    COMMIT;
-    
-EXCEPTION
-    WHEN OTHERS THEN
-        p_error := 'ERROR en P_EJECUTAR_CAMPANA_CHALLENGE: ' || SQLERRM;
-        ROLLBACK;
-END P_EJECUTAR_CAMPANA_CHALLENGE;
-
-PROCEDURE ACTUALIZAR_CHAMPION_CHALLENGE
-AS
-    v_ultimo_lote NUMBER;
-BEGIN
-    SELECT MAX(id_lote) INTO v_ultimo_lote FROM PR.PR_CHAMPION_CHALLENGE_LOG;
-    
-    IF v_ultimo_lote IS NULL THEN
-        DBMS_OUTPUT.PUT_LINE('No hay lotes en el log para procesar.');
-        RETURN;
-    END IF;
-    
-    -- Actualizar DESEMBOLSO POR FIRMA DIGITAL
-    UPDATE PR.PR_CHAMPION_CHALLENGE_LOG log
-    SET 
-        log.tipo_desembolso = 'DESEMBOLSO POR FIRMA DIGITAL',
-        log.no_credito_nuevo_core = (
-            SELECT cred.no_credito
-            FROM (
-                SELECT cred.no_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.FECHA_DESEMBOLSO_CORE = (
-            SELECT cred.f_primer_desembolso
-            FROM (
-                SELECT cred.f_primer_desembolso
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-            SELECT cred.monto_credito
-            FROM (
-                SELECT cred.monto_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.ESTADO_FINAL_DIGITAL = (
-            SELECT bit.codigo_estado
-            FROM (
-                SELECT bit.codigo_estado
-                FROM pr_bitacora_represtamo bit
-                WHERE bit.id_represtamo = log.id_represtamo
-                ORDER BY bit.fecha_bitacora DESC, bit.id_bitacora DESC
-            ) bit
-            WHERE ROWNUM = 1
-        )
-    WHERE log.id_lote = v_ultimo_lote
-        AND log.grupo_asignado = 'CHAMPION'
-        AND log.tipo_desembolso IS NULL
-        AND EXISTS (
-            SELECT 1 
-            FROM pr_bitacora_represtamo b1
-            WHERE b1.id_represtamo = log.id_represtamo
-              AND b1.codigo_estado = 'CRY'
-        )
-        AND EXISTS (
-            SELECT 1 
-            FROM pr_bitacora_represtamo b2
-            WHERE b2.id_represtamo = log.id_represtamo
-              AND b2.codigo_estado = 'CRD'
-        );
-    
-    -- Actualizar DESEMBOLSO TRADICIONAL
-    UPDATE PR.PR_CHAMPION_CHALLENGE_LOG log
-    SET 
-        log.tipo_desembolso = 'DESEMBOLSO TRADICIONAL',
-        log.no_credito_nuevo_core = (
-            SELECT cred.no_credito
-            FROM (
-                SELECT cred.no_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.FECHA_DESEMBOLSO_CORE = (
-            SELECT cred.f_primer_desembolso
-            FROM (
-                SELECT cred.f_primer_desembolso
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-            SELECT cred.monto_credito
-            FROM (
-                SELECT cred.monto_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.ESTADO_FINAL_DIGITAL = (
-            SELECT bit.codigo_estado
-            FROM (
-                SELECT bit.codigo_estado
-                FROM pr_bitacora_represtamo bit
-                WHERE bit.id_represtamo = log.id_represtamo
-                ORDER BY bit.fecha_bitacora DESC, bit.id_bitacora DESC
-            ) bit
-            WHERE ROWNUM = 1
-        )
-    WHERE log.id_lote = v_ultimo_lote
-        AND log.grupo_asignado = 'CHAMPION'
-        AND log.tipo_desembolso IS NULL
-        AND EXISTS (
-            SELECT 1 
-            FROM pr_bitacora_represtamo b1
-            WHERE b1.id_represtamo = log.id_represtamo
-              AND b1.codigo_estado = 'CRD'
-        )
-        AND NOT EXISTS (
-            SELECT 1 
-            FROM pr_bitacora_represtamo b2
-            WHERE b2.id_represtamo = log.id_represtamo
-              AND b2.codigo_estado = 'CRY'
-        );
-    
-    -- Actualizar DESEMBOLSO POR OFICINA
-    UPDATE PR.PR_CHAMPION_CHALLENGE_LOG log
-    SET 
-        log.tipo_desembolso = 'DESEMBOLSO POR OFICINA',
-        log.no_credito_nuevo_core = (
-            SELECT cred.no_credito
-            FROM (
-                SELECT cred.no_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.FECHA_DESEMBOLSO_CORE = (
-            SELECT cred.f_primer_desembolso
-            FROM (
-                SELECT cred.f_primer_desembolso
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.MONTO_DESEMBOLSADO = (
-            SELECT cred.monto_credito
-            FROM (
-                SELECT cred.monto_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ),
-        log.ESTADO_FINAL_DIGITAL = (
-            SELECT bit.codigo_estado
-            FROM (
-                SELECT bit.codigo_estado
-                FROM pr_bitacora_represtamo bit
-                WHERE bit.id_represtamo = log.id_represtamo
-                ORDER BY bit.fecha_bitacora DESC, bit.id_bitacora DESC
-            ) bit
-            WHERE ROWNUM = 1
-        )
-    WHERE log.id_lote = v_ultimo_lote
-        AND log.grupo_asignado = 'CHALLENGER'
-        AND log.tipo_desembolso IS NULL
-        AND (
-            SELECT cred.no_credito
-            FROM (
-                SELECT cred.no_credito
-                FROM pr_creditos cred
-                WHERE cred.codigo_cliente = log.cod_cliente
-                  AND cred.estado = 'D'
-                  AND cred.f_primer_desembolso BETWEEN log.fecha_proceso AND log.fecha_proceso + 30
-                  AND cred.no_credito != log.no_credito
-                ORDER BY cred.f_primer_desembolso DESC
-            ) cred
-            WHERE ROWNUM = 1
-        ) IS NOT NULL;
-    
-    COMMIT;
-    
-    DBMS_OUTPUT.PUT_LINE('Proceso completado exitosamente para el lote: ' || v_ultimo_lote);
-        
-EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
-        DBMS_OUTPUT.PUT_LINE('No se guardó ningún cambio.');
-        ROLLBACK;
-        RAISE;
-END ACTUALIZAR_CHAMPION_CHALLENGE;
+   END P_CARGAR_DATOS_FEC_NUEVO;      
 END PR_PKG_REPRESTAMOS;
 /
