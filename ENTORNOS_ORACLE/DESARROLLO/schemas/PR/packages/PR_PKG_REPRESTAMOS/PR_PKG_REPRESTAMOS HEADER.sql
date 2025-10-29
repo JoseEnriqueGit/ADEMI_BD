@@ -507,6 +507,8 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                                                          p_SubirFileFlow    IN     BOOLEAN DEFAULT TRUE,
                                                          pError             IN OUT VARCHAR2);  
    PROCEDURE P_REGISTRO_SOLICITUD;
+   PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
+                                         pTotalRegistros  IN NUMBER);
    PROCEDURE P_Insertar_Campana(
                                 p_codigoEmpresa IN NUMBER,
                                 p_nombre IN VARCHAR2,
