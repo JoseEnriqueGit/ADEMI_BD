@@ -121,7 +121,7 @@ create or replace PACKAGE BODY                                  PR_PKG_REPRESTAM
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
         -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -1584,7 +1584,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.codigo_aval_repre != a1.codigo_cliente)
         -- Se valida que los clientes no tengan no garantes 
         AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA_HISTORICO(a.no_credito) = 0
-                -- Se valida que los clientes no esten en lista PEP
+        -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
@@ -2718,14 +2718,11 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                --Actualizo el estado del detalle de la bitacora
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
        
-         COMMIT;     
-         
-        UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO 
-                FROM PA_DETALLADO_DE08 
-                WHERE NO_CREDITO = y.NO_CREDITO 
-                AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
-                AND  fecha_corte = v_fecha_corte);
-           COMMIT;         
+       UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO 
+               FROM PA_DETALLADO_DE08 
+               WHERE NO_CREDITO = y.NO_CREDITO 
+               AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
+               AND  fecha_corte = v_fecha_corte);
       END LOOP;
     
     
@@ -2739,7 +2736,6 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                 SET codigo_precalificacion = a.CODIGO_REPRESTAMO,
                     mto_preaprobado = a.mto_preaprobado
               WHERE rowid = a.id;
-          COMMIT;
       END LOOP;
            
            
@@ -3840,7 +3836,6 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
          SELECT COUNT(*) INTO vTotal_Carga FROM PR.PR_REPRESTAMOS A WHERE A.ESTADO = 'RE';
          EXCEPTION WHEN NO_DATA_FOUND THEN
          vTotal_Carga:= 0;   
-         COMMIT;
         END; 
      
       --Cambio el estado del detalle de la bitacora
@@ -7961,14 +7956,14 @@ END P_Registra_Solicitud_Campana;
    
    PROCEDURE P_REGISTRO_SOLICITUD IS
         
-       VMSG  VARCHAR2(4000);
+       VMSG          VARCHAR2(4000);
        pMensaje      VARCHAR2(100);  
        idCabeceraDet NUMBER; 
-            
+       vUsuario      VARCHAR2(30) := NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'), USER);
        CURSOR CUR_REPRESTAMO IS 
-       SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
-       FROM PR_REPRESTAMOS
-       WHERE ESTADO = 'RE';
+         SELECT ID_REPRESTAMO, ESTADO, XCORE_GLOBAL
+           FROM PR_REPRESTAMOS
+          WHERE ESTADO = 'RE';
             
       BEGIN
          
@@ -8012,12 +8007,11 @@ END P_Registra_Solicitud_Campana;
                 */
                 
                 FOR A IN CUR_REPRESTAMO LOOP
-                PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
-                        
-                        PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
-                        
-                    COMMIT;
-                END LOOP ;
+                    VMSG := NULL;
+                    PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO, vUsuario, VMSG);
+                    PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO, NULL, 'RE', NULL, '', vUsuario);
+                END LOOP;
+                COMMIT;
                 /*PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 100, 'SE ACTUALIZO', pMensaje );
                 PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET (pIDAPLICACION, 'FINALIZADO', 'SE FINALIZO', pMensaje );*/
                       
@@ -8042,7 +8036,66 @@ END P_Registra_Solicitud_Campana;
        
                  
   END P_REGISTRO_SOLICITUD;
-   
+
+  PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
+                                        pTotalRegistros  IN NUMBER) IS
+        vHistorial   PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vTrabajo     PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vNuevoValor  PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vEntrada     VARCHAR2(4000);
+        vPosicion    PLS_INTEGER;
+        vSecuencia   NUMBER;
+    BEGIN
+        BEGIN
+            SELECT VALOR
+              INTO vHistorial
+              FROM PA.PA_PARAMETROS_MVP
+             WHERE CODIGO_MVP = 'REPRESTAMOS'
+               AND CODIGO_PARAMETRO = pCodigoParametro;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                vHistorial := NULL;
+        END;
+
+        vHistorial := NVL(vHistorial, '');
+        vSecuencia := NVL(REGEXP_COUNT(vHistorial, '}'), 0) + 1;
+        vEntrada   := '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') ||
+                      '","R":' || NVL(pTotalRegistros, 0) ||
+                      ',"E":'  || vSecuencia || '}';
+
+        IF vHistorial IS NULL OR vHistorial = '' THEN
+            vNuevoValor := vEntrada;
+        ELSE
+            vNuevoValor := vHistorial || ',' || vEntrada;
+        END IF;
+
+        IF LENGTH(vNuevoValor) > 4000 THEN
+            vTrabajo := vHistorial;
+            LOOP
+                EXIT WHEN vTrabajo IS NULL OR vTrabajo = '';
+                vPosicion := INSTR(vTrabajo, '}');
+                EXIT WHEN vPosicion = 0;
+                vTrabajo := SUBSTR(vTrabajo, vPosicion + 1);
+                vTrabajo := LTRIM(vTrabajo, ',');
+                IF vTrabajo IS NULL OR vTrabajo = '' THEN
+                    vNuevoValor := vEntrada;
+                ELSE
+                    vNuevoValor := vTrabajo || ',' || vEntrada;
+                END IF;
+                EXIT WHEN LENGTH(vNuevoValor) <= 4000;
+            END LOOP;
+
+            IF LENGTH(vNuevoValor) > 4000 THEN
+                vNuevoValor := SUBSTR(vEntrada, 1, 4000);
+            END IF;
+        END IF;
+
+        UPDATE PA.PA_PARAMETROS_MVP
+           SET VALOR = vNuevoValor
+         WHERE CODIGO_MVP = 'REPRESTAMOS'
+           AND CODIGO_PARAMETRO = pCodigoParametro;
+    END P_Registrar_Ejecucion_Param;
+
   PROCEDURE P_Carga_Precalifica_Cancelado ( pMensaje IN OUT VARCHAR2) IS
   -- Variable para guardar el ID de la ejecución del profiler
   v_profiler_run_id BINARY_INTEGER;
@@ -8242,9 +8295,8 @@ END P_Carga_Precalifica_Cancelado;
                   END LOOP;
                   
                  
-                  
-                UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
-                WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_EJECUCIONES';
+                
+                P_Registrar_Ejecucion_Param('CARGA_DIRIGIDA_EJECUCIONES', v_conteo);
                 COMMIT;
                 
                 UPDATE PA.PA_PARAMETROS_MVP SET VALOR='N' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_PROCESO_ACTIVO';
@@ -8428,18 +8480,7 @@ END P_Carga_Precalifica_Cancelado;
         
         END LOOP;
         
-        UPDATE
-            PA.PA_PARAMETROS_MVP
-        SET
-            VALOR = VALOR ||(
-                CASE
-                    WHEN NVL(REGEXP_COUNT(VALOR, '}'), 0) > 0 THEN ','
-                    ELSE ''
-                END
-            ) || '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') || '","R":' || v_conteo || ',"E":' || NVL(REGEXP_COUNT(VALOR, '}') + 1, 1) || '}'
-        WHERE
-            CODIGO_MVP = 'REPRESTAMOS'
-            AND CODIGO_PARAMETRO = 'CAMPANA_ESPECIAL_EJECUCIONES';
+        P_Registrar_Ejecucion_Param('CAMPANA_ESPECIAL_EJECUCIONES', v_conteo);
         
         COMMIT;
         
@@ -9513,11 +9554,9 @@ END P_Carga_Precalifica_Cancelado;
   FUNCTION F_Validar_Listas_PEP (
     p_codempresa IN VARCHAR2,
     p_codpersona IN VARCHAR2) RETURN NUMBER IS
+        PRAGMA UDF;
         BEGIN
-        -- CAMBIO AQUI
-            --IF PA.P_DATOS_PERSONA.esta_en_lista_pep(p_codempresa, p_codpersona) THEN
             IF esta_en_lista_pep(p_codempresa, p_codpersona) THEN
-            -- HASTA AQUI
                 RETURN 1;
             ELSE
                 RETURN 0;
@@ -9527,11 +9566,9 @@ END P_Carga_Precalifica_Cancelado;
   FUNCTION F_Validar_Lista_NEGRA (
     p_codempresa IN VARCHAR2,
     p_codpersona IN VARCHAR2) RETURN NUMBER IS
+        PRAGMA UDF;
         BEGIN
-        -- CAMBIO AQUI
-            --IF PA.P_DATOS_PERSONA.esta_en_lista_negra(p_codempresa, p_codpersona) THEN
             IF esta_en_lista_negra(p_codempresa, p_codpersona) THEN
-            -- HASTA AQUI
                 RETURN 1;
             ELSE
                 RETURN 0;
@@ -9916,45 +9953,45 @@ END P_Carga_Precalifica_Cancelado;
     END F_Existe_Plazo;
     
     FUNCTION F_TIENE_GARANTIA(pNoCredito IN NUMBER)
-   
-   RETURN NUMBER IS
-   vExiste     NUMBER := 0;
-   BEGIN
-           SELECT COUNT(1) INTO vExiste
-        FROM PR_CREDITOS A,
-             PR_GARANTIAS_X_CREDITO B,
-             PR_GARANTIAS C
-        WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
-        AND A.no_credito = pNoCredito
-        AND A.estado IN ('D','V','M','E','J') 
-        AND B.codigo_empresa = a.codigo_empresa
-        AND B.no_credito = a.no_credito
-        AND C.codigo_empresa = b.codigo_empresa 
-        AND C.numero_garantia = b.numero_garantia
-        AND C.codigo_tipo_garantia_sb != 'NA';
-        
+      RETURN NUMBER IS
+      PRAGMA UDF;
+      vExiste NUMBER := 0;
+    BEGIN
+        SELECT COUNT(1)
+          INTO vExiste
+          FROM PR_CREDITOS A
+               JOIN PR_GARANTIAS_X_CREDITO B
+                 ON B.codigo_empresa = A.codigo_empresa
+                AND B.no_credito = A.no_credito
+               JOIN PR_GARANTIAS C
+                 ON C.codigo_empresa = B.codigo_empresa
+                AND C.numero_garantia = B.numero_garantia
+         WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
+           AND A.no_credito     = pNoCredito
+           AND A.estado        IN ('D','V','M','E','J')
+           AND C.codigo_tipo_garantia_sb <> 'NA';
+
         RETURN vExiste;
-        
     END F_TIENE_GARANTIA;
     
   FUNCTION F_TIENE_GARANTIA_HISTORICO(pNoCredito IN NUMBER)
-  
-   
-   RETURN NUMBER IS
-   vExiste     NUMBER := 0;
+      RETURN NUMBER IS
+      PRAGMA UDF;
+      vExiste NUMBER := 0;
    BEGIN
-           SELECT COUNT(1) INTO vExiste
-        FROM PR_CREDITOS_HI A,
-             PR_GARANTIAS_X_CREDITO B,
-             PR_GARANTIAS C
-        WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
-        AND A.no_credito = pNoCredito
-        AND A.estado IN ('D','V','M','E','J') 
-        AND B.codigo_empresa = a.codigo_empresa
-        AND B.no_credito = a.no_credito
-        AND C.codigo_empresa = b.codigo_empresa 
-        AND C.numero_garantia = b.numero_garantia
-        AND C.codigo_tipo_garantia_sb != 'NA';
+        SELECT COUNT(1)
+          INTO vExiste
+          FROM PR_CREDITOS_HI A
+               JOIN PR_GARANTIAS_X_CREDITO B
+                 ON B.codigo_empresa = A.codigo_empresa
+                AND B.no_credito = A.no_credito
+               JOIN PR_GARANTIAS C
+                 ON C.codigo_empresa = B.codigo_empresa
+                AND C.numero_garantia = B.numero_garantia
+         WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
+           AND A.no_credito     = pNoCredito
+           AND A.estado        IN ('D','V','M','E','J')
+           AND C.codigo_tipo_garantia_sb <> 'NA';
         
         RETURN vExiste;
   
@@ -13548,6 +13585,7 @@ FUNCTION esta_en_lista_ofac(
    p_codempresa VARCHAR2,
    p_codpersona VARCHAR2)
    RETURN BOOLEAN IS
+   PRAGMA UDF;
    --OBJETIVO : Devuelve true si el nombre la persona se encuentra en la Lista ofac.
    --REQUIERE : p_codempresa- codigo de la empresa; p_codPersona -- Codigo de la persona
    --HISTORIA : Dfatule 27/09/2007 CREACION
@@ -13671,6 +13709,7 @@ FUNCTION esta_en_lista_negra(
       p_codempresa                        VARCHAR2,
       p_codpersona                        VARCHAR2 )
       RETURN BOOLEAN IS
+      PRAGMA UDF;
       /*
          OBJETIVO
           Devuelve true si la persona se encuenta en la lista
@@ -13704,6 +13743,7 @@ FUNCTION esta_en_lista_pep(
       p_codempresa                        VARCHAR2,
       p_codpersona                        VARCHAR2 )
       RETURN BOOLEAN IS
+      PRAGMA UDF;
       --  OBJETIVO :    Devuelve true si la persona se encuenta en la Lista PEP.
       --  [...]
       l_dummy NUMBER;
