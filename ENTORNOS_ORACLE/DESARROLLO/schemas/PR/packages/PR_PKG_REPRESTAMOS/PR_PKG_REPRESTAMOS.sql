@@ -20,365 +20,250 @@ create or replace PACKAGE BODY                                  PR_PKG_REPRESTAM
        -- 8 - Excluir cliente que tengas pr¿stamos desembolsados en los ¿ltimos 6 meses;
        --   - Se actualizar¿ el Campo 'ESTADO' con 'X1', y el Campo 'OBSERVACIONES' con 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||PA.PARAM.PARAMETRO_GENERAL
        --   - ('PRECAL_DESEMBOLSO_PR', 'PR')||' DIAS' en la Tabla PR_PRECALIFICADOS
-
-       CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS    
-       select a.codigo_empresa
-         CODIGO_EMPRESA, 
-         pr_pkg_represtamos.f_genera_secuencia ID_REPRESTAMO,
-         a.codigo_cliente, 
-         P_FECHA_CORTE FECHA_CORTE,
-         a.NO_CREDITO,           
-         'RE' ESTADO, 
-         NULL CODIGO_PRECALIFICACION, 
-         0 DIAS_ATRASO, 
-         sysdate FECHA_PROCESO, 
-         0 PIN,--lpad(PA.PKG_NOTIFICACIONES.GENERAR_PIN_RANDOM(100,999999),6, '0') PIN,
-         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN') INTENTOS_PIN,
-         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION') INTENTOS_IDENTIFICACION,    --   TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'INTENTOS_IDENT')) INTENTOS_IDENTIFICACION,    ---DEBE INSERTAR ESTE PARAMETRO 
-         'N' IND_SOLICITA_AYUDA,
-         --0 mto_aprobado,
-         b.monto_desembolsado mto_aprobado,
-         0 mto_preaprobado,
-         null OBSERVACIONES, 
-         USER ADICIONADO_POR, 
-         sysdate FECHA_ADICION, 
-         NULL MODIFICADO_POR, 
-         null FECHA_MODIFICACION,
-         NULL ESTADO_ORIGINAL,
-         NULL XCORE_GLOBAL,--NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE(PA.OBT_IDENTIFICACION_PERSONA(  a.codigo_cliente,'1')),0) XCORE_GLOBAL,
-         NULL XCORE_CUSTOM, --NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE_CUSTOM(PA.OBT_IDENTIFICACION_PERSONA( A.codigo_cliente,'1')),0) XCORE_CUSTOM
-         NULL ID_CARGA_DIRIGIDA,
-         NULL ID_CAMPANA_ESPECIALES,
-         'N'  ES_FIADOR
-         FROM PR_CREDITOS a,
-         pa_detallado_De08 b,
-              PR_tipo_credito_REPRESTAMO c 
-         WHERE ROWNUM <= TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO')) and  a.tipo_credito= c.tipo_credito  
-         AND (EXISTS (SELECT 1
-            FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
-            WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )
-         AND b.tipo_credito= c.tipo_credito 
-         AND  b.fecha_corte =  TO_DATE('19/11/2024', 'DD/MM/YYYY')
-         AND  b.no_credito = a.no_credito
-         AND  b.fuente = 'PR'
-         AND  c.CARGA = 'S'         
-         AND  b.dias_atraso <=PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_MORA_MAYOR_PR')
-         AND b.CALIFICA_CLIENTE  IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
-          
-           AND (( b.MTO_BALANCE_CAPITAL / 
-                     CASE WHEN b.MONTO_DESEMBOLSADO =0 then
-                         b.MONTO_CREDITO
-                         else b.MONTO_DESEMBOLSADO END )*100 )<= 100 - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CAPITAL_PAGADO'))
-         
-         and a.codigo_empresa =  PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-         and not exists (SELECT 1
-                                  FROM PR_CREDITOS C 
-                                 WHERE C.CODIGO_EMPRESA      =  a.CODIGO_EMPRESA
-                                   AND C.NO_CREDITO          != a.NO_CREDITO                       
-                                   AND C.CODIGO_CLIENTE      = a.CODIGO_CLIENTE                        
-                                   AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
-                                   AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))))
-          AND not exists (SELECT 1
-                                  FROM PR_CREDITOS C 
-                                 WHERE C.CODIGO_EMPRESA      =  a.CODIGO_EMPRESA
-                                   AND C.NO_CREDITO          != a.NO_CREDITO                       
-                                   AND C.CODIGO_CLIENTE      = a.CODIGO_CLIENTE                        
-                                   AND C.ESTADO              = 'E')
-          -- validación para  solo pesonas físicas                     
-          AND exists (SELECT 1 
-                      FROM PERSONAS a
-                      WHERE COD_PERSONA = cast(a.codigo_cliente as varchar2(15))
-                      AND ES_FISICA = PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'PERSONA_FISICA' ))
-         -- validación la nacionalidad              
-         AND EXISTS ( SELECT 1
-                      FROM ID_PERSONAS a
-                      WHERE COD_PERSONA = cast(a.codigo_cliente as varchar2(15))
-                      AND   COD_PAIS    IN (SELECT COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS ( 'NACIONALIDAD')))
-                      AND   COD_TIPO_ID IN (SELECT COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS ( 'TIPO_DOCUMENTO'))))          
-         --  se valida que no exista el mismo crédito con un proceso iniciado de représtamo 
-         AND not exists (select 1
-                                 from pr_represtamos
-                                 where codigo_empresa = a.codigo_empresa 
-                                 and no_credito =  a.NO_CREDITO
-                                 and estado in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_NO_REPROCESO')))
-                                 --('RE','VR','NP','SC','CRB','CRS','CRD')
-                                 )
-         -- Se valida que solo se selecciones creditos que cumplan con el criterio del monto desembolsado se encuentre entre el parámetro
-        /* AND exists (select 1
-                            from PR_PLAZO_CREDITO_REPRESTAMO
-                            where codigo_empresa = a.codigo_empresa
-                            and tipo_credito = c.tipo_credito
-                            AND A.MONTO_DESEMBOLSADO between monto_min and monto_max
-                           )*/
-      -- Se valida que sea a una sola firma        
-        AND not EXISTS (select 1--a.no_credito---, a.codigo_cliente, b.codigo_aval_repre
-                        from PR_CREDITOS a1, 
-                            PR_AVAL_REPRE_X_CREDITO b
-                        where a1.codigo_empresa = 1
-                        and a1.no_credito = a.no_credito
-                        and b.codigo_empresa = a1.codigo_empresa
-                        and b.no_credito = a1.no_credito
-                        and b.codigo_aval_repre != a1.codigo_cliente
-                        AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
-        -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
-        -- Se valida que los clientes no esten en lista NEGRA
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
-        ;
-           
-       TYPE tCREDITOS_PROCESAR IS TABLE OF CREDITOS_PROCESAR%ROWTYPE;
-       vCREDITOS_PROCESAR        tCREDITOS_PROCESAR := TCREDITOS_PROCESAR ();
-       
-       v_fecha_corte             DATE; 
+       v_fecha_corte             DATE;
        v_fecha_proceso           DATE;
-       v_atraso_30               NUMBER(10); 
-       --agregue esta variable
-       pMensaje      VARCHAR2(100);
-       
-       --AGREGUE ESTA NUEVA VARIABLE   
-       --idCabeceraDet NUMBER;
-          
-    BEGIN
-    
-            
-            --VERIFICAR SI EXISTE EL REGISTRO
-           /* BEGIN
-                SELECT ID_APLICACION_PASO_DET
-                INTO idCabeceraDet
-                FROM PR.PR_APLICACION_PASO_DET
-                WHERE ID_APLICACION_PASO_DET = pIDAPLICACION;
-                
-                DBMS_OUTPUT.PUT_LINE ( 'qUE PASO AQUI = ' || idCabeceraDet );
-                
-                EXCEPTION
-                    WHEN NO_DATA_FOUND THEN
-                    --SI NO SE ENCUENTRA NINGUN REGISTRO CREARA UNO NUEVO
-                     PR.PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_DET ( 'RD_CARGA_PRECALIFICACION', 'RD_CARGA.PRECALIFICA_REPRESTAMO', 'INICIADO', pMensaje ); 
-                        
-                        
-                     --OBTENER EL ID DEL NUEVO REGISTRO
-                     SELECT PR.SEQ_PR_APLICACION_PASO_DET.CURRVAL
-                     INTO idCabeceraDet
-                     FROM DUAL;  
-                     
-                     DBMS_OUTPUT.PUT_LINE ( 'idCabeceraDet = ' || idCabeceraDet );
-                     
-                     --ACTUALIZAR EL PARAMETRO DE ENTRADA CON EL NUEVO ID
-                     pIDAPLICACION := idCabeceraDet;
-                     
-                     DBMS_OUTPUT.PUT_LINE ( 'pIDAPLICACION PARA EL OTRO PASO = ' || pIDAPLICACION );
-                     DBMS_OUTPUT.PUT_LINE ('SE CREO EL REGISTRO CON ID: ' || idCabeceraDet);
-                                      
-                    WHEN OTHERS THEN
-                        DBMS_OUTPUT.PUT_LINE('Error inesperado al verificar o crear el registro: ' || SQLERRM);
-                    RETURN;                     
-                END;
-            
-            --ACTUALIZAR BITACORA SI YA EXISTE
-            IF idCabeceraDet IS NOT NULL THEN
-                PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 10, 'EN PROCESO', pMensaje );
-            END IF;*/
-    
-       
-       -- Asigna el valor del Par¿metro a la variable correspondioente 
-       v_atraso_30 := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIA_ATRASO_TC'));
-      -- Ejecuto un SELECT INTO de la FECHA_PROCESO en la tabla PR_REPRESTAMOS    
-      -- Calculo que la variable v_fecha_froceso + el Par¿metro de Fecha_a_Procesar(Que puede ser 10 d¿as)
-      -- Si la Fecha resultante es Mayor al trunc(Sysdate) Ejecuto el Package PR_PKG_PRECALIFICADOS;
-      -- de lo contrario ejecuto un Return, para que el Package CDG.P_CARGA_PRESTAMOS termine su Ejecuci¿n.  
-          BEGIN
-              SELECT P.FECHA_PROCESO
-               INTO v_fecha_proceso      
-               FROM PR.PR_REPRESTAMOS P
-              WHERE P.FECHA_PROCESO IS NOT NULL 
-                AND ROWNUM = 1;
-          EXCEPTION WHEN NO_DATA_FOUND THEN
-              v_fecha_proceso:= TRUNC(SYSDATE)-30;
-          END;      
-       --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 20, 'EN PROCESO', pMensaje );   
-          BEGIN
-              v_fecha_proceso:= v_fecha_proceso +  TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIAS_PROCESAR'));
-              IF v_fecha_proceso > TRUNC(SYSDATE) THEN
-                --PR_REPRESTAMOS.ACTUALIZA_PRECALIFICACION;
-                DBMS_OUTPUT.PUT_LINE ( 'v_fecha_proceso = ' || v_fecha_proceso );
-                RETURN;
-              END IF;
-          END; 
-       
-      
-        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 30, 'EN PROCESO', pMensaje );
-       
-       -- Para obtener la fecha m¿xima anterior
-        SELECT MAX (P.FECHA_CORTE)  
-          INTO v_fecha_corte
-          FROM PA_DETALLADO_DE08 P
-         WHERE P.FUENTE       = 'PR'
-           AND P.FECHA_CORTE  <  ( SELECT MAX(P.FECHA_CORTE)   
-                                     FROM PA_DETALLADO_DE08 P
-                                    WHERE P.FUENTE       = 'PR' );
-       
-       OPEN CREDITOS_PROCESAR(v_fecha_corte); 
+       v_fecha_proceso_ejec      DATE := SYSDATE;
+       v_atraso_30               NUMBER(10);
+       v_lote_carga              NUMBER;
+       v_max_intentos_pin        NUMBER;
+       v_max_intentos_ident      NUMBER;
+       v_capital_pagado          NUMBER;
+       v_meses_max_desembolso    NUMBER;
+       v_dias_procesar           NUMBER;
+       v_persona_fisica          VARCHAR2(30);
+       v_clientes_sola_firma     VARCHAR2(1);
+       v_codigo_empresa          NUMBER;
+       v_param_deembolso_text    VARCHAR2(100);
+       v_param_deembolso_val     NUMBER;
+       v_param_mora_val          NUMBER;
+       pMensaje                  VARCHAR2(100);
+   BEGIN
+       v_atraso_30            := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIA_ATRASO_TC'));
+       v_lote_carga           := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO'));
+       v_max_intentos_pin     := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN'));
+       v_max_intentos_ident   := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION'));
+       v_capital_pagado       := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CAPITAL_PAGADO'));
+       v_meses_max_desembolso := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO'));
+       v_dias_procesar        := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIAS_PROCESAR'));
+       v_persona_fisica       := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PERSONA_FISICA');
+       v_clientes_sola_firma  := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CLIENTES_A_SOLA_FIRMA');
+       v_codigo_empresa       := PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo;
+       v_param_deembolso_text := OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR');
+       v_param_deembolso_val  := TO_NUMBER(v_param_deembolso_text);
+       v_param_mora_val       := TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR'));
 
-        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 40, 'EN PROCESO', pMensaje );
-       LOOP
-          VCREDITOS_PROCESAR.DELETE;
-          FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
-          -- Inserta los Precalificados
-          FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
+       BEGIN
+           SELECT P.FECHA_PROCESO
+             INTO v_fecha_proceso
+             FROM PR.PR_REPRESTAMOS P
+            WHERE P.FECHA_PROCESO IS NOT NULL
+              AND ROWNUM = 1;
+       EXCEPTION
+           WHEN NO_DATA_FOUND THEN
+               v_fecha_proceso := TRUNC(SYSDATE) - 30;
+       END;
 
-         
+       v_fecha_proceso := v_fecha_proceso + v_dias_procesar;
+       IF v_fecha_proceso > TRUNC(v_fecha_proceso_ejec) THEN
+           DBMS_OUTPUT.PUT_LINE('v_fecha_proceso = ' || v_fecha_proceso);
+           RETURN;
+       END IF;
 
-           -- 7 - Excluir cr¿ditos con atraso mayor a 45 d¿as
-           -- 7 - en los ¿ltimos 6 meses = v_dias_180 
-           FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT                                 
-           -- Se actualiza el campo DIAS_ATRASO en la Tabla PR_REPRESTAMOS
-           -- con el M¿ximo d¿a de atraso en los ¿ltimos 6 meses   
-           UPDATE PR.PR_REPRESTAMOS y
-                SET     Y.DIAS_ATRASO   = (SELECT MAX(D.DIAS_ATRASO)
-                                               FROM  PA.PA_DETALLADO_DE08 D
-                                              WHERE  D.FUENTE           = 'PR'
-                                                 AND D.FECHA_CORTE      >= ADD_MONTHS(VCREDITOS_PROCESAR(x).FECHA_CORTE , -6) -- 7 - Excluir cr¿ditos con atraso mayor a 45 d¿as en los ¿ltimos 6 meses
-                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(x).NO_CREDITO 
-                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
-                                               --  AND D.DIAS_ATRASO      >= v_mayor_45 
-                                                 )
-             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
-               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
-               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
-               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
-               AND y.ESTADO         = 'RE';   
-         
-       
-              
-            --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );  
-       
-              
-          -- 8 - Excluir cliente con TC con dias de atraso mayor a 30 d¿as 
-          -- Actualiza el estado cuando existe un detalle PA.PA_DETALLADO_DE08 de TC
-          -- Se actualizar¿ el Campo 'ESTADO' con 'X3'; y el Campo 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-          -- en la Tabla PR_REPRESTAMOS
-          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
-             UPDATE PR.PR_REPRESTAMOS y
-                SET y.ESTADO         = 'X3',
-                    Y.OBSERVACIONES  = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-              WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
-                AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
-                AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
-                AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO
-                AND y.ESTADO         = 'RE'             
-                AND 1                IN (SELECT 1
-                                          FROM PA_DETALLADO_DE08 D
-                                         WHERE D.FUENTE           =  'TC'
-                                           AND D.FECHA_CORTE      =  VCREDITOS_PROCESAR(x).FECHA_CORTE
-                                           AND D.NO_CREDITO       != VCREDITOS_PROCESAR(x).NO_CREDITO                                      
-                                           AND D.CODIGO_CLIENTE   =  VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
-                                           AND D.CODIGO_EMPRESA   =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
-                                           AND D.DIAS_ATRASO      >= v_atraso_30); 
-          
-            
-          --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 60, 'EN PROCESO', pMensaje );
-          -- Evalua si el cliente tiene otro Prestamo Desembolsados en los ¿ltimos 6 Meses
-          -- 9 - Excluir cliente que tengas prestamos desembolsados de los ¿ltimos 6 meses
-          -- Se actualizar¿ el Campo 'ESTADO' con 'X1'; y el Campo 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||PA.PARAMETROS_X_EMPRESA( 'PRECAL_DESEMBOLSO_PR', 'PR')||' MESES'
-          -- en la Tabla PR_REPRESTAMOS
-          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
-             UPDATE PR.PR_REPRESTAMOS y
-                SET y.ESTADO         = 'X1', 
-                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
-             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
-               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
-               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
-               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
-               AND y.ESTADO         = 'RE'   
-               AND 1 = (SELECT DISTINCT 1
-                          FROM PR_CREDITOS C 
-                         WHERE C.CODIGO_EMPRESA      =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
-                           AND C.NO_CREDITO          != VCREDITOS_PROCESAR(x).NO_CREDITO                       
-                           AND C.CODIGO_CLIENTE      = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE                        
-                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los ¿ltimos 6 meses
-                           AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))));
+       SELECT MAX(P.FECHA_CORTE)
+         INTO v_fecha_corte
+         FROM PA_DETALLADO_DE08 P
+        WHERE P.FUENTE      = 'PR'
+          AND P.FECHA_CORTE < (SELECT MAX(P2.FECHA_CORTE)
+                                 FROM PA_DETALLADO_DE08 P2
+                                WHERE P2.FUENTE = 'PR');
 
-          EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
-       END LOOP;
-       
-       CLOSE CREDITOS_PROCESAR;
-       
-       
-       --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 70, 'EN PROCESO', pMensaje );
-       
-       -- Se actualiza el ESTADO con valor 'X2' y el campo OBSERVACIONES con 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
-       -- en la tabla PR_REPRESTAMOS para todos los Cr¿ditos precalificados con Estodo ='P'
-        UPDATE PR.PR_REPRESTAMOS P
-           SET P.ESTADO         = 'X2',
-               P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
-         WHERE P.DIAS_ATRASO    > 1000--OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
-           AND P.ESTADO         = 'RE';
-        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 80, 'EN PROCESO', pMensaje );   
-        -- Se eliminan los represtamos que tienen creditos mancomunados
-        DELETE  PR_REPRESTAMOS --PR_OPCIONES_REPRESTAMO
-        WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
-                    FROM PR_REPRESTAMOS A
-                    WHERE ESTADO = 'RE'
-                    AND EXISTS (SELECT 1
-                                FROM CUENTA_CLIENTE_RELACION
-                                WHERE COD_SISTEMA = 'PR'
-                                AND NUM_CUENTA = A.NO_CREDITO
-                                AND NVL(TIPO_RELACION,'x') = 'O'
-                                )
-                    ); 
-        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 90, 'EN PROCESO', pMensaje ); 
-       -- Se valida que la edad este entre el rango de 18 a 75, definido por parametros
-       DELETE  PR_REPRESTAMOS
-        WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
-                    FROM PR_REPRESTAMOS A
-                    WHERE ESTADO = 'RE'
-                    AND   PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD ( A.CODIGO_CLIENTE,'CARGA' ) = 0
-                    ); 
-                
-     DELETE PR_REPRESTAMOS
-      WHERE ESTADO LIKE 'X%';  
-      
-      --Actualiza el detalle de la bitacora para cambiar el estado a proceso
-        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 100, 'EN PROCESO', pMensaje );
-         --Finalizo el proceso
-        --PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET ( pIDAPLICACION,'FINALIZADO', 'SE FINALIZO',pMensaje );
-        
-          
-      COMMIT;
-        -- PR.PR_PKG_REPRESTAMOS.ACTUALIZA_PRECALIFICACION;
-    EXCEPTION WHEN OTHERS THEN   
-        DECLARE
-            vIdError      PLS_INTEGER := 0;
-        BEGIN                                    
-          
-        pMensaje:='ERROR CON EL STORE PROCEDURE PRECALIFICA_REPRESTAMO';
-          setError(pProgramUnit => 'Precalifica_Represtamo', 
-                   pPieceCodeName => NULL, 
-                   pErrorDescription => SQLERRM,                                                              
-                   pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
-                   pEmailNotification => NULL, 
-                   pParamList => IA.LOGGER.vPARAMLIST, 
-                   pOutputLogger => FALSE, 
-                   pExecutionTime => NULL, 
-                   pIdError => vIdError); 
-                   
-        --Si da error actualizo el detalle de la bitacora para capturar el error           
-        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ERROR', 100, SQLERRM,pMensaje );
-        
-        END;
-        
-        
-    END Precalifica_Represtamo;
+       INSERT INTO PR.PR_REPRESTAMOS (
+           CODIGO_EMPRESA,
+           ID_REPRESTAMO,
+           CODIGO_CLIENTE,
+           FECHA_CORTE,
+           NO_CREDITO,
+           ESTADO,
+           CODIGO_PRECALIFICACION,
+           DIAS_ATRASO,
+           FECHA_PROCESO,
+           PIN,
+           INTENTOS_PIN,
+           INTENTOS_IDENTIFICACION,
+           IND_SOLICITA_AYUDA,
+           MTO_CREDITO_ACTUAL,
+           MTO_PREAPROBADO,
+           OBSERVACIONES,
+           ADICIONADO_POR,
+           FECHA_ADICION,
+           MODIFICADO_POR,
+           FECHA_MODIFICACION,
+           ESTADO_ORIGINAL,
+           XCORE_GLOBAL,
+           XCORE_CUSTOM,
+           ID_CARGA_DIRIGIDA,
+           ID_REPRE_CAMPANA_ESPECIALES,
+           ES_FIADOR)
+       SELECT a.codigo_empresa,
+              PR.PR_PKG_REPRESTAMOS.f_genera_secuencia,
+              a.codigo_cliente,
+              v_fecha_corte,
+              a.no_credito,
+              'RE',
+              NULL,
+              0,
+              v_fecha_proceso_ejec,
+              0,
+              v_max_intentos_pin,
+              v_max_intentos_ident,
+              'N',
+              b.monto_desembolsado,
+              0,
+              NULL,
+              USER,
+              v_fecha_proceso_ejec,
+              NULL,
+              NULL,
+              NULL,
+              NULL,
+              NULL,
+              NULL,
+              NULL,
+              'N'
+         FROM PR_CREDITOS a,
+              PA_DETALLADO_DE08 b,
+              PR_TIPO_CREDITO_REPRESTAMO c
+        WHERE ROWNUM <= v_lote_carga
+          AND a.tipo_credito = c.tipo_credito
+          AND (EXISTS (SELECT 1
+                         FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
+                        WHERE a.codigo_periodo_cuota = subq.COLUMN_VALUE)
+               OR NOT EXISTS (SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq))
+          AND b.tipo_credito = c.tipo_credito
+          AND b.fecha_corte = v_fecha_corte
+          AND b.no_credito = a.no_credito
+          AND b.fuente = 'PR'
+          AND c.carga = 'S'
+          AND b.dias_atraso <= v_param_mora_val
+          AND b.califica_cliente IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
+          AND ((b.mto_balance_capital / CASE WHEN b.monto_desembolsado = 0 THEN b.monto_credito ELSE b.monto_desembolsado END) * 100) <= 100 - v_capital_pagado
+          AND a.codigo_empresa = v_codigo_empresa
+          AND NOT EXISTS (SELECT 1
+                            FROM PR_CREDITOS c2
+                           WHERE c2.codigo_empresa      = a.codigo_empresa
+                             AND c2.no_credito          != a.no_credito
+                             AND c2.codigo_cliente      = a.codigo_cliente
+                             AND c2.f_primer_desembolso > ADD_MONTHS(SYSDATE, - v_meses_max_desembolso)
+                             AND c2.estado              IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))))
+          AND NOT EXISTS (SELECT 1
+                            FROM PR_CREDITOS c3
+                           WHERE c3.codigo_empresa = a.codigo_empresa
+                             AND c3.no_credito     != a.no_credito
+                             AND c3.codigo_cliente = a.codigo_cliente
+                             AND c3.estado         = 'E')
+          AND EXISTS (SELECT 1
+                        FROM PERSONAS per
+                       WHERE per.cod_persona = CAST(a.codigo_cliente AS VARCHAR2(15))
+                         AND per.es_fisica   = v_persona_fisica)
+          AND EXISTS (SELECT 1
+                        FROM ID_PERSONAS perid
+                       WHERE perid.cod_persona = CAST(a.codigo_cliente AS VARCHAR2(15))
+                         AND perid.cod_pais    IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('NACIONALIDAD')))
+                         AND perid.cod_tipo_id IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('TIPO_DOCUMENTO'))))
+          AND NOT EXISTS (SELECT 1
+                            FROM PR_REPRESTAMOS prs
+                           WHERE prs.codigo_empresa = a.codigo_empresa
+                             AND prs.no_credito     = a.no_credito
+                             AND prs.estado         IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_NO_REPROCESO'))))
+          AND NOT EXISTS (SELECT 1
+                            FROM PR_CREDITOS a1,
+                                 PR_AVAL_REPRE_X_CREDITO b1
+                           WHERE a1.codigo_empresa = v_codigo_empresa
+                             AND a1.no_credito     = a.no_credito
+                             AND b1.codigo_empresa = a1.codigo_empresa
+                             AND b1.no_credito     = a1.no_credito
+                             AND b1.codigo_aval_repre != a1.codigo_cliente
+                             AND v_clientes_sola_firma = 'S')
+          AND PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0
+          AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(v_codigo_empresa, a.codigo_cliente) = 0
+          AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(v_codigo_empresa, a.codigo_cliente) = 0;
+
+       UPDATE PR.PR_REPRESTAMOS y
+          SET y.dias_atraso = (SELECT MAX(d.dias_atraso)
+                                 FROM PA.PA_DETALLADO_DE08 d
+                                WHERE d.fuente         = 'PR'
+                                  AND d.fecha_corte    >= ADD_MONTHS(y.fecha_corte, -6)
+                                  AND d.no_credito     = y.no_credito
+                                  AND d.codigo_cliente = y.codigo_cliente)
+        WHERE y.fecha_proceso = v_fecha_proceso_ejec
+          AND y.estado = 'RE';
+
+       UPDATE PR.PR_REPRESTAMOS y
+          SET y.estado        = 'X3',
+              y.observaciones = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A ' || v_atraso_30 || ' DIAS'
+        WHERE y.fecha_proceso = v_fecha_proceso_ejec
+          AND y.estado = 'RE'
+          AND EXISTS (SELECT 1
+                        FROM PA_DETALLADO_DE08 d
+                       WHERE d.fuente         = 'TC'
+                         AND d.fecha_corte    = y.fecha_corte
+                         AND d.no_credito     != y.no_credito
+                         AND d.codigo_cliente = y.codigo_cliente
+                         AND d.codigo_empresa = y.codigo_empresa
+                         AND d.dias_atraso    >= v_atraso_30);
+
+       UPDATE PR.PR_REPRESTAMOS y
+          SET y.estado        = 'X1',
+              y.observaciones = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS ' || v_param_deembolso_text || ' MESES'
+        WHERE y.fecha_proceso = v_fecha_proceso_ejec
+          AND y.estado = 'RE'
+          AND EXISTS (SELECT 1
+                        FROM PR_CREDITOS c
+                       WHERE c.codigo_empresa      = y.codigo_empresa
+                         AND c.no_credito          != y.no_credito
+                         AND c.codigo_cliente      = y.codigo_cliente
+                         AND c.f_primer_desembolso > ADD_MONTHS(SYSDATE, - v_param_deembolso_val)
+                         AND c.estado              IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
+
+       UPDATE PR.PR_REPRESTAMOS p
+          SET p.estado        = 'X2',
+              p.observaciones = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A ' || p.dias_atraso || ' DIAS'
+        WHERE p.estado = 'RE'
+          AND p.dias_atraso > v_param_mora_val;
+
+       DELETE FROM PR.PR_REPRESTAMOS r
+        WHERE r.estado = 'RE'
+          AND EXISTS (SELECT 1
+                        FROM CUENTA_CLIENTE_RELACION rel
+                       WHERE rel.cod_sistema   = 'PR'
+                         AND rel.num_cuenta    = r.no_credito
+                         AND NVL(rel.tipo_relacion, 'x') = 'O');
+
+       DELETE FROM PR.PR_REPRESTAMOS r
+        WHERE r.estado = 'RE'
+          AND PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD(r.codigo_cliente, 'CARGA') = 0;
+
+       DELETE FROM PR_REPRESTAMOS
+        WHERE ESTADO LIKE 'X%';
+
+       COMMIT;
+   EXCEPTION
+       WHEN OTHERS THEN
+           DECLARE
+               vIdError PLS_INTEGER := 0;
+           BEGIN
+               pMensaje := 'ERROR CON EL STORE PROCEDURE PRECALIFICA_REPRESTAMO';
+               setError(pProgramUnit => 'Precalifica_Represtamo',
+                        pPieceCodeName => NULL,
+                        pErrorDescription => SQLERRM,
+                        pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
+                        pEmailNotification => NULL,
+                        pParamList => IA.LOGGER.vPARAMLIST,
+                        pOutputLogger => FALSE,
+                        pExecutionTime => NULL,
+                        pIdError => vIdError);
+           END;
+   END Precalifica_Represtamo;
 PROCEDURE Precalifica_Repre_Cancelado IS 
     CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS
          select a.codigo_empresa
