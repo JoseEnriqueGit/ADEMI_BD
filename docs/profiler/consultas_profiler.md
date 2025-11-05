@@ -10,7 +10,8 @@ SELECT runid,
        run_comment,
        TO_CHAR(run_date,'YYYY-MM-DD HH24:MI:SS') AS run_start,
        ROUND(run_total_time / 1e9, 2)            AS total_seconds,
-       total_elapsed_time                        AS elapsed_ticks
+       ROUND(run_total_time / 6e10, 2)           AS total_minutes,
+       ROUND(run_total_time / 3.6e12, 2)         AS total_hours
   FROM SROBLES.plsql_profiler_runs
  WHERE run_comment LIKE '%P_Carga_Precalifica_Cancelado%'
  ORDER BY runid DESC;
@@ -23,6 +24,8 @@ SELECT u.unit_type,
        u.unit_name,
        SUM(d.total_occur)                          AS exec_count,
        ROUND(SUM(d.total_time)/1e9, 3)             AS total_seconds,
+       ROUND(SUM(d.total_time)/6e10, 3)            AS total_minutes,
+       ROUND(SUM(d.total_time)/3.6e12, 3)          AS total_hours,
        ROUND(SUM(d.total_time)
               / NULLIF(SUM(d.total_occur), 0) / 1e6, 3) AS avg_ms_per_call
   FROM SROBLES.plsql_profiler_units u
@@ -39,6 +42,8 @@ SELECT u.unit_type,
 ```sql
 SELECT d.line#,
        ROUND(d.total_time / 1e9, 4) AS seconds,
+       ROUND(d.total_time / 6e10, 4) AS minutes,
+       ROUND(d.total_time / 3.6e12, 4) AS hours,
        d.total_occur,
        ROUND(d.total_time / NULLIF(d.total_occur, 0) / 1e6, 3) AS avg_ms,
        s.text
@@ -69,6 +74,14 @@ SELECT log_id,
        EXTRACT(HOUR   FROM run_duration) * 3600 +
        EXTRACT(MINUTE FROM run_duration) * 60 +
        EXTRACT(SECOND FROM run_duration)    AS duration_seconds,
+       ROUND((EXTRACT(DAY    FROM run_duration) * 86400 +
+             EXTRACT(HOUR   FROM run_duration) * 3600 +
+             EXTRACT(MINUTE FROM run_duration) * 60 +
+             EXTRACT(SECOND FROM run_duration)) / 60, 2) AS duration_minutes,
+       ROUND((EXTRACT(DAY    FROM run_duration) * 86400 +
+             EXTRACT(HOUR   FROM run_duration) * 3600 +
+             EXTRACT(MINUTE FROM run_duration) * 60 +
+             EXTRACT(SECOND FROM run_duration)) / 3600, 2) AS duration_hours,
        additional_info
   FROM dba_scheduler_job_run_details
  WHERE owner    = 'PR'
@@ -82,8 +95,22 @@ SELECT log_id,
 SELECT r.runid,
        TO_CHAR(r.run_date, 'YYYY-MM-DD HH24:MI:SS') AS profiler_start,
        ROUND(r.run_total_time / 1e9, 2)             AS profiler_seconds,
+       ROUND(r.run_total_time / 6e10, 2)            AS profiler_minutes,
+       ROUND(r.run_total_time / 3.6e12, 2)          AS profiler_hours,
        j.actual_start_date,
-       j.run_duration
+       j.run_duration,
+       EXTRACT(DAY    FROM j.run_duration) * 86400 +
+       EXTRACT(HOUR   FROM j.run_duration) * 3600 +
+       EXTRACT(MINUTE FROM j.run_duration) * 60 +
+       EXTRACT(SECOND FROM j.run_duration)          AS scheduler_seconds,
+       ROUND((EXTRACT(DAY    FROM j.run_duration) * 86400 +
+             EXTRACT(HOUR   FROM j.run_duration) * 3600 +
+             EXTRACT(MINUTE FROM j.run_duration) * 60 +
+             EXTRACT(SECOND FROM j.run_duration)) / 60, 2) AS scheduler_minutes,
+       ROUND((EXTRACT(DAY    FROM j.run_duration) * 86400 +
+             EXTRACT(HOUR   FROM j.run_duration) * 3600 +
+             EXTRACT(MINUTE FROM j.run_duration) * 60 +
+             EXTRACT(SECOND FROM j.run_duration)) / 3600, 2) AS scheduler_hours
   FROM SROBLES.plsql_profiler_runs r
   JOIN dba_scheduler_job_run_details j
     ON j.actual_start_date BETWEEN r.run_date - INTERVAL '5' MINUTE
