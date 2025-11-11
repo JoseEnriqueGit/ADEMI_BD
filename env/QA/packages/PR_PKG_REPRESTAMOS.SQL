@@ -6546,8 +6546,9 @@ end loop;
 return;
 
 EXCEPTION
-WHEN NO_DATA_NEEDED THEN -- Consumidor dejó de leer; es normal en funciones pipelined
-NULL;
+WHEN NO_DATA_NEEDED THEN
+    -- Consumidor dejó de leer; no se debe registrar como error.
+    RETURN;
 
 WHEN OTHERS THEN DECLARE vIdError PLS_INTEGER := 0;
 
@@ -6565,7 +6566,7 @@ setError(
     pIdError = > vIdError
 );
 
-NULL;
+RAISE;
 
 END;
 
