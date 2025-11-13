@@ -1,5 +1,71 @@
 create or replace PACKAGE BODY       PR_PKG_REPRESTAMOS IS
 
+   TYPE t_api_log_ctx IS RECORD (
+       id_log   NUMBER,
+       start_ts TIMESTAMP
+   );
+
+   FUNCTION resolve_api_user RETURN VARCHAR2 IS
+   BEGIN
+       RETURN NVL(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), USER);
+   EXCEPTION
+       WHEN OTHERS THEN
+           RETURN USER;
+   END;
+
+   FUNCTION resolve_api_ip RETURN VARCHAR2 IS
+   BEGIN
+       RETURN SYS_CONTEXT('USERENV', 'IP_ADDRESS');
+   EXCEPTION
+       WHEN OTHERS THEN
+           RETURN NULL;
+   END;
+
+   PROCEDURE start_api_log(
+       p_endpoint     IN VARCHAR2,
+       p_metodo       IN VARCHAR2,
+       p_service_name IN VARCHAR2,
+       p_params       IN CLOB,
+       p_ctx          OUT t_api_log_ctx
+   ) IS
+       v_log IA_PKG_APIS.t_log_rec;
+   BEGIN
+       IA_PKG_APIS.begin_call(
+           p_endpoint     => p_endpoint,
+           p_metodo       => p_metodo,
+           p_usuario      => resolve_api_user,
+           p_ip_origen    => resolve_api_ip,
+           p_service_name => p_service_name,
+           p_params       => p_params,
+           p_log_rec      => v_log
+       );
+       p_ctx.id_log   := v_log.id_log;
+       p_ctx.start_ts := v_log.start_ts;
+   EXCEPTION
+       WHEN OTHERS THEN
+           p_ctx.id_log   := NULL;
+           p_ctx.start_ts := SYSTIMESTAMP;
+   END;
+
+   PROCEDURE finish_api_log(
+       p_ctx       IN t_api_log_ctx,
+       p_status    IN NUMBER,
+       p_error_msg IN VARCHAR2,
+       p_response  IN CLOB
+   ) IS
+   BEGIN
+       IA_PKG_APIS.end_call(
+           p_log_id      => p_ctx.id_log,
+           p_status_code => p_status,
+           p_error_msg   => p_error_msg,
+           p_response    => p_response,
+           p_start_ts    => p_ctx.start_ts
+       );
+   EXCEPTION
+       WHEN OTHERS THEN
+           NULL;
+   END;
+
    PROCEDURE Precalifica_Represtamo  IS 
        
        --- => Condicones a tomar en cuenta para la Precalificaci¿n de Cr¿ditos
