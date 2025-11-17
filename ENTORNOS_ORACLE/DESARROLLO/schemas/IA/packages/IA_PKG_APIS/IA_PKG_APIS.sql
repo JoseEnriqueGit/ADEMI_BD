@@ -1,87 +1,292 @@
 CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
-    gc_ms_per_day CONSTANT NUMBER := 86400000; -- 24h * 60m * 60s * 1000ms
+    gc_ms_per_day           CONSTANT NUMBER       := 86400000; -- 24h * 60m * 60s * 1000ms
+    gc_longitud_resumen     CONSTANT PLS_INTEGER  := 1000;
+    gc_placeholder_sensible CONSTANT VARCHAR2(64) := '[CONTENIDO_PROTEGIDO]';
 
-    PROCEDURE begin_call(
-        p_endpoint      IN IA.IA_API_LOGS.ENDPOINT%TYPE,
-        p_metodo        IN IA.IA_API_LOGS.METODO%TYPE,
-        p_usuario       IN IA.IA_API_LOGS.USUARIO%TYPE,
-        p_ip_origen     IN IA.IA_API_LOGS.IP_ORIGEN%TYPE,
-        p_service_name  IN IA.IA_API_LOGS.SERVICE_NAME%TYPE,
-        p_params        IN IA.IA_API_LOGS.PARAMETROS%TYPE,
-        p_log_rec       OUT t_log_rec
-    ) IS
+    SUBTYPE t_bandera_sensible IS IA.IA_API_LOGS.IS_SENSITIVE%TYPE;
+
+    TYPE t_metadatos_http IS RECORD (
+        categoria IA.IA_API_LOGS.STATUS_CATEGORY%TYPE,
+        nivel_log t_nivel_log
+    );
+
+    FUNCTION limitar_varchar(p_texto VARCHAR2, p_longitud PLS_INTEGER) RETURN VARCHAR2 IS
     BEGIN
+        IF p_texto IS NULL THEN
+            RETURN NULL;
+        END IF;
+        RETURN SUBSTR(TRIM(p_texto), 1, p_longitud);
+    END;
+
+    FUNCTION normalizar_metodo(p_metodo VARCHAR2) RETURN t_metodo_http IS
+        v_metodo t_metodo_http := UPPER(TRIM(p_metodo));
+    BEGIN
+        IF v_metodo IS NULL THEN
+            -- Guard clause: sin método HTTP no hay semántica para auditar.
+            RAISE_APPLICATION_ERROR(-20950, 'El método HTTP es obligatorio para registrar la bitácora.');
+        END IF;
+        RETURN v_metodo;
+    END;
+
+    FUNCTION normalizar_nivel(p_nivel t_nivel_log) RETURN t_nivel_log IS
+        v_nivel t_nivel_log := UPPER(TRIM(NVL(p_nivel, 'INFO')));
+    BEGIN
+        IF v_nivel NOT IN ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL') THEN
+            RETURN 'INFO';
+        END IF;
+        RETURN v_nivel;
+    END;
+
+    FUNCTION normalizar_bandera_sensible(p_bandera t_bandera_sensible) RETURN t_bandera_sensible IS
+        v_flag t_bandera_sensible := UPPER(TRIM(NVL(p_bandera, 'N')));
+    BEGIN
+        IF v_flag NOT IN ('Y', 'N') THEN
+            RETURN 'N';
+        END IF;
+        RETURN v_flag;
+    END;
+
+    FUNCTION sanitizar_payload(
+        p_datos   IN CLOB,
+        p_bandera IN t_bandera_sensible
+    ) RETURN CLOB IS
+    BEGIN
+        IF p_datos IS NULL THEN
+            RETURN NULL;
+        END IF;
+        IF p_bandera = 'Y' THEN
+            -- Evitamos replicar datos sensibles y simplificamos la gobernanza del dato.
+            RETURN TO_CLOB(gc_placeholder_sensible);
+        END IF;
+        RETURN REGEXP_REPLACE(p_datos, '[[:cntrl:]]', ' ');
+    END;
+
+    FUNCTION resumir_payload(p_datos CLOB) RETURN VARCHAR2 IS
+    BEGIN
+        IF p_datos IS NULL THEN
+            RETURN NULL;
+        END IF;
+        RETURN DBMS_LOB.SUBSTR(p_datos, gc_longitud_resumen, 1);
+    END;
+
+    FUNCTION calcular_duracion_ms(p_inicio TIMESTAMP) RETURN NUMBER IS
+    BEGIN
+        IF p_inicio IS NULL THEN
+            RETURN NULL;
+        END IF;
+        RETURN ROUND((SYSTIMESTAMP - p_inicio) * gc_ms_per_day, 2);
+    END;
+
+    FUNCTION clasificar_por_rango(p_codigo NUMBER) RETURN IA.IA_API_LOGS.STATUS_CATEGORY%TYPE IS
+    BEGIN
+        IF p_codigo BETWEEN 100 AND 199 THEN
+            RETURN 'INFORMATIONAL';
+        ELSIF p_codigo BETWEEN 200 AND 299 THEN
+            RETURN 'SUCCESS';
+        ELSIF p_codigo BETWEEN 300 AND 399 THEN
+            RETURN 'REDIRECTION';
+        ELSIF p_codigo BETWEEN 400 AND 499 THEN
+            RETURN 'CLIENT_ERROR';
+        ELSIF p_codigo >= 500 THEN
+            RETURN 'SERVER_ERROR';
+        END IF;
+        RETURN 'UNKNOWN';
+    END;
+
+    FUNCTION obtener_metadatos_http(
+        p_codigo_estado      IN IA.IA_API_LOGS.STATUS_CODE%TYPE,
+        p_respuesta_es_error IN BOOLEAN
+    ) RETURN t_metadatos_http IS
+        v_metadatos t_metadatos_http;
+    BEGIN
+        IF p_codigo_estado IS NULL THEN
+            v_metadatos.categoria := 'UNKNOWN';
+            v_metadatos.nivel_log := CASE WHEN p_respuesta_es_error THEN 'ERROR' ELSE 'INFO' END;
+            RETURN v_metadatos;
+        END IF;
+
+        BEGIN
+            SELECT STATUS_CATEGORY, SEVERITY_LEVEL
+              INTO v_metadatos.categoria, v_metadatos.nivel_log
+              FROM IA.IA_HTTP_STATUS_CATALOG
+             WHERE STATUS_CODE = p_codigo_estado;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                -- Lookup table fallback a rangos HTTP para no dejar huecos de clasificación.
+                v_metadatos.categoria := clasificar_por_rango(p_codigo_estado);
+                v_metadatos.nivel_log :=
+                    CASE
+                        WHEN p_respuesta_es_error THEN 'ERROR'
+                        WHEN v_metadatos.categoria IN ('CLIENT_ERROR', 'SERVER_ERROR') THEN 'WARN'
+                        ELSE 'INFO'
+                    END;
+        END;
+
+        IF p_respuesta_es_error = TRUE AND v_metadatos.nivel_log IN ('DEBUG', 'INFO') THEN
+            v_metadatos.nivel_log := 'ERROR';
+        END IF;
+        RETURN v_metadatos;
+    END;
+
+    FUNCTION mapear_codigo_error(p_codigo NUMBER) RETURN NUMBER IS
+        v_codigo NUMBER := NVL(p_codigo, -20001);
+    BEGIN
+        IF v_codigo BETWEEN -20999 AND -20000 THEN
+            RETURN v_codigo;
+        END IF;
+        RETURN GREATEST(-20999, -20000 - ABS(v_codigo));
+    END;
+
+    PROCEDURE iniciar_bitacora_api(
+        p_ruta_endpoint     IN IA.IA_API_LOGS.ENDPOINT%TYPE,
+        p_metodo_http       IN IA.IA_API_LOGS.METODO%TYPE,
+        p_identificador_cli IN IA.IA_API_LOGS.USUARIO%TYPE,
+        p_ip_cliente        IN IA.IA_API_LOGS.IP_ORIGEN%TYPE,
+        p_nombre_servicio   IN IA.IA_API_LOGS.SERVICE_NAME%TYPE,
+        p_carga_util        IN CLOB,
+        p_nivel_log         IN IA.IA_API_LOGS.LOG_LEVEL%TYPE DEFAULT 'INFO',
+        p_marcar_sensible   IN IA.IA_API_LOGS.IS_SENSITIVE%TYPE DEFAULT 'N',
+        p_contexto          OUT NOCOPY tipo_contexto_bitacora_api
+    ) IS
+        v_contexto   tipo_contexto_bitacora_api;
+        v_metodo     t_metodo_http;
+        v_nivel      t_nivel_log;
+        v_bandera    t_bandera_sensible;
+        v_payload    CLOB;
+        v_usuario    VARCHAR2(100);
+        v_servicio   VARCHAR2(200);
+        v_endpoint   VARCHAR2(200);
+    BEGIN
+        IF p_ruta_endpoint IS NULL THEN
+            -- Guard clause para proteger el particionado por fecha/endpoint.
+            RAISE_APPLICATION_ERROR(-20949, 'La ruta del endpoint es obligatoria para registrar la bitácora.');
+        END IF;
+
+        v_metodo   := normalizar_metodo(p_metodo_http);
+        v_nivel    := normalizar_nivel(p_nivel_log);
+        v_bandera  := normalizar_bandera_sensible(p_marcar_sensible);
+        v_usuario  := NVL(limitar_varchar(p_identificador_cli, 100), USER);
+        v_servicio := NVL(limitar_varchar(p_nombre_servicio, 200), limitar_varchar(p_ruta_endpoint, 200));
+        v_endpoint := limitar_varchar(p_ruta_endpoint, 200);
+        v_payload  := sanitizar_payload(p_carga_util, v_bandera);
+
         INSERT INTO IA.IA_API_LOGS (
-            ID_LOG,
             ENDPOINT,
             METODO,
             USUARIO,
             IP_ORIGEN,
             SERVICE_NAME,
-            PARAMETROS
+            LOG_LEVEL,
+            IS_SENSITIVE,
+            PARAMETROS,
+            REQUEST_BODY_SUMMARY
         ) VALUES (
-            IA.SEQ_API_LOGS.NEXTVAL,
-            p_endpoint,
-            UPPER(p_metodo),
-            p_usuario,
-            p_ip_origen,
-            p_service_name,
-            p_params
-        ) RETURNING ID_LOG INTO p_log_rec.id_log;
+            v_endpoint,
+            v_metodo,
+            v_usuario,
+            limitar_varchar(p_ip_cliente, 50),
+            v_servicio,
+            v_nivel,
+            v_bandera,
+            v_payload,
+            resumir_payload(v_payload)
+        ) RETURNING ID_LOG INTO v_contexto.id_bitacora;
 
-        p_log_rec.start_ts := SYSTIMESTAMP;
-        p_log_rec.endpoint := p_endpoint;
-        p_log_rec.metodo   := UPPER(p_metodo);
-        p_log_rec.usuario  := p_usuario;
-        p_log_rec.ip_origen := p_ip_origen;
-        p_log_rec.service_name := p_service_name;
+        v_contexto.fecha_inicio       := SYSTIMESTAMP;
+        v_contexto.ruta_endpoint      := v_endpoint;
+        v_contexto.metodo_http        := v_metodo;
+        v_contexto.identificador_cli  := v_usuario;
+        v_contexto.ip_cliente         := limitar_varchar(p_ip_cliente, 50);
+        v_contexto.nombre_servicio    := v_servicio;
+        v_contexto.nivel_log          := v_nivel;
+        v_contexto.indicador_sensible := v_bandera;
+
+        p_contexto := v_contexto;
     EXCEPTION
         WHEN OTHERS THEN
-            p_log_rec.id_log := NULL;
-            p_log_rec.start_ts := SYSTIMESTAMP;
+            p_contexto.id_bitacora        := NULL;
+            p_contexto.fecha_inicio       := SYSTIMESTAMP;
+            p_contexto.ruta_endpoint      := v_endpoint;
+            p_contexto.metodo_http        := v_metodo;
+            p_contexto.identificador_cli  := v_usuario;
+            p_contexto.ip_cliente         := limitar_varchar(p_ip_cliente, 50);
+            p_contexto.nombre_servicio    := v_servicio;
+            p_contexto.nivel_log          := v_nivel;
+            p_contexto.indicador_sensible := v_bandera;
             RAISE;
-    END begin_call;
+    END iniciar_bitacora_api;
 
-    PROCEDURE end_call(
-        p_log_id        IN IA.IA_API_LOGS.ID_LOG%TYPE,
-        p_status_code   IN IA.IA_API_LOGS.STATUS_CODE%TYPE,
-        p_error_msg     IN IA.IA_API_LOGS.ERROR_MSG%TYPE,
-        p_response      IN IA.IA_API_LOGS.RESPONSE_MSG%TYPE,
-        p_start_ts      IN TIMESTAMP DEFAULT NULL
+    PROCEDURE finalizar_bitacora_api(
+        p_contexto            IN OUT NOCOPY tipo_contexto_bitacora_api,
+        p_codigo_estado       IN IA.IA_API_LOGS.STATUS_CODE%TYPE,
+        p_mensaje_respuesta   IN IA.IA_API_LOGS.ERROR_MSG%TYPE,
+        p_carga_respuesta     IN CLOB,
+        p_respuesta_es_error  IN BOOLEAN DEFAULT NULL
     ) IS
-        v_start TIMESTAMP := NVL(p_start_ts, SYSTIMESTAMP);
+        v_respuesta CLOB;
+        v_metadatos t_metadatos_http;
+        v_tiempo_ms NUMBER;
+        v_resumen   VARCHAR2(1000);
+        v_es_error  BOOLEAN;
     BEGIN
-        IF p_log_id IS NULL THEN
-            RETURN; -- logging inicial falló
+        IF p_contexto.id_bitacora IS NULL THEN
+            RETURN; -- Early return: no hay registro que actualizar.
         END IF;
 
-        UPDATE IA.IA_API_LOGS
-           SET STATUS_CODE = p_status_code,
-               ERROR_MSG   = p_error_msg,
-               RESPONSE_MSG = p_response,
-               TIEMPO_MS   = ROUND((SYSTIMESTAMP - v_start) * gc_ms_per_day, 2)
-         WHERE ID_LOG = p_log_id;
-    END end_call;
+        IF p_respuesta_es_error IS NULL THEN
+            v_es_error := (p_codigo_estado BETWEEN 400 AND 599);
+        ELSE
+            v_es_error := p_respuesta_es_error;
+        END IF;
 
-    PROCEDURE log_and_raise(
-        p_log_rec     IN OUT NOCOPY t_log_rec,
-        p_status_code IN IA.IA_API_LOGS.STATUS_CODE%TYPE,
-        p_error_msg   IN IA.IA_API_LOGS.ERROR_MSG%TYPE,
-        p_raise_msg   IN VARCHAR2 DEFAULT NULL
+        v_respuesta := sanitizar_payload(p_carga_respuesta, p_contexto.indicador_sensible);
+        v_resumen   := resumir_payload(v_respuesta);
+        v_metadatos := obtener_metadatos_http(p_codigo_estado, v_es_error);
+        v_tiempo_ms := calcular_duracion_ms(p_contexto.fecha_inicio);
+
+        UPDATE IA.IA_API_LOGS
+           SET STATUS_CODE      = p_codigo_estado,
+               STATUS_CATEGORY  = v_metadatos.categoria,
+               LOG_LEVEL        = v_metadatos.nivel_log,
+               ERROR_MSG        = limitar_varchar(p_mensaje_respuesta, 4000),
+               RESPONSE_MSG     = v_respuesta,
+               RESPONSE_SUMMARY = v_resumen,
+               TIEMPO_MS        = v_tiempo_ms
+         WHERE ID_LOG = p_contexto.id_bitacora;
+
+        p_contexto.nivel_log    := v_metadatos.nivel_log;
+        p_contexto.fecha_inicio := NULL;
+    END finalizar_bitacora_api;
+
+    PROCEDURE registrar_error_y_propagar(
+        p_contexto          IN OUT NOCOPY tipo_contexto_bitacora_api,
+        p_codigo_estado     IN IA.IA_API_LOGS.STATUS_CODE%TYPE,
+        p_mensaje_tecnico   IN IA.IA_API_LOGS.ERROR_MSG%TYPE,
+        p_detalle_excepcion IN VARCHAR2 DEFAULT NULL
     ) IS
+        v_mensaje VARCHAR2(2000);
     BEGIN
-        end_call(
-            p_log_id      => p_log_rec.id_log,
-            p_status_code => p_status_code,
-            p_error_msg   => p_error_msg,
-            p_response    => NULL,
-            p_start_ts    => p_log_rec.start_ts
+        finalizar_bitacora_api(
+            p_contexto           => p_contexto,
+            p_codigo_estado      => p_codigo_estado,
+            p_mensaje_respuesta  => p_mensaje_tecnico,
+            p_carga_respuesta    => NULL,
+            p_respuesta_es_error => TRUE
         );
+
+        v_mensaje := limitar_varchar(
+            CASE
+                WHEN p_detalle_excepcion IS NULL THEN p_mensaje_tecnico
+                ELSE p_mensaje_tecnico || ' -> ' || p_detalle_excepcion
+            END,
+            2000
+        );
+
         RAISE_APPLICATION_ERROR(
-            num => NVL(p_status_code, -20001),
-            msg => NVL(p_raise_msg, p_error_msg)
+            num => mapear_codigo_error(p_codigo_estado),
+            msg => v_mensaje
         );
-    END log_and_raise;
+    END registrar_error_y_propagar;
 END IA_PKG_APIS;
 /
 
