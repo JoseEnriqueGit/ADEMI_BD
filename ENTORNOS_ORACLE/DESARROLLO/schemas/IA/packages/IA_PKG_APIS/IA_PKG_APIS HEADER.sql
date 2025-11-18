@@ -1,9 +1,5 @@
 CREATE OR REPLACE PACKAGE IA.IA_PKG_APIS IS
-    /*
-      Bitácora centralizada para ORDS. La interfaz aplica guard clauses para detener
-      datos incompletos antes de tocar la tabla IA_API_LOGS y estandariza la captura
-      de contexto de ejecución para enlazar cualquier endpoint sin repetir lógica.
-    */
+
     SUBTYPE t_metodo_http IS IA.IA_API_LOGS.METODO%TYPE;
     SUBTYPE t_ruta_endpoint IS IA.IA_API_LOGS.ENDPOINT%TYPE;
     SUBTYPE t_nivel_log IS IA.IA_API_LOGS.LOG_LEVEL%TYPE;
