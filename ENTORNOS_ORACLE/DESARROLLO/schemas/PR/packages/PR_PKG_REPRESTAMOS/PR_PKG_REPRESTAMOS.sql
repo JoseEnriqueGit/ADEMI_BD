@@ -25,8 +25,8 @@ create or replace PACKAGE BODY       PR_PKG_REPRESTAMOS IS
    ) IS
    BEGIN
        IA_PKG_APIS.iniciar_bitacora_api(
-           p_endpoint     => p_endpoint,
-           p_metodo_http  => p_metodo,
+           p_ruta_endpoint     => p_endpoint,
+           p_metodo_http       => p_metodo,
            p_identificador_cli => resolve_api_user,
            p_ip_cliente        => resolve_api_ip,
            p_nombre_servicio   => p_service_name,
