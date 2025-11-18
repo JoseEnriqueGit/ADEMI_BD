@@ -1,5 +1,5 @@
 CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
-    gc_ms_per_day           CONSTANT NUMBER       := 86400000; -- 24h * 60m * 60s * 1000ms
+    gc_ms_per_day           CONSTANT NUMBER       := 86400000;
     gc_longitud_resumen     CONSTANT PLS_INTEGER  := 1000;
     gc_placeholder_sensible CONSTANT VARCHAR2(64) := '[CONTENIDO_PROTEGIDO]';
 
@@ -22,7 +22,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_metodo t_metodo_http := UPPER(TRIM(p_metodo));
     BEGIN
         IF v_metodo IS NULL THEN
-            -- Guard clause: sin método HTTP no hay semántica para auditar.
             RAISE_APPLICATION_ERROR(-20950, 'El método HTTP es obligatorio para registrar la bitácora.');
         END IF;
         RETURN v_metodo;
@@ -55,7 +54,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
             RETURN NULL;
         END IF;
         IF p_bandera = 'Y' THEN
-            -- Evitamos replicar datos sensibles y simplificamos la gobernanza del dato.
             RETURN TO_CLOB(gc_placeholder_sensible);
         END IF;
         RETURN REGEXP_REPLACE(p_datos, '[[:cntrl:]]', ' ');
@@ -70,11 +68,19 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
     END;
 
     FUNCTION calcular_duracion_ms(p_inicio TIMESTAMP) RETURN NUMBER IS
+        v_interval INTERVAL DAY TO SECOND;
+        v_total_ms NUMBER;
     BEGIN
         IF p_inicio IS NULL THEN
             RETURN NULL;
         END IF;
-        RETURN ROUND((SYSTIMESTAMP - p_inicio) * gc_ms_per_day, 2);
+        v_interval := SYSTIMESTAMP - p_inicio;
+        v_total_ms :=
+              EXTRACT(DAY FROM v_interval) * gc_ms_per_day
+            + EXTRACT(HOUR FROM v_interval) * 3600000
+            + EXTRACT(MINUTE FROM v_interval) * 60000
+            + EXTRACT(SECOND FROM v_interval) * 1000;
+        RETURN ROUND(v_total_ms, 2);
     END;
 
     FUNCTION clasificar_por_rango(p_codigo NUMBER) RETURN IA.IA_API_LOGS.STATUS_CATEGORY%TYPE IS
@@ -112,7 +118,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
              WHERE STATUS_CODE = p_codigo_estado;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                -- Lookup table fallback a rangos HTTP para no dejar huecos de clasificación.
                 v_metadatos.categoria := clasificar_por_rango(p_codigo_estado);
                 v_metadatos.nivel_log :=
                     CASE
@@ -156,9 +161,10 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_usuario    VARCHAR2(100);
         v_servicio   VARCHAR2(200);
         v_endpoint   VARCHAR2(200);
+        v_ip_normal  IA.IA_API_LOGS.IP_ORIGEN%TYPE;
+        v_request_summary VARCHAR2(1000);
     BEGIN
         IF p_ruta_endpoint IS NULL THEN
-            -- Guard clause para proteger el particionado por fecha/endpoint.
             RAISE_APPLICATION_ERROR(-20949, 'La ruta del endpoint es obligatoria para registrar la bitácora.');
         END IF;
 
@@ -168,7 +174,9 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_usuario  := NVL(limitar_varchar(p_identificador_cli, 100), USER);
         v_servicio := NVL(limitar_varchar(p_nombre_servicio, 200), limitar_varchar(p_ruta_endpoint, 200));
         v_endpoint := limitar_varchar(p_ruta_endpoint, 200);
+        v_ip_normal := limitar_varchar(p_ip_cliente, 50);
         v_payload  := sanitizar_payload(p_carga_util, v_bandera);
+        v_request_summary := resumir_payload(v_payload);
 
         INSERT INTO IA.IA_API_LOGS (
             ENDPOINT,
@@ -184,19 +192,19 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
             v_endpoint,
             v_metodo,
             v_usuario,
-            limitar_varchar(p_ip_cliente, 50),
+            v_ip_normal,
             v_servicio,
             v_nivel,
             v_bandera,
             v_payload,
-            resumir_payload(v_payload)
+            v_request_summary
         ) RETURNING ID_LOG INTO v_contexto.id_bitacora;
 
         v_contexto.fecha_inicio       := SYSTIMESTAMP;
         v_contexto.ruta_endpoint      := v_endpoint;
         v_contexto.metodo_http        := v_metodo;
         v_contexto.identificador_cli  := v_usuario;
-        v_contexto.ip_cliente         := limitar_varchar(p_ip_cliente, 50);
+        v_contexto.ip_cliente         := v_ip_normal;
         v_contexto.nombre_servicio    := v_servicio;
         v_contexto.nivel_log          := v_nivel;
         v_contexto.indicador_sensible := v_bandera;
@@ -209,7 +217,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
             p_contexto.ruta_endpoint      := v_endpoint;
             p_contexto.metodo_http        := v_metodo;
             p_contexto.identificador_cli  := v_usuario;
-            p_contexto.ip_cliente         := limitar_varchar(p_ip_cliente, 50);
+            p_contexto.ip_cliente         := v_ip_normal;
             p_contexto.nombre_servicio    := v_servicio;
             p_contexto.nivel_log          := v_nivel;
             p_contexto.indicador_sensible := v_bandera;
@@ -228,9 +236,10 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_tiempo_ms NUMBER;
         v_resumen   VARCHAR2(1000);
         v_es_error  BOOLEAN;
+        v_mensaje   VARCHAR2(4000);
     BEGIN
         IF p_contexto.id_bitacora IS NULL THEN
-            RETURN; -- Early return: no hay registro que actualizar.
+            RETURN;
         END IF;
 
         IF p_respuesta_es_error IS NULL THEN
@@ -243,12 +252,13 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_resumen   := resumir_payload(v_respuesta);
         v_metadatos := obtener_metadatos_http(p_codigo_estado, v_es_error);
         v_tiempo_ms := calcular_duracion_ms(p_contexto.fecha_inicio);
+        v_mensaje   := limitar_varchar(p_mensaje_respuesta, 4000);
 
         UPDATE IA.IA_API_LOGS
            SET STATUS_CODE      = p_codigo_estado,
                STATUS_CATEGORY  = v_metadatos.categoria,
                LOG_LEVEL        = v_metadatos.nivel_log,
-               ERROR_MSG        = limitar_varchar(p_mensaje_respuesta, 4000),
+               ERROR_MSG        = v_mensaje,
                RESPONSE_MSG     = v_respuesta,
                RESPONSE_SUMMARY = v_resumen,
                TIEMPO_MS        = v_tiempo_ms
