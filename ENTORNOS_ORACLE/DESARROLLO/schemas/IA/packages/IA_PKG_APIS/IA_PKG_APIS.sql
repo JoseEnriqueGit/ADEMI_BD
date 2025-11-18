@@ -22,7 +22,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_metodo t_metodo_http := UPPER(TRIM(p_metodo));
     BEGIN
         IF v_metodo IS NULL THEN
-            -- Guard clause: sin método HTTP no hay semántica para auditar.
             RAISE_APPLICATION_ERROR(-20950, 'El método HTTP es obligatorio para registrar la bitácora.');
         END IF;
         RETURN v_metodo;
@@ -55,7 +54,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
             RETURN NULL;
         END IF;
         IF p_bandera = 'Y' THEN
-            -- Evitamos replicar datos sensibles y simplificamos la gobernanza del dato.
             RETURN TO_CLOB(gc_placeholder_sensible);
         END IF;
         RETURN REGEXP_REPLACE(p_datos, '[[:cntrl:]]', ' ');
@@ -112,7 +110,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
              WHERE STATUS_CODE = p_codigo_estado;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                -- Lookup table fallback a rangos HTTP para no dejar huecos de clasificación.
                 v_metadatos.categoria := clasificar_por_rango(p_codigo_estado);
                 v_metadatos.nivel_log :=
                     CASE
@@ -158,7 +155,6 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_endpoint   VARCHAR2(200);
     BEGIN
         IF p_ruta_endpoint IS NULL THEN
-            -- Guard clause para proteger el particionado por fecha/endpoint.
             RAISE_APPLICATION_ERROR(-20949, 'La ruta del endpoint es obligatoria para registrar la bitácora.');
         END IF;
 
@@ -230,7 +226,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_PKG_APIS IS
         v_es_error  BOOLEAN;
     BEGIN
         IF p_contexto.id_bitacora IS NULL THEN
-            RETURN; -- Early return: no hay registro que actualizar.
+            RETURN;
         END IF;
 
         IF p_respuesta_es_error IS NULL THEN
