@@ -61,7 +61,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_API_LOGGER IS
         RETURN v_bandera;
     END normalizar_bandera_sensible;
 
-    FUNCTION sanitizar_payload(
+    FUNCTION limpiar_payload(
         p_datos       IN CLOB,
         p_es_sensible IN CHAR
     ) RETURN CLOB IS
@@ -75,7 +75,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_API_LOGGER IS
         END IF;
         
         RETURN REGEXP_REPLACE(p_datos, '[[:cntrl:]]', ' ');
-    END sanitizar_payload;
+    END limpiar_payload;
 
     FUNCTION resumir_payload(p_datos IN CLOB) RETURN VARCHAR2 IS
     BEGIN
@@ -205,7 +205,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_API_LOGGER IS
         v_endpoint := limitar_texto(p_ruta_endpoint, 200);
         v_ip       := limitar_texto(p_ip_cliente, 50);
         
-        v_payload         := sanitizar_payload(p_carga_util, v_bandera);
+        v_payload         := limpiar_payload(p_carga_util, v_bandera);
         v_resumen_request := resumir_payload(v_payload);
 
         INSERT INTO IA.IA_API_LOGS (
@@ -287,7 +287,7 @@ CREATE OR REPLACE PACKAGE BODY IA.IA_API_LOGGER IS
             v_es_error := p_respuesta_es_error;
         END IF;
 
-        v_respuesta    := sanitizar_payload(p_carga_respuesta, p_contexto.indicador_sensible);
+        v_respuesta    := limpiar_payload(p_carga_respuesta, p_contexto.indicador_sensible);
         v_resumen_resp := resumir_payload(v_respuesta);
         
         v_metadatos := obtener_categoria_y_severidad(p_codigo_estado, v_es_error);
