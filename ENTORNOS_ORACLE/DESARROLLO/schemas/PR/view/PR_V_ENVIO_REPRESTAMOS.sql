@@ -12,87 +12,80 @@ CREATE OR REPLACE FORCE VIEW PR.PR_V_ENVIO_REPRESTAMOS (
         FECHA_PROCESO,
         FECHA_VENCIMIENTO,
         ESTADO
-    ) BEQUEATH DEFINER AS WITH params AS (
-        SELECT UPPER(TRIM(column_value)) AS val
-        FROM TABLE(
-                pr.pr_pkg_represtamos.f_obt_valor_parametros('CANALES_HABILITADOS')
-            )
-    )
-SELECT r.id_represtamo,
-    c.numero_identificacion,
-    cr.canal,
-    CASE
-        WHEN cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_EMAIL') THEN 'CANAL_EMAIL'
-        WHEN cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')
-        AND r.id_carga_dirigida IS NOT NULL THEN 'CANAL_CARGA_DIRIGIDA'
-        WHEN cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')
-        AND r.id_repre_campana_especiales IS NOT NULL THEN 'CANAL_CAMPANA_ESPECIAL'
-        WHEN cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS') THEN 'CANAL_SMS'
-    END AS canal_desc,
-    c.nombres,
-    c.primer_apellido || ' ' || c.segundo_apellido AS apellidos,
-    r.mto_preaprobado,
-    cr.valor AS contacto,
-    CASE
-        WHEN cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_EMAIL') THEN pr.pr_pkg_represtamos.f_obt_subject_email(r.id_represtamo)
-        ELSE NULL
-    END AS subject_email,
-    pr.pr_pkg_represtamos.f_obt_body_mensaje(r.id_represtamo, cr.canal) AS texto_mensaje,
-    r.fecha_proceso,
-    TRUNC(LAST_DAY(r.fecha_proceso)) AS fecha_vencimiento,
-    r.estado
-FROM pr.pr_represtamos r
-    JOIN clientes_b2000 c ON c.codigo_empresa = r.codigo_empresa
-    AND c.codigo_cliente = r.codigo_cliente
-    JOIN pr.pr_canales_represtamo cr ON cr.codigo_empresa = r.codigo_empresa
-    AND cr.id_represtamo = r.id_represtamo
-WHERE r.codigo_empresa = pr.pr_pkg_represtamos.f_obt_empresa_represtamo
-    AND r.id_represtamo = r.id_represtamo || ''
-    AND cr.canal = cr.canal || ''
-    AND r.estado = 'NP'
-    AND EXISTS (
-        SELECT 1
-        FROM pr.pr_solicitud_represtamo o
-        WHERE o.codigo_empresa = r.codigo_empresa
+    ) BEQUEATH DEFINER AS
+-- Precalculamos una sola vez los valores de los parámetros y la lista de canales habilitados
+WITH cfg AS (
+    SELECT pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_EMAIL') AS canal_email,
+           pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')   AS canal_sms
+    FROM dual
+),
+params AS (
+    SELECT UPPER(TRIM(column_value)) AS val
+    FROM TABLE(pr.pr_pkg_represtamos.f_obt_valor_parametros('CANALES_HABILITADOS'))
+),
+base AS (
+    SELECT r.id_represtamo,
+           r.codigo_empresa,
+           r.codigo_cliente,
+           r.id_carga_dirigida,
+           r.id_repre_campana_especiales,
+           r.mto_preaprobado,
+           r.fecha_proceso,
+           r.estado,
+           c.numero_identificacion,
+           c.nombres,
+           c.primer_apellido,
+           c.segundo_apellido,
+           cr.canal,
+           cr.valor,
+           CASE
+               WHEN cr.canal = cfg.canal_email
+                    AND r.id_carga_dirigida IS NULL
+                    AND r.id_repre_campana_especiales IS NULL THEN 'CANAL_EMAIL'
+               WHEN cr.canal = cfg.canal_sms
+                    AND r.id_carga_dirigida IS NOT NULL THEN 'CANAL_CARGA_DIRIGIDA'
+               WHEN cr.canal = cfg.canal_sms
+                    AND r.id_repre_campana_especiales IS NOT NULL THEN 'CANAL_CAMPANA_ESPECIAL'
+               WHEN cr.canal = cfg.canal_sms
+                    AND r.id_carga_dirigida IS NULL
+                    AND r.id_repre_campana_especiales IS NULL THEN 'CANAL_SMS'
+           END AS canal_desc
+    FROM pr.pr_represtamos r
+    JOIN clientes_b2000 c
+      ON c.codigo_empresa = r.codigo_empresa
+     AND c.codigo_cliente = r.codigo_cliente
+    JOIN pr.pr_canales_represtamo cr
+      ON cr.codigo_empresa = r.codigo_empresa
+     AND cr.id_represtamo = r.id_represtamo
+    CROSS JOIN cfg
+    WHERE r.codigo_empresa = pr.pr_pkg_represtamos.f_obt_empresa_represtamo
+      AND r.estado = 'NP'
+      AND EXISTS (
+          SELECT 1
+          FROM pr.pr_solicitud_represtamo o
+          WHERE o.codigo_empresa = r.codigo_empresa
             AND o.id_represtamo = r.id_represtamo
-    )
-    AND (
-        (
-            cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_EMAIL')
-            AND r.id_carga_dirigida IS NULL
-            AND r.id_repre_campana_especiales IS NULL
-            AND EXISTS (
-                SELECT 1
-                FROM params p
-                WHERE p.val = 'CANAL_EMAIL'
-            )
-        )
-        OR (
-            cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')
-            AND r.id_carga_dirigida IS NULL
-            AND r.id_repre_campana_especiales IS NULL
-            AND EXISTS (
-                SELECT 1
-                FROM params p
-                WHERE p.val = 'CANAL_SMS'
-            )
-        )
-        OR (
-            cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')
-            AND r.id_carga_dirigida IS NOT NULL
-            AND EXISTS (
-                SELECT 1
-                FROM params p
-                WHERE p.val = 'CANAL_CARGA_DIRIGIDA'
-            )
-        )
-        OR (
-            cr.canal = pr.pr_pkg_represtamos.f_obt_parametro_represtamo('CANAL_SMS')
-            AND r.id_repre_campana_especiales IS NOT NULL
-            AND EXISTS (
-                SELECT 1
-                FROM params p
-                WHERE p.val = 'CANAL_CAMPANA_ESPECIAL'
-            )
-        )
-    );
+      )
+)
+SELECT b.id_represtamo,
+       b.numero_identificacion,
+       b.canal,
+       b.canal_desc,
+       b.nombres,
+       b.primer_apellido || ' ' || b.segundo_apellido AS apellidos,
+       b.mto_preaprobado,
+       b.valor AS contacto,
+       CASE
+           WHEN b.canal_desc = 'CANAL_EMAIL' THEN pr.pr_pkg_represtamos.f_obt_subject_email(b.id_represtamo)
+       END AS subject_email,
+       pr.pr_pkg_represtamos.f_obt_body_mensaje(b.id_represtamo, b.canal) AS texto_mensaje,
+       b.fecha_proceso,
+       TRUNC(LAST_DAY(b.fecha_proceso)) AS fecha_vencimiento,
+       b.estado
+FROM base b
+WHERE b.canal_desc IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM params p
+      WHERE p.val = b.canal_desc
+  );
