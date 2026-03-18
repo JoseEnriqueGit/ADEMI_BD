@@ -4,7 +4,7 @@
 Este es un repositorio local de objetos de base de datos Oracle para ADEMI (institución financiera). Contiene PL/SQL packages, tablas, vistas, jobs organizados por entorno (DESARROLLO, QA) y schema (PR, PA, CD, CC, IA, TC).
 
 ## Estructura principal
-- `ENTORNOS_ORACLE/` - Fuente de verdad. Estructura: `{ENTORNO}/schemas/{SCHEMA}/{tipo_objeto}/`
+- `ENTORNOS_ORACLE/` - Estructura: `{ENTORNO}/schemas/{SCHEMA}/{tipo_objeto}/`
 - `historias/` - Historial de trabajo por ticket. Cada historia tiene README.md, scripts/, y opcionalmente paquetes/, tests/, evidencia/
 - `diff/` - Comparaciones before/after de procedimientos
 - `docs/` - Documentación (digcert, guías, notas, profiler, QA)
@@ -28,6 +28,12 @@ Este es un repositorio local de objetos de base de datos Oracle para ADEMI (inst
 2. Agregar entrada al `CHANGELOG.md` del entorno
 3. Si el objeto es crítico (ej: PR_PKG_REPRESTAMOS), agregar entrada a su CHANGELOG.md propio
 4. Si es parte de una historia, documentar en `historias/{numero_historia}/`
+
+## Regla de entornos (OBLIGATORIA para todas las skills)
+- **SIEMPRE preguntar al usuario** a cuál entorno consultar (DESARROLLO o QA) antes de leer cualquier objeto Oracle (spec.sql, body.sql, tablas, vistas, etc.)
+- **Ningún entorno es "fuente de verdad" por defecto.** Ambos pueden diferir y el usuario decide cuál es relevante para la tarea.
+- Si un objeto referenciado (tabla, índice, paquete de otro schema) **no existe en el repositorio local**, solicitar al usuario que lo consulte directamente en la base de datos y lo comparta.
+- Esta regla aplica a TODAS las skills: oracle-optimize, oracle-explain, y cualquier tarea que involucre leer/modificar objetos de BD.
 
 ## Lenguaje
 - Responder siempre en español

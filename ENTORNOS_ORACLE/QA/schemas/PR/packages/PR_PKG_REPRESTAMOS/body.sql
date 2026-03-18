@@ -3741,8 +3741,8 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
               CURSOR CARGAR_WORLD_COMPLIANCE IS
                SELECT R.ID_REPRESTAMO,R.NO_CREDITO, PF.PRIMER_APELLIDO, PF.PRIMER_NOMBRE, b.NUMERO_IDENTIFICACION-- S.IDENTIFICACION
                FROM PR_REPRESTAMOS R 
-               LEFT JOIN PERSONAS_FISICAS PF ON PF.COD_PER_FISICA = R.CODIGO_CLIENTE
-               LEFT JOIN PR_SOLICITUD_REPRESTAMO S ON S.ID_REPRESTAMO = R.ID_REPRESTAMO
+               LEFT JOIN PERSONAS_FISICAS PF ON PF.COD_PER_FISICA = TO_CHAR(R.CODIGO_CLIENTE)
+               LEFT JOIN PR_SOLICITUD_REPRESTAMO S ON S.CODIGO_EMPRESA = R.CODIGO_EMPRESA AND S.ID_REPRESTAMO = R.ID_REPRESTAMO
                LEFT JOIN CLIENTES_B2000 B ON B.CODIGO_CLIENTE = R.CODIGO_CLIENTE
                WHERE R.ESTADO = 'RE'
                AND WORLD_COMPLIANCE IS NULL
@@ -3835,27 +3835,27 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
            END IF;
             DBMS_OUTPUT.PUT_LINE ( 'WORLD_COMPLIANCE ' || VALOR || ' id ' ||a.id_represtamo );
             UPDATE PR.PR_SOLICITUD_REPRESTAMO SET WORLD_COMPLIANCE = VALOR WHERE ID_REPRESTAMO = A.ID_REPRESTAMO ;
-            COMMIT;
-            EXCEPTION WHEN OTHERS THEN   
+            EXCEPTION WHEN OTHERS THEN
                 DECLARE
                     vIdError      PLS_INTEGER := 0;
-                BEGIN                                    
-                  
-                  setError(pProgramUnit => 'OBT_WORLD_COMPLIANCE', 
-                           pPieceCodeName => NULL, 
-                           pErrorDescription => SQLERRM ,                                                              
-                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
-                           pEmailNotification => NULL, 
-                           pParamList => IA.LOGGER.vPARAMLIST, 
-                           pOutputLogger => FALSE, 
-                           pExecutionTime => NULL, 
-                           pIdError => vIdError); 
-                END;   
+                BEGIN
+
+                  setError(pProgramUnit => 'OBT_WORLD_COMPLIANCE',
+                           pPieceCodeName => NULL,
+                           pErrorDescription => SQLERRM ,
+                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
+                           pEmailNotification => NULL,
+                           pParamList => IA.LOGGER.vPARAMLIST,
+                           pOutputLogger => FALSE,
+                           pExecutionTime => NULL,
+                           pIdError => vIdError);
+                END;
            END;
             --DBMS_OUTPUT.PUT_LINE ( 'WORLD_COMPLIANCE ' || VALOR || ' id ' ||a.id_represtamo );
             --DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
             --DBMS_OUTPUT.PUT_LINE ('higherPercent = ' || VALOR);
          END LOOP ;
+         COMMIT;
            
      END LOOP ;
      
