@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed 's/.*\\\\.//')",
+      "Bash(rmdir db/tables db/views db/scripts db/procedimientos/TIPO_DOCUMENTO_PKM db/procedimientos db/packages/DIGCERT_SIMULADOR db/packages db)",
+      "Bash(rmdir env:*)"
+    ]
+  }
+}
