@@ -7901,7 +7901,6 @@ END P_Registra_Solicitud_Campana;
               --DBMS_OUTPUT.PUT_LINE ( 'Entra = '||A.ID_REPRESTAMO  );
                 PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
                p_generar_bitacora(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
-                COMMIT;
                -- IF vMsg IS NOT NULL THEN
                     DBMS_OUTPUT.PUT_LINE ( 'vMsg = ' || VMSG );
                     VMSG := NULL;
@@ -8023,11 +8022,11 @@ END P_Registra_Solicitud_Campana;
                 
                 FOR A IN CUR_REPRESTAMO LOOP
                 PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
-                        
+
                         PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
-                        
-                    COMMIT;
+
                 END LOOP ;
+                COMMIT;
                 /*PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 100, 'SE ACTUALIZO', pMensaje );
                 PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET (pIDAPLICACION, 'FINALIZADO', 'SE FINALIZO', pMensaje );*/
                       
