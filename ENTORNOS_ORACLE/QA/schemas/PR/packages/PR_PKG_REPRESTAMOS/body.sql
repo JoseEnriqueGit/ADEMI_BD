@@ -8094,6 +8094,10 @@ END P_Registra_Solicitud_Campana;
          v_fin DATE;
          v_seg NUMBER(10);
          VALOR VARCHAR(400);
+         -- OPT-008: Variables para cachear resultados de F_Existe_*
+         v_tiene_solicitud BOOLEAN;
+         v_tiene_canales   BOOLEAN;
+         v_tiene_credito   BOOLEAN;
          /*pIDAPLICACION1 NUMBER;
          pIDAPLICACION2 NUMBER;
          pIDAPLICACION3 NUMBER;
@@ -8178,28 +8182,34 @@ END P_Registra_Solicitud_Campana;
 
                     
                       
+                      -- OPT-008: Cachear F_Existe_* en variables para evitar llamadas redundantes
                       FOR A IN CUR_REPRESTAMO LOOP
                       DBMS_OUTPUT.PUT_LINE ( 'Entra AL CURSOR CUR_REPRESTAMO = '|| A.ID_REPRESTAMO  );
 
+                        -- Evaluar una sola vez por iteracion
+                        v_tiene_solicitud := PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO);
+                        v_tiene_canales   := PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO);
+                        v_tiene_credito   := PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO);
+
                         -- validar que tenga solicitud, que tenga canales
-                        IF  PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO)AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN 
+                        IF v_tiene_solicitud AND v_tiene_canales AND v_tiene_credito THEN
                          PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'NP', NULL, 'Notificaci¿n Pendiente', USER);
-                         
+
                          ELSE
-                         
-                            IF  PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) = FALSE THEN
+
+                            IF v_tiene_credito = FALSE THEN
                              PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
                             ELSE
-                                IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN
+                                IF v_tiene_solicitud AND v_tiene_canales = FALSE AND v_tiene_credito THEN
                                     PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
                                 ELSE
                                 PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
                                 END IF;
-                
-                        END IF; 
-                       
+
+                        END IF;
+
                        END IF;
-                      
+
                       END LOOP;
                 UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
                 WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='EJECUCIONES';
