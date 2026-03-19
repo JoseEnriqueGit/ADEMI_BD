@@ -2720,15 +2720,13 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                --Actualizo el estado del detalle de la bitacora
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
        
-         COMMIT;     
-         
-        UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO 
-                FROM PA_DETALLADO_DE08 
-                WHERE NO_CREDITO = y.NO_CREDITO 
+        UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO
+                FROM PA_DETALLADO_DE08
+                WHERE NO_CREDITO = y.NO_CREDITO
                 AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
                 AND  fecha_corte = v_fecha_corte);
-           COMMIT;         
       END LOOP;
+      COMMIT;
     
     
       --Cambio el estado del detalle de la bitacora
@@ -2737,12 +2735,12 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
       -- para todos lo cr¿ditos en la tabla PR_PRECALIFICADOS con ESTADO diferente a 'P'
       FOR a IN PRECALIFICADOS LOOP
            --IF a.CODIGO_REPRESTAMO != 'NI' THEN
-             UPDATE PR_REPRESTAMOS  
+             UPDATE PR_REPRESTAMOS
                 SET codigo_precalificacion = a.CODIGO_REPRESTAMO,
                     mto_preaprobado = a.mto_preaprobado
               WHERE rowid = a.id;
-          COMMIT;
       END LOOP;
+      COMMIT;
            
            
        --Validacion del DE08 FIADOR
@@ -2773,9 +2771,9 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
          PR_PKG_REPRESTAMOS.p_generar_bitacora(a.id_represtamo,NULL,vEstado,NULL,vComentario, USER);
          DBMS_OUTPUT.PUT_LINE('Despues de generar bitacora '||a.id_represtamo);
         END IF;
-       COMMIT; 
 
-          END LOOP;   
+          END LOOP;
+       COMMIT;   
            
        --Actualizo el estado del detalle de la bitacora
       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );
