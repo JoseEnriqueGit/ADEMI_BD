@@ -3380,55 +3380,12 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        --Cambio el estado del detalle de la bitacora
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( 'ENPROCESO', 50, 'EN PROCESO', pMensaje ); 
         
-       FOR i IN 1..vCantidad_Procesar LOOP
-        FOR A IN CUR_UPDATE_XCORE LOOP
-         
-        --Cambio el estado del detalle de la bitacora
-         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 60, 'EN PROCESO', pMensaje ); 
-            
-            
-           BEGIN
-               xcore := 745; --NVL(TRIM(JSON_VALUE( PA.PA_PKG_CONSULTA_DATACREDITO.CONSULTAR_JSON(PA.OBT_IDENTIFICACION_PERSONA(a.codigo_cliente,'1') ,'C','COMPATIBILIDAD',NULL,NULL,NULL,NULL,0), '$.respuesta.valor.applicants.primaryConsumer.interconnectResponse.Xcore_PD12M_ALL_PC_NC_Global.Xcore')),0);
-               --NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE(PA.OBT_IDENTIFICACION_PERSONA(  a.codigo_cliente,'1')),0);
-               IF xcore IS NULL THEN
-                    xcore := 0;
-               END IF;
-
-              EXCEPTION WHEN OTHERS THEN   
-                DECLARE
-                    vIdError      PLS_INTEGER := 0;
-                BEGIN                                    
-                  pMensaje:='ERROR CON EL STORE PROCEDURE ACTUALIZA_XCORE_CUSTOM';
-                  setError(pProgramUnit => 'Actualiza_XCORE_CUSTOM', 
-                           pPieceCodeName => NULL, 
-                           pErrorDescription => SQLERRM ,                                                              
-                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
-                           pEmailNotification => NULL, 
-                           pParamList => IA.LOGGER.vPARAMLIST, 
-                           pOutputLogger => FALSE, 
-                           pExecutionTime => NULL, 
-                           pIdError => vIdError); 
-                           --DBMS_OUTPUT.PUT_LINE ( 'DBMS_UTILITY.FORMAT_ERROR_BACKTRACE = ' || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE );
-                    --Capturo el error del detalle de la bitacora
-                --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ERROR', 100, SQLERRM, pMensaje );
-                    xcore := 0;
-                    --DBMS_OUTPUT.PUT_LINE ( 'xcore2 = ' || xcore );
-                END;  
-
-                      COMMIT;
-
-             END ; 
-             
-             --Cambio el estado del detalle de la bitacora
-            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 90, 'EN PROCESO', pMensaje ); 
-            
-             UPDATE PR_REPRESTAMOS  
-             SET XCORE_GLOBAL = xcore, XCORE_CUSTOM = xcore
-             WHERE rowid = a.id;
-              COMMIT;
-          END LOOP ;
-        
-      END LOOP;
+       -- OPT-005: Reemplazado loop doble con UPDATE directo (xcore=745 hardcodeado)
+       -- Si se reactiva la llamada a DataCredito, revertir este cambio
+       UPDATE PR_REPRESTAMOS
+       SET XCORE_GLOBAL = 745, XCORE_CUSTOM = 745
+       WHERE ESTADO = 'RE' AND XCORE_GLOBAL IS NULL;
+       COMMIT;
       
       
        --Cambio el estado del detalle de la bitacora
