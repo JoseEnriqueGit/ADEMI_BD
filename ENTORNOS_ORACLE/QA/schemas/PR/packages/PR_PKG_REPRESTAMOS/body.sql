@@ -3660,9 +3660,9 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                     END IF;
 
                 END IF;
-                COMMIT;
             END LOOP;
-        
+            COMMIT;
+
          --ACTUALIZO EL DETALLE DE LA BITACORA
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 100, 'SE ACTUALIZO', pMensaje );    
             
