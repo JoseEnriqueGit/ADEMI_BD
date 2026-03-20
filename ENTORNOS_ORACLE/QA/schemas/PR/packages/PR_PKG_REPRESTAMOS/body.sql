@@ -2702,32 +2702,31 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 20, 'EN PROCESO', pMensaje );
                      
    --ACTUALIZA EL MONTO CREDITO ACTUAL
-          
-          FOR y in Actualizar_Mto_Credito_Actual LOOP
-             UPDATE PR.PR_REPRESTAMOS R SET  R.MTO_CREDITO_ACTUAL = (SELECT monto_desembolsado
-                                               FROM  PA.PA_DETALLADO_DE08 D
-                                              WHERE  D.FUENTE           = 'PR'
-                                                 AND D.NO_CREDITO       = y.NO_CREDITO 
-                                                 AND D.CODIGO_CLIENTE   = y.CODIGO_CLIENTE
-                                                 AND D.FECHA_CORTE   = ( SELECT MAX(P.FECHA_CORTE)   
-                                                                                                FROM PA_DETALLADO_DE08 P
-                                                                                                WHERE P.FUENTE       = 'PR' 
-                                                                                                AND P.NO_CREDITO     = y.NO_CREDITO 
-                                                                                                AND P.CODIGO_CLIENTE = y.CODIGO_CLIENTE))
-                                                                                                
-               WHERE R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-               AND R.CODIGO_CLIENTE =   y.CODIGO_CLIENTE
-               AND R.NO_CREDITO     =   y.NO_CREDITO 
-               AND R.ESTADO         = 'RE';
-               --Actualizo el estado del detalle de la bitacora
-        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
-       
-        UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO
-                FROM PA_DETALLADO_DE08
-                WHERE NO_CREDITO = y.NO_CREDITO
-                AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
-                AND  fecha_corte = v_fecha_corte);
-      END LOOP;
+   -- OPT-004: Reemplazado loop row-by-row con UPDATE set-based
+
+          UPDATE PR.PR_REPRESTAMOS R
+          SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
+                                        FROM PA.PA_DETALLADO_DE08 D
+                                       WHERE D.FUENTE         = 'PR'
+                                         AND D.NO_CREDITO     = R.NO_CREDITO
+                                         AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
+                                         AND D.FECHA_CORTE    = (SELECT MAX(P.FECHA_CORTE)
+                                                                   FROM PA_DETALLADO_DE08 P
+                                                                  WHERE P.FUENTE         = 'PR'
+                                                                    AND P.NO_CREDITO     = R.NO_CREDITO
+                                                                    AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
+          WHERE R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+            AND R.ESTADO = 'RE';
+
+          UPDATE PR_REPRESTAMOS R
+          SET R.ESTADO = 'RSB'
+          WHERE R.ESTADO = 'RE'
+            AND EXISTS (SELECT 1
+                          FROM PA_DETALLADO_DE08 D
+                         WHERE D.NO_CREDITO = R.NO_CREDITO
+                           AND D.CALIFICA_CLIENTE NOT IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
+                           AND D.fecha_corte = v_fecha_corte);
+
       COMMIT;
     
     
