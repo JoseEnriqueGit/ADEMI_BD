@@ -15,3 +15,5 @@
 | OPT-007 | PR_PKG_REPRESTAMOS     | PVALIDA_XCORE               | N/A (redo) | -99% flushes | QA      | 2026-03-19 |
 | OPT-008 | PR_PKG_REPRESTAMOS     | P_Carga_Precalifica_Cancel  | 3-9 SELECTs| 3 SELECTs    | QA      | 2026-03-19 |
 | OPT-009 | PR_PKG_REPRESTAMOS     | F_Obtener_Nuevo_Credito     | ~17,235    | <500         | QA      | 2026-03-19 |
+| OPT-004 | PR_PKG_REPRESTAMOS     | Actualiza_Precalificacion   | N iters    | 2 UPDATEs    | QA      | 2026-03-19 |
+| OPT-010 | PR_PKG_REPRESTAMOS     | CREDITOS_PROCESAR (x3)      | N ctx sw   | ANTI JOIN    | QA      | 2026-03-19 |

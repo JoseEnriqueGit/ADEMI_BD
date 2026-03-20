@@ -4,11 +4,7 @@
 
 ## Pendientes del orquestador P_CARGA_PRECALIFICA_CANCELADO
 
-| ID Futuro | SQL Quest    | Cost   | Descripcion                                    | Procedure probable                 |
-|-----------|-------------|--------|------------------------------------------------|------------------------------------|
-| OPT-004   | N/A         | N/A    | Convertir loop row-by-row a UPDATE set-based    | Actualiza_Precalificacion (L.2704) |
-| OPT-009   | 385-392     | ~17,235| Subqueries escalares MIN/MAX tipo credito       | F_OBTENER_NUEVO_CREDITO            |
-| OPT-010   | 399/400     | N/A    | Inline F_TIENE_GARANTIA en cursor principal     | Precalifica_Represtamo             |
+> Todas las optimizaciones del orquestador han sido implementadas (OPT-001 a OPT-010).
 
 ## Pendientes fuera de la cadena del orquestador
 

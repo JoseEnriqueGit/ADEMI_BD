@@ -122,7 +122,15 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
         -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+       -- OPT-010: Inline F_TIENE_GARANTIA como NOT EXISTS (elimina context switch PL/SQL)
+       AND NOT EXISTS (SELECT 1
+                         FROM PR_CREDITOS cr
+                         JOIN PR_GARANTIAS_X_CREDITO gx ON gx.CODIGO_EMPRESA = cr.CODIGO_EMPRESA AND gx.NO_CREDITO = cr.NO_CREDITO
+                         JOIN PR_GARANTIAS g ON g.CODIGO_EMPRESA = gx.CODIGO_EMPRESA AND g.NUMERO_GARANTIA = gx.NUMERO_GARANTIA
+                        WHERE cr.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+                          AND cr.NO_CREDITO = a.NO_CREDITO
+                          AND cr.ESTADO IN ('D','V','M','E','J')
+                          AND g.CODIGO_TIPO_GARANTIA_SB != 'NA')
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -477,7 +485,15 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
         -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- OPT-010: Inline F_TIENE_GARANTIA como NOT EXISTS (elimina context switch PL/SQL)
+       AND NOT EXISTS (SELECT 1
+                         FROM PR_CREDITOS cr
+                         JOIN PR_GARANTIAS_X_CREDITO gx ON gx.CODIGO_EMPRESA = cr.CODIGO_EMPRESA AND gx.NO_CREDITO = cr.NO_CREDITO
+                         JOIN PR_GARANTIAS g ON g.CODIGO_EMPRESA = gx.CODIGO_EMPRESA AND g.NUMERO_GARANTIA = gx.NUMERO_GARANTIA
+                        WHERE cr.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+                          AND cr.NO_CREDITO = a.NO_CREDITO
+                          AND cr.ESTADO IN ('D','V','M','E','J')
+                          AND g.CODIGO_TIPO_GARANTIA_SB != 'NA')
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -1237,7 +1253,15 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente)
         -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+       -- OPT-010: Inline F_TIENE_GARANTIA como NOT EXISTS (elimina context switch PL/SQL)
+       AND NOT EXISTS (SELECT 1
+                         FROM PR_CREDITOS cr
+                         JOIN PR_GARANTIAS_X_CREDITO gx ON gx.CODIGO_EMPRESA = cr.CODIGO_EMPRESA AND gx.NO_CREDITO = cr.NO_CREDITO
+                         JOIN PR_GARANTIAS g ON g.CODIGO_EMPRESA = gx.CODIGO_EMPRESA AND g.NUMERO_GARANTIA = gx.NUMERO_GARANTIA
+                        WHERE cr.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+                          AND cr.NO_CREDITO = a.NO_CREDITO
+                          AND cr.ESTADO IN ('D','V','M','E','J')
+                          AND g.CODIGO_TIPO_GARANTIA_SB != 'NA')
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
