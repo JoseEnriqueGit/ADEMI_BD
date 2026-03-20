@@ -9664,14 +9664,15 @@ END P_Registra_Solicitud_Campana;
         DBMS_OUTPUT.PUT_LINE('EL REPRESTAMO ES DE CAMPAÑA ESPECIAL');
             FOR A IN CREDITO LOOP
                 BEGIN
-                    SELECT T.TIPO_CREDITO 
+                    -- OPT-009: Reemplazado MIN/MAX scalar subqueries con JOIN directo
+                    SELECT T.TIPO_CREDITO
                     INTO NUEVO_TIPO
-                    FROM PR.PR_TIPO_CREDITO_REPRESTAMO T, PR.PR_REPRESTAMOS R      
+                    FROM PR.PR_TIPO_CREDITO_REPRESTAMO T
+                    JOIN PR.PR_PLAZO_CREDITO_REPRESTAMO P ON P.TIPO_CREDITO = T.TIPO_CREDITO
+                    JOIN PR.PR_REPRESTAMOS R ON R.ID_REPRESTAMO = pIdReprestamo
                     WHERE T.TIPO_CREDITO = A.TIPO_CREDITO_DESTINO
-                      AND R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO) 
-                      AND R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO)
-                      AND ROWNUM <= 1
-                      AND R.ID_REPRESTAMO = pIdReprestamo;
+                      AND R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                      AND ROWNUM <= 1;
                     DBMS_OUTPUT.PUT_LINE('CREDITO DE CAMPAÑA ESPECIAL');
                     DBMS_OUTPUT.PUT_LINE('Nuevo Tipo de Crédito: ' || NUEVO_TIPO);
                     RETURN NUEVO_TIPO; -- Retorna el valor encontrado y sale de la función
@@ -9718,10 +9719,11 @@ END P_Registra_Solicitud_Campana;
                             WHERE  R.TIPO_CREDITO = NT.TIPO_CREDITO AND  R.OBSOLETO = 0 AND  NVL(R.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
                       )
                 ) INTO NUEVO_TIPO
+                -- OPT-009: Reemplazado OR en LEFT JOIN con COALESCE para permitir uso de indice
                 FROM PR_REPRESTAMOS   R
                 LEFT JOIN PR_CREDITOS      C ON C.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR_CREDITOS_HI   H ON H.NO_CREDITO = R.NO_CREDITO
-                LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+                LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = COALESCE(C.TIPO_CREDITO, H.TIPO_CREDITO)
                 WHERE R.ID_REPRESTAMO = pIdReprestamo;
                 RETURN NUEVO_TIPO;
                 DBMS_OUTPUT.PUT_LINE ( 'NUEVO CREDITO '|| NUEVO_TIPO || 'REPRESTAMOS' || pIdReprestamo);
@@ -9746,17 +9748,18 @@ END P_Registra_Solicitud_Campana;
         IF PR.PR_PKG_REPRESTAMOS.F_Validar_Tipo_Represtamo(pIdReprestamo) THEN
             FOR A IN CREDITO LOOP
                 BEGIN
-                SELECT (SELECT NT.TIPO_CREDITO 
-                        FROM PR_TIPO_CREDITO NT 
-                        WHERE PMONTO >= (SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) 
-                          AND PMONTO <= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) 
-                          AND T.CODIGO_SUB_APLICACION = NT.CODIGO_SUB_APLICACION 
-                          AND T.GRUPO_TIPO_CREDITO = NT.GRUPO_TIPO_CREDITO 
-                          AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC 
-                          AND EXISTS (SELECT 1 
-                                      FROM PR.PR_TIPO_CREDITO_REPRESTAMO 
-                                      WHERE TIPO_CREDITO = NT.TIPO_CREDITO 
-                                      AND OBSOLETO = 0 
+                -- OPT-009: Reemplazado MIN/MAX scalar subqueries con JOIN a PR_PLAZO_CREDITO_REPRESTAMO
+                SELECT (SELECT NT.TIPO_CREDITO
+                        FROM PR_TIPO_CREDITO NT
+                        JOIN PR.PR_PLAZO_CREDITO_REPRESTAMO P ON P.TIPO_CREDITO = NT.TIPO_CREDITO
+                        WHERE PMONTO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                          AND T.CODIGO_SUB_APLICACION = NT.CODIGO_SUB_APLICACION
+                          AND T.GRUPO_TIPO_CREDITO = NT.GRUPO_TIPO_CREDITO
+                          AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC
+                          AND EXISTS (SELECT 1
+                                      FROM PR.PR_TIPO_CREDITO_REPRESTAMO
+                                      WHERE TIPO_CREDITO = NT.TIPO_CREDITO
+                                      AND OBSOLETO = 0
                                       AND (CREDITO_CAMPANA_ESPECIAL = 'S')
                                       ))
                 INTO NUEVO_TIPO
