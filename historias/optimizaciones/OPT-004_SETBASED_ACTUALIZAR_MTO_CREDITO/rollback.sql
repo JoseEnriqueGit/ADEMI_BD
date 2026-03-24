@@ -1,0 +1,21 @@
+-- ============================================================
+-- OPT-004 ROLLBACK: Restaurar FOR loop row-by-row
+-- Ejecutar en Toad conectado a QA, schema PR
+-- ============================================================
+
+-- INSTRUCCIONES:
+-- 1. Abrir body.sql del paquete PR_PKG_REPRESTAMOS
+-- 2. En Actualiza_Precalificacion, buscar el comentario:
+--    "OPT-004: Reemplazado loop row-by-row con UPDATE set-based"
+-- 3. Reemplazar los 2 UPDATEs set-based con el FOR loop original
+--    segun el codigo en BEFORE.sql
+-- 4. Restaurar tambien el cursor Actualizar_Mto_Credito_Actual si fue eliminado
+-- 5. Recompilar el paquete en Toad
+--
+-- Alternativa por git:
+--   Buscar el commit de OPT-004 con: git log --oneline --grep="OPT-004"
+--   Revertir: git revert <hash>
+--   Recompilar body.sql en Toad
+--
+-- NOTA: Este rollback no afecta datos ni indices.
+-- La funcionalidad es identica, solo cambia el metodo de ejecucion.
