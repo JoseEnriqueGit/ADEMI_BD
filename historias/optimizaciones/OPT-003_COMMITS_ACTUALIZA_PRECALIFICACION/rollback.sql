@@ -1,0 +1,32 @@
+-- ============================================================
+-- OPT-003 ROLLBACK: Restaurar COMMITs dentro de loops
+-- Ejecutar en Toad conectado a QA, schema PR
+-- ============================================================
+
+-- INSTRUCCIONES:
+-- 1. Abrir body.sql del paquete PR_PKG_REPRESTAMOS
+-- 2. En Actualiza_Precalificacion, restaurar los COMMITs dentro de cada loop
+--    segun el codigo en BEFORE.sql
+-- 3. Recompilar el paquete en Toad
+--
+-- Alternativa por git:
+--   git revert 837fa2b
+--   (luego recompilar body.sql en Toad)
+--
+-- CAMBIOS ESPECIFICOS A RESTAURAR:
+--
+-- Loop 1 (Actualizar_Mto_Credito_Actual):
+--   Agregar COMMIT; despues del primer UPDATE (linea ~2719)
+--   Agregar COMMIT; despues del segundo UPDATE (linea ~2729)
+--   Eliminar el COMMIT; que esta despues del END LOOP
+--
+-- Loop 2 (PRECALIFICADOS):
+--   Mover el COMMIT; de despues del END LOOP a dentro del loop,
+--   justo despues del UPDATE PR_REPRESTAMOS ... WHERE rowid = a.id;
+--
+-- Loop 3 (CUR_FIADOR):
+--   Mover el COMMIT; de despues del END LOOP a dentro del loop,
+--   justo despues del END IF;
+--
+-- NOTA: Este rollback no afecta datos ni indices. Solo cambia
+-- la frecuencia de commits (rendimiento, no funcionalidad).
