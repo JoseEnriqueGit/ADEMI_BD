@@ -1,58 +1,47 @@
-# OPT-009 - Subqueries escalares en F_OBTENER_NUEVO_CREDITO y F_Obtener_Credito_Cancelado
+# OPT-009 - Subqueries escalares en F_OBTENER_NUEVO_CREDITO
 
 - **Paquete**: PR_PKG_REPRESTAMOS
-- **Funciones**: F_Obtener_Nuevo_Credito, F_Obtener_Credito_Cancelado
+- **Funcion**: F_Obtener_Nuevo_Credito (lineas 9678-9760)
 - **Entorno**: QA
-- **Fecha**: 2026-03-19
+- **Fecha**: 2026-03-25
 - **SQL Quest**: SQL 385/386/391/392 (cost ~17,235)
 
 ## Problema
-Tres problemas de rendimiento:
+La rama ELSE de la funcion (represtamos normales, no de campana) tenia un SELECT
+con un scalar subquery que contenia 3 subqueries anidadas mas:
 
-### 1. Scalar subqueries MIN/MAX (IF branch, lineas 9671-9672)
+1. `IN (SELECT ... WHERE CREDITO_FMO = 'S')` — verificar si el origen es FMO
+2. `NOT IN (SELECT ... WHERE CREDITO_FMO = 'S')` — excluir destinos FMO
+3. `EXISTS (SELECT 1 ... WHERE OBSOLETO = 0 AND CREDITO_CAMPANA_ESPECIAL <> 'S')` — vigente sin campana
+
+Las subqueries 1 y 2 consultaban la misma tabla con el mismo filtro.
+Ademas, el scalar subquery se ejecuta por cada fila del query externo.
+
+## Cambios realizados (3 fases)
+
+### Fase 1 (ya aplicada): MIN/MAX -> JOIN con BETWEEN en rama IF
+Reemplazado scalar subqueries MIN(MONTO_MIN)/MAX(MONTO_MAX) con JOIN directo.
+
+### Fase 2 (ya aplicada): OR -> COALESCE en LEFT JOIN
 ```sql
-R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) FROM PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO)
-R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) FROM PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO)
-```
-Dos subqueries ejecutadas por cada fila candidata.
-
-### 2. OR en LEFT JOIN (ELSE branch, linea 9724)
-```sql
-LEFT JOIN PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
-```
-El OR impide que Oracle use indices en el JOIN.
-
-### 3. Mismo patron MIN/MAX en F_Obtener_Credito_Cancelado (lineas 9751-9752)
-
-## Cambios realizados
-
-### Cambio 1: MIN/MAX -> JOIN con BETWEEN
-```sql
--- ANTES:
-FROM PR_TIPO_CREDITO_REPRESTAMO T, PR_REPRESTAMOS R
-WHERE R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) ...)
-  AND R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) ...)
-
--- DESPUES:
-FROM PR_TIPO_CREDITO_REPRESTAMO T
-JOIN PR_PLAZO_CREDITO_REPRESTAMO P ON P.TIPO_CREDITO = T.TIPO_CREDITO
-JOIN PR_REPRESTAMOS R ON R.ID_REPRESTAMO = pIdReprestamo
-WHERE R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+-- ANTES: LEFT JOIN PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+-- DESPUES: LEFT JOIN PR_TIPO_CREDITO T ON T.TIPO_CREDITO = COALESCE(C.TIPO_CREDITO, H.TIPO_CREDITO)
 ```
 
-### Cambio 2: OR -> COALESCE
-```sql
--- ANTES:
-LEFT JOIN PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+### Fase 3 (nueva): Eliminar scalar subquery completo y 3 subqueries anidadas
+Reemplazado el SELECT con scalar subquery por un SELECT directo con JOINs:
 
--- DESPUES:
-LEFT JOIN PR_TIPO_CREDITO T ON T.TIPO_CREDITO = COALESCE(C.TIPO_CREDITO, H.TIPO_CREDITO)
-```
+- Scalar subquery eliminado -> SELECT MIN(NT.TIPO_CREDITO) INTO directo
+- Subquery 1 (FMO origen) -> LEFT JOIN a PR_TIPO_CREDITO_REPRESTAMO FMO
+- Subquery 2 (excluir FMO destino) -> JOIN con condicion NVL(RV.CREDITO_FMO,'N') <> 'S'
+- Subquery 3 (vigente sin campana) -> JOIN con condiciones OBSOLETO=0 y CAMPANA<>'S'
+
+Ver BEFORE.sql y AFTER.sql para el codigo exacto.
 
 ## Razonamiento
-- JOIN con BETWEEN permite a Oracle evaluar la condicion de rango una sola vez usando el indice
-- COALESCE permite INDEX SCAN en lugar de CONCATENATION/UNION forzado por el OR
-- Un credito existe en PR_CREDITOS (activo) o PR_CREDITOS_HI (historico), no ambos, asi que COALESCE es semanticamente equivalente
+- 3 subqueries IN/NOT IN/EXISTS reemplazadas con JOINs directos
+- Oracle puede resolver todo en un solo plan de ejecucion sin scalar subquery re-execution
+- La regla de FACILIDAD (si origen es FMO se ignora) se implementa con LEFT JOIN + IS NOT NULL
 
 ## Como revertir
-`git revert <commit>`
+Compilar rollback.sql en Toad o: `git revert <commit>`

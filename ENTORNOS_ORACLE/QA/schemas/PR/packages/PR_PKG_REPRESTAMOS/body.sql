@@ -9717,37 +9717,28 @@ END P_Registra_Solicitud_Campana;
                 LEFT JOIN PR.PR_CREDITOS_HI H ON H.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR.PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
                 WHERE R.ID_REPRESTAMO = pIdReprestamo ;*/
-                SELECT (
-                    SELECT MIN(NT.TIPO_CREDITO)
-                    FROM   PR_TIPO_CREDITO                NT
-                    JOIN   PR_PLAZO_CREDITO_REPRESTAMO    P 
-                         ON  P.TIPO_CREDITO = NT.TIPO_CREDITO
-                    WHERE R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
-                      AND NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
-                      AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
-                      --AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC
-                      /*  Regla de FACILIDAD: Si el ORIGEN (T) es FMO se ignora
-                                              Si no es FMO debe coincidir           */
-                      AND ( T.TIPO_CREDITO IN (SELECT TIPO_CREDITO
-                                               FROM   PR_TIPO_CREDITO_REPRESTAMO
-                                               WHERE  CREDITO_FMO = 'S')
-                            OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC )
-                      -- Excluir tipos de crédito FMO
-                      AND NT.TIPO_CREDITO NOT IN (SELECT TIPO_CREDITO
-                                                  FROM   PR_TIPO_CREDITO_REPRESTAMO
-                                                  WHERE  CREDITO_FMO = 'S')
-                      -- Vigente y sin campaña especial
-                      AND EXISTS ( SELECT 1
-                            FROM   PR_TIPO_CREDITO_REPRESTAMO R
-                            WHERE  R.TIPO_CREDITO = NT.TIPO_CREDITO AND  R.OBSOLETO = 0 AND  NVL(R.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
-                      )
-                ) INTO NUEVO_TIPO
-                -- OPT-009: Reemplazado OR en LEFT JOIN con COALESCE para permitir uso de indice
+                -- OPT-009: Eliminadas 3 subqueries anidadas, reemplazadas con JOINs
+                SELECT MIN(NT.TIPO_CREDITO) INTO NUEVO_TIPO
                 FROM PR_REPRESTAMOS   R
                 LEFT JOIN PR_CREDITOS      C ON C.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR_CREDITOS_HI   H ON H.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = COALESCE(C.TIPO_CREDITO, H.TIPO_CREDITO)
-                WHERE R.ID_REPRESTAMO = pIdReprestamo;
+                -- JOIN al tipo credito destino con rango de plazo
+                JOIN PR_TIPO_CREDITO             NT ON NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
+                                                    AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
+                JOIN PR_PLAZO_CREDITO_REPRESTAMO P  ON P.TIPO_CREDITO = NT.TIPO_CREDITO
+                -- Vigente, sin campaña especial, no FMO
+                JOIN PR_TIPO_CREDITO_REPRESTAMO  RV ON RV.TIPO_CREDITO = NT.TIPO_CREDITO
+                                                    AND RV.OBSOLETO = 0
+                                                    AND NVL(RV.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
+                                                    AND NVL(RV.CREDITO_FMO,'N') <> 'S'
+                -- Verificar si origen es FMO para regla de facilidad
+                LEFT JOIN PR_TIPO_CREDITO_REPRESTAMO FMO ON FMO.TIPO_CREDITO = T.TIPO_CREDITO
+                                                         AND FMO.CREDITO_FMO = 'S'
+                WHERE R.ID_REPRESTAMO = pIdReprestamo
+                  AND R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                  -- Regla FACILIDAD: Si origen es FMO se ignora, si no debe coincidir
+                  AND (FMO.TIPO_CREDITO IS NOT NULL OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC);
                 RETURN NUEVO_TIPO;
                 DBMS_OUTPUT.PUT_LINE ( 'NUEVO CREDITO '|| NUEVO_TIPO || 'REPRESTAMOS' || pIdReprestamo);
             EXCEPTION

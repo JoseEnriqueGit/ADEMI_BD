@@ -1,0 +1,18 @@
+-- ============================================================
+-- OPT-009 ROLLBACK: Restaurar scalar subquery con 3 subqueries anidadas
+-- Ejecutar en Toad conectado a QA, schema PR
+-- ============================================================
+--
+-- INSTRUCCIONES:
+-- 1. Abrir body.sql del paquete PR_PKG_REPRESTAMOS
+-- 2. En F_Obtener_Nuevo_Credito, rama ELSE, buscar:
+--    "OPT-009: Eliminadas 3 subqueries anidadas"
+-- 3. Reemplazar el SELECT MIN(...) INTO directo con el codigo de BEFORE.sql
+-- 4. Recompilar el paquete en Toad
+--
+-- Alternativa por git:
+--   git log --oneline --grep="OPT-009"
+--   git revert <hash>
+--   Recompilar body.sql en Toad
+--
+-- NOTA: Este rollback no afecta datos ni indices.
