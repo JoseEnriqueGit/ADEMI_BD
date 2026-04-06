@@ -4,8 +4,28 @@
 -- ============================================================
 
 -- PASO 1: Recompilar el paquete con los cursores originales
--- Restaurar CUR_DE08_SIB y CUR_DE05_SIB en body.sql con el codigo de BEFORE.sql
--- y compilar el paquete completo en Toad.
+-- En body.sql, reemplazar los cursores CUR_DE08_SIB y CUR_DE05_SIB
+-- del procedure Actualiza_Precalificacion con el codigo de BEFORE.sql:
+--
+--   CURSOR CUR_DE08_SIB IS
+--       SELECT B.ROWID ID, b.id_represtamo, NVL(A.CLASIFICACION,'NULA') CLASIFICACION
+--       FROM PA_DE08_SIB A,
+--            PR_REPRESTAMOS B
+--       WHERE A.FECHA_CORTE = (SELECT MAX(FECHA_CORTE) FROM PA_DE08_SIB)
+--       AND OBT_IDENTIFICACION_PERSONA(B.CODIGO_CLIENTE,'1') = A.ID_DEUDOR
+--       AND B.ESTADO = 'RE'
+--       AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'DE08_SIB' ) = 'S' ;
+--
+--   CURSOR CUR_DE05_SIB IS
+--       SELECT B.ROWID ID, b.id_represtamo, A.cedula, a.entidad
+--       FROM PA_DE05_SIB A,
+--               PR_REPRESTAMOS B
+--       WHERE A.FECHA_CASTIGO = (SELECT MAX(FECHA_CASTIGO) FROM PA_DE05_SIB)
+--       AND OBT_IDENTIFICACION_PERSONA(B.CODIGO_CLIENTE,'1') = A.cedula
+--       AND B.ESTADO = 'RE'
+--       AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CASTIGOS_SIB' ) = 'S';
+--
+-- Luego compilar el paquete completo en Toad.
 --
 -- Alternativa por git:
 --   git revert 14f64ff

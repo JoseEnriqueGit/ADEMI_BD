@@ -1,0 +1,31 @@
+-- ============================================================
+-- OPT-005 ROLLBACK: Restaurar loop doble original de Actualiza_XCORE_CUSTOM
+-- Ejecutar en Toad conectado a QA, schema PR
+-- ============================================================
+-- Recompilar el paquete PR_PKG_REPRESTAMOS con el procedure
+-- Actualiza_XCORE_CUSTOM restaurado al codigo de BEFORE.sql.
+--
+-- El procedure original usaba:
+--   1. CURSOR CUR_UPDATE_XCORE con ROWNUM <= parametro LOTE_PROCESO_XCORE
+--   2. vCantidad_Procesar = round(COUNT(*) / lote) + 1
+--   3. FOR i IN 1..vCantidad_Procesar LOOP
+--        FOR A IN CUR_UPDATE_XCORE LOOP
+--          xcore := 750; (hardcodeado, DataCredito comentado)
+--          UPDATE PR_REPRESTAMOS SET XCORE_GLOBAL = xcore, XCORE_CUSTOM = xcore WHERE rowid = a.id;
+--          COMMIT;
+--        END LOOP;
+--      END LOOP;
+--
+-- Para restaurar:
+--   1. Copiar el contenido de BEFORE.sql
+--   2. Reemplazar el procedure Actualiza_XCORE_CUSTOM en body.sql
+--   3. Compilar el paquete completo en Toad
+--
+-- Alternativa por git:
+--   git revert <commit-hash>
+--   (luego recompilar body.sql en Toad)
+-- ============================================================
+
+-- El codigo completo del procedure original esta en BEFORE.sql.
+-- Copiar el bloque PROCEDURE Actualiza_XCORE_CUSTOM IS ... END Actualiza_XCORE_CUSTOM;
+-- desde BEFORE.sql y pegarlo en body.sql reemplazando la version optimizada.

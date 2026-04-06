@@ -1,0 +1,32 @@
+-- OPT-008 ROLLBACK: Restaurar llamadas directas a F_Existe_* en el loop
+-- Revertir commit 821d2f1
+--
+-- Para revertir, en el body de PR.PR_PKG_REPRESTAMOS:
+--
+-- 1. Buscar el loop final de P_Carga_Precalifica_Cancelado (FOR A IN CUR_REPRESTAMO LOOP)
+--
+-- 2. ELIMINAR las 3 lineas de cache de variables:
+--        v_tiene_solicitud := PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO);
+--        v_tiene_canales   := PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO);
+--        v_tiene_credito   := PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO);
+--
+-- 3. REEMPLAZAR las variables por las llamadas directas en los IF/ELSIF:
+--
+--    Linea del IF principal:
+--      CAMBIAR: IF v_tiene_solicitud AND v_tiene_canales AND v_tiene_credito THEN
+--      POR:     IF PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) THEN
+--
+--    Linea del IF credito:
+--      CAMBIAR: IF v_tiene_credito = FALSE THEN
+--      POR:     IF PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) = FALSE THEN
+--
+--    Linea del IF solicitud/canales:
+--      CAMBIAR: IF v_tiene_solicitud AND v_tiene_canales = FALSE AND v_tiene_credito THEN
+--      POR:     IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) THEN
+--
+-- 4. ELIMINAR las declaraciones de variables del bloque DECLARE:
+--        v_tiene_solicitud  BOOLEAN;
+--        v_tiene_canales    BOOLEAN;
+--        v_tiene_credito    BOOLEAN;
+--
+-- 5. Recompilar el package body despues del cambio.

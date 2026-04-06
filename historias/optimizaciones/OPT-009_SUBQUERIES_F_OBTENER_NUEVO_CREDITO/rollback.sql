@@ -1,18 +1,34 @@
 -- ============================================================
--- OPT-009 ROLLBACK: Restaurar scalar subquery con 3 subqueries anidadas
+-- OPT-009 ROLLBACK: Restaurar F_Obtener_Nuevo_Credito y eliminar indice
 -- Ejecutar en Toad conectado a QA, schema PR
 -- ============================================================
+
+-- =============================================================================
+-- PASO 1: Eliminar el indice creado
+-- =============================================================================
+DROP INDEX PR.IDX_CREDITOS_HI_NOCREDITO;
+
+-- =============================================================================
+-- PASO 2: Restaurar la funcion original en el body del paquete
+-- =============================================================================
+-- NOTA: Como el cambio de la query en el paquete aun NO fue aplicado,
+-- este paso solo seria necesario si la optimizacion se aplica en el futuro.
 --
--- INSTRUCCIONES:
--- 1. Abrir body.sql del paquete PR_PKG_REPRESTAMOS
--- 2. En F_Obtener_Nuevo_Credito, rama ELSE, buscar:
---    "OPT-009: Eliminadas 3 subqueries anidadas"
--- 3. Reemplazar el SELECT MIN(...) INTO directo con el codigo de BEFORE.sql
--- 4. Recompilar el paquete en Toad
+-- En caso de que se haya aplicado:
+-- 1. Buscar FUNCTION F_Obtener_Nuevo_Credito en el body de PR_PKG_REPRESTAMOS
+-- 2. En la rama ELSE (represtamo normal), reemplazar la query con JOINs directos
+--    por la query original con scalar subquery
+-- 3. La query original usa:
+--    - SELECT (scalar subquery) INTO NUEVO_TIPO FROM ...
+--    - Dentro del scalar subquery:
+--      * T.TIPO_CREDITO IN (SELECT ... WHERE CREDITO_FMO = 'S')
+--      * NT.TIPO_CREDITO NOT IN (SELECT ... WHERE CREDITO_FMO = 'S')
+--      * EXISTS (SELECT 1 FROM PR_TIPO_CREDITO_REPRESTAMO WHERE ...)
+-- 4. Recompilar el package body
+--
+-- El codigo completo de la funcion original esta en BEFORE.sql
 --
 -- Alternativa por git:
 --   git log --oneline --grep="OPT-009"
 --   git revert <hash>
 --   Recompilar body.sql en Toad
---
--- NOTA: Este rollback no afecta datos ni indices.

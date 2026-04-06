@@ -289,3 +289,59 @@ Da instrucciones concretas para que el usuario verifique los cambios:
 7. **No inventar datos** — si no puedes determinar el impacto, dilo
 8. **Comentar solo lo no-obvio** — un BULK COLLECT estándar no necesita comentario, un workaround por un bug de Oracle sí
 9. **Respetar el estilo existente** del codebase (prefijos v_, P_, naming conventions de ADEMI)
+10. **Documentación OBLIGATORIA por cada optimización** — ver sección siguiente
+
+---
+
+## PASO 9 (OBLIGATORIO): Documentación por optimización
+
+Cada optimización DEBE tener su carpeta en `historias/optimizaciones/OPT-NNN_nombre/` con estos archivos:
+
+### README.md (obligatorio)
+```markdown
+# OPT-NNN - Titulo descriptivo
+
+- **Paquete**: nombre del paquete
+- **Procedure/Funcion**: nombre
+- **Entorno**: QA / DESARROLLO
+- **Fecha**: YYYY-MM-DD
+- **SQL Quest**: (si aplica) SQL NNN (cost X)
+- **Cost**: X -> Y (reduccion Z%)
+- **Git commit**: hash
+
+## Problema
+[Qué estaba mal y por qué impactaba el rendimiento]
+
+## Cambios realizados
+[Lista de cambios con lineas afectadas]
+
+## Razonamiento
+[Por qué cada cambio mejora el rendimiento]
+
+## Resultados verificados
+[Tabla con Explain Plan ANTES vs DESPUÉS]
+
+## Como revertir
+[Instrucciones exactas: git revert + rollback de indices si aplica]
+```
+
+### BEFORE.sql (obligatorio)
+Código PL/SQL **exacto** antes de la optimización. Debe ser compilable si se pega en Toad.
+
+### AFTER.sql (obligatorio)
+Código PL/SQL **exacto** después de la optimización. Debe ser compilable si se pega en Toad.
+
+### rollback.sql (obligatorio)
+Script completo para revertir TODOS los cambios (paquete + indices + tablas).
+Incluir:
+- El código original del cursor/procedure/función
+- DROP INDEX para indices creados
+- Instrucciones claras de compilación
+
+### Índice (obligatorio)
+Actualizar `historias/optimizaciones/README.md` con la nueva entrada.
+
+### Regla de entornos (OBLIGATORIA)
+- **SIEMPRE preguntar al usuario** a cuál entorno consultar (DESARROLLO o QA) antes de leer cualquier objeto Oracle
+- **Ningún entorno es "fuente de verdad" por defecto**
+- Si un objeto referenciado no existe en el repositorio local, solicitar al usuario que lo consulte en la BD

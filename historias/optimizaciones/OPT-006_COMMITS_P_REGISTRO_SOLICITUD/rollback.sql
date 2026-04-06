@@ -1,0 +1,41 @@
+-- ============================================================
+-- OPT-006 ROLLBACK: Restaurar COMMIT dentro del FOR loop
+-- Ejecutar en Toad conectado a QA, schema PR
+-- ============================================================
+-- Para revertir, mover el COMMIT de vuelta dentro del FOR loop
+-- en ambos procedures.
+--
+-- Alternativa por git:
+--   git revert 73849ac
+--   (luego recompilar body.sql en Toad)
+-- ============================================================
+
+-- ======================
+-- P_REGISTRO_SOLICITUD (~linea 8059)
+-- ======================
+-- Restaurar COMMIT dentro del loop:
+--
+--   FOR A IN CUR_REPRESTAMO LOOP
+--       PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,
+--           NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+--       PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO,
+--           NULL, 'RE', NULL, '',
+--           NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
+--       COMMIT;  -- <-- restaurar aqui
+--   END LOOP ;
+--   (eliminar el COMMIT que esta despues del END LOOP)
+
+-- ==============================
+-- P_Carga_Precalifica_Manual (~linea 8318)
+-- ==============================
+-- Restaurar COMMIT dentro del loop:
+--
+--   FOR A IN CUR_REPRESTAMO LOOP
+--       PR.PR_PKG_REPRESTAMOS.P_Registra_Solicitud_Dirigida(A.ID_REPRESTAMO,
+--           NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+--       COMMIT;  -- <-- restaurar aqui
+--   END LOOP;
+--   (eliminar el COMMIT que esta despues del END LOOP)
+
+-- Luego compilar el paquete completo en Toad.
+-- El codigo completo del procedure original esta en BEFORE.sql.

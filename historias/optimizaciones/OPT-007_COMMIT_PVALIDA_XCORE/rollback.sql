@@ -1,0 +1,24 @@
+-- OPT-007 ROLLBACK: Restaurar COMMIT dentro del FOR LOOP en PVALIDA_XCORE
+-- Revertir commit e13ee50
+--
+-- Para revertir, en el body de PR.PR_PKG_REPRESTAMOS:
+--
+-- 1. Buscar el procedimiento PVALIDA_XCORE
+-- 2. Mover el COMMIT de despues del END LOOP a ANTES del END LOOP
+--    (justo despues del END IF final, antes del END LOOP)
+--
+-- Cambiar ESTO (version optimizada):
+--
+--                END IF;
+--                -- COMMIT removido de aqui
+--            END LOOP;
+--
+--            COMMIT;
+--
+-- Por ESTO (version original):
+--
+--                END IF;
+--                COMMIT;
+--            END LOOP;
+--
+-- Recompilar el package body despues del cambio.
