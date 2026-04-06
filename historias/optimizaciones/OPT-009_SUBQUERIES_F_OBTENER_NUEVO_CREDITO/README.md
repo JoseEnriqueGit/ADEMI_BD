@@ -7,8 +7,8 @@
 - **Entorno:** QA
 - **Fecha:** 2026-03-25
 
-## Estado actual
-**El cambio en el paquete PR_PKG_REPRESTAMOS aun NO fue aplicado al body.sql.** La funcion F_Obtener_Nuevo_Credito todavia tiene el codigo original con scalar subqueries. Solo se creo el indice `PR.IDX_CREDITOS_HI_NOCREDITO`. El BEFORE.sql refleja el codigo actual del body.sql. El AFTER.sql es la version optimizada pendiente de aplicar.
+## Estado
+**APLICADO.** Indice creado en QA + cambio en body.sql aplicado.
 
 ## Problema
 La rama ELSE de la funcion (represtamos normales, no de campana) tenia un SELECT
@@ -32,7 +32,7 @@ La tabla `PR_CREDITOS_HI` se accedia con `LEFT JOIN` sin indice en `NO_CREDITO`,
 CREATE INDEX PR.IDX_CREDITOS_HI_NOCREDITO ON PR.PR_CREDITOS_HI(NO_CREDITO);
 ```
 
-### Fase 2: Reescribir query con JOINs directos (pendiente de aplicar)
+### Fase 2: Reescribir query con JOINs directos (aplicado)
 - Scalar subquery eliminado -> SELECT MIN(NT.TIPO_CREDITO) INTO directo
 - Subquery 1 (FMO origen) -> LEFT JOIN a PR_TIPO_CREDITO_REPRESTAMO FMO
 - Subquery 2 (excluir FMO destino) -> JOIN con condicion NVL(RV.CREDITO_FMO,'N') <> 'S'
@@ -54,6 +54,6 @@ CREATE INDEX PR.IDX_CREDITOS_HI_NOCREDITO ON PR.PR_CREDITOS_HI(NO_CREDITO);
 3. Recompilar el package body
 
 ## Archivos
-- `BEFORE.sql` - Funcion completa original con scalar subqueries (codigo actual en body.sql)
-- `AFTER.sql` - Funcion completa optimizada con JOINs directos (pendiente de aplicar)
+- `BEFORE.sql` - Funcion completa original con scalar subqueries
+- `AFTER.sql` - Funcion completa optimizada con JOINs directos
 - `rollback.sql` - DROP del indice e instrucciones para restaurar la funcion original
