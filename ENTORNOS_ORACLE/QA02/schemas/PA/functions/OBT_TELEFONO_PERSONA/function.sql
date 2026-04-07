@@ -35,11 +35,29 @@ BEGIN
               FROM tel_personas
              WHERE cod_persona = inCodPersona
                AND tip_telefono = inTipoTelefono
+               AND tel_personas.ES_DEFAULT = 'S'
                AND ROWNUM = 1;
         EXCEPTION
            WHEN OTHERS THEN
               vLabTel := NULL;
         END;
+
+        IF vlabtel IS NULL THEN
+            BEGIN
+                SELECT DECODE ( cod_area, NULL, num_telefono,
+                                                DECODE (extension, NULL, '(' || cod_area || ')' || num_telefono,
+                                                                         '(' || cod_area || ')' || num_telefono || ' ' || extension)) telefono
+                  INTO vlabtel
+                  FROM tel_personas
+                 WHERE cod_persona = inCodPersona
+                   AND tip_telefono = inTipoTelefono
+                   AND tel_personas.ES_DEFAULT = 'N'
+                   AND ROWNUM = 1;
+            EXCEPTION
+               WHEN OTHERS THEN
+                  vLabTel := NULL;
+            END;
+        END IF;
     END IF;
 
     RETURN vLabTel;
