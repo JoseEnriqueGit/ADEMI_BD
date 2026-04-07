@@ -120,10 +120,18 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
+       AND NOT EXISTS (
+            SELECT 1
+            FROM PR_GARANTIAS_X_CREDITO gxc
+            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
+                                AND g.numero_garantia = gxc.numero_garantia
+            WHERE gxc.codigo_empresa = a.codigo_empresa
+              AND gxc.no_credito = a.no_credito
+              AND g.codigo_tipo_garantia_sb != 'NA'
+       )
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
         -- Se valida que los clientes no esten en lista NEGRA
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
         ;
@@ -475,12 +483,20 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
+        AND NOT EXISTS (
+            SELECT 1
+            FROM PR_GARANTIAS_X_CREDITO gxc
+            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
+                                AND g.numero_garantia = gxc.numero_garantia
+            WHERE gxc.codigo_empresa = a.codigo_empresa
+              AND gxc.no_credito = a.no_credito
+              AND g.codigo_tipo_garantia_sb != 'NA'
+        )
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
         -- Se valida que los clientes no esten en lista NEGRA
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
         ;
         
                          
@@ -1235,10 +1251,18 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.codigo_empresa = a1.codigo_empresa
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente)
-        -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
+       AND NOT EXISTS (
+            SELECT 1
+            FROM PR_GARANTIAS_X_CREDITO gxc
+            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
+                                AND g.numero_garantia = gxc.numero_garantia
+            WHERE gxc.codigo_empresa = a.codigo_empresa
+              AND gxc.no_credito = a.no_credito
+              AND g.codigo_tipo_garantia_sb != 'NA'
+       )
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
         -- Se valida que los clientes no esten en lista NEGRA
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
         AND EXISTS (

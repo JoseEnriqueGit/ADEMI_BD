@@ -44,5 +44,79 @@ Aplicado en 3 cursores (lineas 125, 480, 1240).
 - Oracle puede optimizar el subquery como parte del plan completo del cursor
 - Semanticamente equivalente: COUNT(1) = 0 es lo mismo que NOT EXISTS
 
+## Indice creado
+```sql
+CREATE INDEX PR.IDX_GARANTIAS_TIPO_SB
+ON PR.PR_GARANTIAS (CODIGO_EMPRESA, NUMERO_GARANTIA, CODIGO_TIPO_GARANTIA_SB)
+TABLESPACE PR_DAT;
+```
+
+## Resultados verificados (Explain Plan en Toad)
+
+| Metrica | ANTES (con funcion) | DESPUES (NOT EXISTS) |
+|---------|--------------------|--------------------|
+| Cost visible | 271 | 473 |
+| Costo oculto funcion | 6 x 1,476 = 8,856 | 0 |
+| **Costo real total** | **9,127** | **473** |
+| Mejora real | | -94.8% |
+
+**Nota**: El ANTES muestra cost 271 pero NO incluye el costo de la funcion PL/SQL que se ejecuta por cada fila. El DESPUES muestra todo el costo real.
+
+## Scripts para Explain Plan (ejecutar en Toad)
+
+### ANTES (con funcion PL/SQL):
+```sql
+SELECT a.no_credito, a.codigo_cliente
+FROM PR_CREDITOS a
+WHERE a.codigo_empresa = 1
+  AND a.estado IN ('D','V','M','E','J')
+  AND PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0
+  AND ROWNUM <= 100;
+```
+
+### DESPUES (con NOT EXISTS inline):
+```sql
+SELECT a.no_credito, a.codigo_cliente
+FROM PR_CREDITOS a
+WHERE a.codigo_empresa = 1
+  AND a.estado IN ('D','V','M','E','J')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM PR_GARANTIAS_X_CREDITO B
+      JOIN PR_GARANTIAS C ON C.codigo_empresa = B.codigo_empresa
+                          AND C.numero_garantia = B.numero_garantia
+      WHERE B.codigo_empresa = a.codigo_empresa
+        AND B.no_credito = a.no_credito
+        AND C.codigo_tipo_garantia_sb != 'NA'
+  )
+  AND ROWNUM <= 100;
+```
+
+### Costo de 1 ejecucion de la funcion (para calcular costo real del ANTES):
+```sql
+SELECT COUNT(1)
+FROM PR_CREDITOS A,
+     PR_GARANTIAS_X_CREDITO B,
+     PR_GARANTIAS C
+WHERE A.codigo_empresa = 1
+  AND A.no_credito = 12345
+  AND A.estado IN ('D','V','M','E','J')
+  AND B.codigo_empresa = A.codigo_empresa
+  AND B.no_credito = A.no_credito
+  AND C.codigo_empresa = B.codigo_empresa
+  AND C.numero_garantia = B.numero_garantia
+  AND C.codigo_tipo_garantia_sb != 'NA';
+```
+
 ## Como revertir
-`git revert <commit>`
+
+### Rollback del paquete:
+```sql
+-- Reemplazar los 3 NOT EXISTS con: AND PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0
+```
+O en git: `git revert <commit>`
+
+### Rollback del indice:
+```sql
+DROP INDEX PR.IDX_GARANTIAS_TIPO_SB;
+```
