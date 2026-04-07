@@ -17,5 +17,8 @@
 --   Revertir: git revert <hash>
 --   Recompilar body.sql en Toad
 --
--- NOTA: Este rollback no afecta datos ni indices.
+-- NOTA: Este rollback no afecta datos.
 -- La funcionalidad es identica, solo cambia el metodo de ejecucion.
+--
+-- ROLLBACK DEL INDICE (si se quiere eliminar):
+-- DROP INDEX PA.IDX_DE08_NOCRED_CALIF_FECHA;

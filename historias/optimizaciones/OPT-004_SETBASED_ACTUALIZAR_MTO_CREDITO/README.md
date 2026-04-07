@@ -34,15 +34,43 @@ Ver BEFORE.sql y AFTER.sql para el codigo exacto.
 - Oracle optimiza el UPDATE set-based internamente con batch processing
 - El cursor Actualizar_Mto_Credito_Actual ya no se usa (codigo muerto eliminado)
 
+## Indice creado para UPDATE 2
+```sql
+CREATE INDEX PA.IDX_DE08_NOCRED_CALIF_FECHA
+ON PA.PA_DETALLADO_DE08 (NO_CREDITO, FECHA_CORTE, CALIFICA_CLIENTE)
+TABLESPACE PA_DAT;
+```
+Covering index que permite a Oracle resolver el EXISTS sin acceder a la tabla.
+
+## Resultados verificados (Explain Plan en Toad)
+
+### UPDATE 1 (MTO_CREDITO_ACTUAL)
+| Metrica | ANTES (por fila) | DESPUES (set-based) |
+|---------|-----------------|---------------------|
+| Cost    | 352             | 10                  |
+| Ejecuciones | N          | 1                   |
+| Cost total (200 filas) | 70,400 | 10        |
+
+### UPDATE 2 (ESTADO='RSB')
+| Metrica | ANTES (por fila) | DESPUES sin idx | DESPUES con idx |
+|---------|-----------------|-----------------|-----------------|
+| Cost    | 44              | 12,149          | 71              |
+| Ejecuciones | N          | 1               | 1               |
+| Cost total (200 filas) | 8,800 | 12,149  | 71              |
+
 ## Como verificar
 ```sql
--- Contar antes de ejecutar
 SELECT COUNT(*) FROM PR_REPRESTAMOS WHERE ESTADO = 'RE';
 -- Ejecutar el procedure
--- Contar despues: debe ser igual o menor (los RSB se restaron)
 SELECT COUNT(*) FROM PR_REPRESTAMOS WHERE ESTADO IN ('RE','RSB');
 ```
 
 ## Como revertir
-Compilar rollback.sql en Toad (restaura el FOR loop original con cursor)
-O en git: buscar el commit de OPT-004 y hacer `git revert <hash>`
+
+### Rollback del paquete:
+Compilar rollback.sql en Toad o: `git revert <commit>`
+
+### Rollback del indice:
+```sql
+DROP INDEX PA.IDX_DE08_NOCRED_CALIF_FECHA;
+```
