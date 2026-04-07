@@ -17,3 +17,4 @@
 | OPT-009 | PR_PKG_REPRESTAMOS     | F_Obtener_Nuevo_Credito     | 17,232     | 909          | QA      | 2026-04-06 |
 | OPT-004 | PR_PKG_REPRESTAMOS     | Actualiza_Precalificacion   | N iters    | 2 UPDATEs    | QA      | 2026-03-19 |
 | OPT-010 | PR_PKG_REPRESTAMOS     | CREDITOS_PROCESAR (x3)      | N ctx sw   | ANTI JOIN    | QA      | 2026-03-19 |
+| OPT-011 | PR_PKG_REPRESTAMOS     | CUR_Anular_creditos_cancel  | 10,656     | 9,748        | QA      | 2026-04-07 |
