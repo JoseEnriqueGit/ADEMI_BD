@@ -58,6 +58,69 @@ Covering index que permite a Oracle resolver el EXISTS sin acceder a la tabla.
 | Ejecuciones | N          | 1               | 1               |
 | Cost total (200 filas) | 8,800 | 12,149  | 71              |
 
+## Scripts para Explain Plan (ejecutar en Toad)
+
+### UPDATE 1 — ANTES (por fila, como hacia el loop):
+```sql
+UPDATE PR.PR_REPRESTAMOS R SET R.MTO_CREDITO_ACTUAL = (SELECT monto_desembolsado
+                                  FROM PA.PA_DETALLADO_DE08 D
+                                 WHERE D.FUENTE         = 'PR'
+                                   AND D.NO_CREDITO     = 12345
+                                   AND D.CODIGO_CLIENTE  = 67890
+                                   AND D.FECHA_CORTE    = (SELECT MAX(P.FECHA_CORTE)
+                                                             FROM PA_DETALLADO_DE08 P
+                                                            WHERE P.FUENTE       = 'PR'
+                                                              AND P.NO_CREDITO   = 12345
+                                                              AND P.CODIGO_CLIENTE = 67890))
+WHERE R.CODIGO_EMPRESA = 1
+  AND R.CODIGO_CLIENTE = 67890
+  AND R.NO_CREDITO     = 12345
+  AND R.ESTADO         = 'RE';
+```
+
+### UPDATE 1 — DESPUES (set-based):
+```sql
+UPDATE PR.PR_REPRESTAMOS R
+SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
+                              FROM PA.PA_DETALLADO_DE08 D
+                             WHERE D.FUENTE         = 'PR'
+                               AND D.NO_CREDITO     = R.NO_CREDITO
+                               AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
+                               AND D.FECHA_CORTE    = (SELECT MAX(P.FECHA_CORTE)
+                                                         FROM PA_DETALLADO_DE08 P
+                                                        WHERE P.FUENTE         = 'PR'
+                                                          AND P.NO_CREDITO     = R.NO_CREDITO
+                                                          AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
+WHERE R.CODIGO_EMPRESA = 1
+  AND R.ESTADO = 'RE';
+```
+
+### UPDATE 2 — ANTES (por fila, como hacia el loop):
+```sql
+UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB'
+WHERE NO_CREDITO = (SELECT NO_CREDITO
+                      FROM PA_DETALLADO_DE08
+                     WHERE NO_CREDITO = 12345
+                       AND CALIFICA_CLIENTE NOT IN (SELECT COLUMN_VALUE
+                                                      FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
+                       AND fecha_corte = (SELECT MAX(FECHA_CORTE) FROM PA_DETALLADO_DE08 WHERE FUENTE = 'PR'));
+```
+
+### UPDATE 2 — DESPUES (set-based con EXISTS):
+```sql
+UPDATE PR_REPRESTAMOS R
+SET R.ESTADO = 'RSB'
+WHERE R.ESTADO = 'RE'
+  AND EXISTS (SELECT 1
+                FROM PA_DETALLADO_DE08 D
+               WHERE D.NO_CREDITO = R.NO_CREDITO
+                 AND D.CALIFICA_CLIENTE NOT IN (SELECT COLUMN_VALUE
+                                                  FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
+                 AND D.FECHA_CORTE = (SELECT MAX(FECHA_CORTE) FROM PA_DETALLADO_DE08 WHERE FUENTE = 'PR'));
+```
+
+---
+
 ## Como verificar
 ```sql
 SELECT COUNT(*) FROM PR_REPRESTAMOS WHERE ESTADO = 'RE';
