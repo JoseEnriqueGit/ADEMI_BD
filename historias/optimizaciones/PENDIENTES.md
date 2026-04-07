@@ -11,7 +11,7 @@
 | SQL Quest    | Cost    | Descripcion                                    | Ubicacion probable                 | Estado |
 |-------------|---------|------------------------------------------------|------------------------------------|--------|
 | SQL 371     | 10,656  | Query anulacion creditos cancelados            | P_Actualizar_Anular_Represtamo     | **En propuestas/** (cost 9,748→26 con hardcodeo, pendiente aprobacion) |
-| SQL 364     | 8,332   | UPDATE PROMOCION_PERSONA con INDEX RANGE SCAN  | P_Registrar_Rechazo                | Pendiente |
+| SQL 364     | 8,332   | UPDATE PROMOCION_PERSONA con INDEX RANGE SCAN  | P_Registrar_Rechazo                | **OPT-012: No optimizable** (PK cubre el query, no se puede mejorar sin cambiar tabla) |
 | SQL 396/397 | ~17,230 | SELECT MAX(PLAZO) con subquery tipo credito    | F_Obtener_Plazo                    | **Resuelto por OPT-009** (indices) — cost bajo de 17,230 a 907 sin cambio de codigo |
 | SQL 149/171/188 | 129,413 | No identificados en PDF (reporte incompleto) | Requieren export del Quest       |
 
