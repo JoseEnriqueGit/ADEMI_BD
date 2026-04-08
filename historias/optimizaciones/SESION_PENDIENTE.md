@@ -34,11 +34,46 @@
 
 ## Lo que queda pendiente (4 items)
 
-### 1. SQL 371 — Hardcodeo de estados (cost 9,748 → 26)
-- **Estado**: Propuesta documentada, pendiente aprobacion del jefe
-- **Archivo**: `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md`
+### 1. Propuestas de hardcodeo — 3 cursores del job mensual (cost total 11,698 → 62)
+- **Estado**: Propuestas documentadas, pendientes aprobacion del jefe
+- **Archivos**:
+  - `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md` — CUR_Anular_creditos_cancelados (9,748→26)
+  - `historias/optimizaciones/propuestas/CURSORES_ANULAR_HARDCODEO_ESTADOS.md` — CUR_Anular (953→18) + CUR_Anular_campana_especiales (997→18)
+- **Job afectado**: JOB_ACTUALIZAR_ANULAR_RD (mensual, dia 1 a las 00:00)
+- **Cadena**: JOB → P_ACTUALIZAR_ANULAR_REPRESTAMO → P_ANULAR_REPRESTAMOS_INACTIVOS → 3 cursores
 - **Accion**: Preguntar al jefe si aprueba el trade-off (hardcodeo vs parametros dinamicos)
-- **Si se aprueba**: Aplicar el cambio al cursor CUR_Anular_creditos_cancelados en body.sql, documentar como OPT-014
+- **Alternativas evaluadas**: Subquery directa (cost 929), CARDINALITY hint (cost 952) — ambas descartadas, Oracle solo hace INLIST ITERATOR con literales
+- **Si se aprueba**: Aplicar los 3 cambios al body.sql, documentar como OPT-014
+
+#### Como probar el job en Toad (medir tiempo ANTES y DESPUES del cambio)
+
+**Ejecutar el job directamente:**
+```sql
+BEGIN
+  DBMS_SCHEDULER.RUN_JOB('PR.JOB_ACTUALIZAR_ANULAR_RD', USE_CURRENT_SESSION => TRUE);
+END;
+/
+```
+
+**O llamar el procedimiento con medicion de tiempo:**
+```sql
+SET TIMING ON;
+DECLARE
+  PMENSAJE VARCHAR2(32767);
+BEGIN
+  PMENSAJE := NULL;
+  PR.PR_PKG_REPRESTAMOS.P_ACTUALIZAR_ANULAR_REPRESTAMO(PMENSAJE);
+  COMMIT;
+  DBMS_OUTPUT.PUT_LINE('Mensaje: ' || PMENSAJE);
+END;
+/
+```
+
+**Proceso de prueba:**
+1. Correr el script ANTES de aplicar cambios — anotar tiempo de ejecucion
+2. Aplicar los cambios (hardcodeo de los 3 cursores) y recompilar el paquete
+3. Correr el mismo script — anotar tiempo DESPUES
+4. Comparar tiempos y documentar en la OPT
 
 ### 2. SQL 151/172 del Quest (cost 106,783) — Confirmar que son CUR_DE05_SIB
 - **Estado**: Probablemente ya resueltos por OPT-013, falta confirmar
@@ -83,7 +118,8 @@ WHERE R.CODIGO_EMPRESA = 1
 | `historias/optimizaciones/README.md` | Indice de todas las OPT (001-013) |
 | `historias/optimizaciones/PENDIENTES.md` | SQLs pendientes del Quest |
 | `historias/optimizaciones/MAPA_JOBS.md` | Mapa completo de los 5 jobs y sus procedimientos |
-| `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md` | Propuesta SQL 371 |
+| `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md` | Propuesta SQL 371 (CUR_Anular_creditos_cancelados) |
+| `historias/optimizaciones/propuestas/CURSORES_ANULAR_HARDCODEO_ESTADOS.md` | Propuesta CUR_Anular + CUR_Anular_campana_especiales |
 | `historias/optimizaciones/OPT-013_INDICE_PA_DE05_SIB/README.md` | OPT-013 completada |
 | `ENTORNOS_ORACLE/QA/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | Paquete principal (13,787 lineas) |
 
