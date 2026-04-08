@@ -9368,11 +9368,13 @@ END P_Registra_Solicitud_Campana;
              SELECT id_represtamo, no_credito
             FROM PR_REPRESTAMOS a
             WHERE codigo_empresa =PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-            and ESTADO in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS_CANCELADOS')))
+            -- OPT-014: Hardcodeo de estados (cost 9,748 -> 26). Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS_CANCELADOS
+            and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','CP')
             and not exists (select 1
                             from pr_creditos
                             where no_credito = a.no_credito
-                            and estado in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS'))))
+                            -- OPT-014: Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS
+                            and estado IN ('D','V','M','E','J','C'))
             and not exists(
                             select 1
                             from pr_creditos_hi h
