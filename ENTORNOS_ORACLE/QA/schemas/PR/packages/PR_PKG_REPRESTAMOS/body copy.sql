@@ -9350,7 +9350,8 @@ END P_Registra_Solicitud_Campana;
         FROM PR_REPRESTAMOS
         WHERE codigo_empresa =PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
         and  id_represtamo = nvl(pIdReprestamo,id_represtamo)
-        and ESTADO in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
+        -- OPT-014: Hardcodeo de estados (cost 953 -> 18). Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
+        and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
         AND TRUNC(FECHA_proceso) <= trunc(sysdate)
         AND trunc(LAST_DAY(FECHA_proceso)) <= TRUNC(trunc(sysdate));
         --AND TRUNC(FECHA_proceso)+PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO('DIA_CADUCA_LINK')<=TRUNC(SYSDATE);
@@ -9361,7 +9362,8 @@ END P_Registra_Solicitud_Campana;
         FROM PR_REPRESTAMOS
         WHERE codigo_empresa =PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
         and  id_represtamo = nvl(pIdReprestamo,id_represtamo)
-        and ESTADO in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
+        -- OPT-014: Hardcodeo de estados (cost 997 -> 18). Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
+        and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
         AND TRUNC(FECHA_proceso)+PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO('DIA_CADUCA_LINK_CANCELADOS')<=TRUNC(SYSDATE);  
           
     CURSOR CUR_Anular_creditos_cancelados IS
