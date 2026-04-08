@@ -138,8 +138,71 @@ WHERE R.CODIGO_EMPRESA = 1
 
 ## Instrucciones para la proxima sesion
 
-1. Leer este documento (`SESION_PENDIENTE.md`) al inicio
-2. Trabajar los 4 items pendientes en orden de prioridad
-3. Para cada item que se complete, documentar en su carpeta OPT correspondiente
-4. Al finalizar, actualizar este documento con los resultados o crear uno nuevo para la sesion siguiente
-5. Si se obtienen resultados de Explain Plan, guardar screenshots o anotar los costs aqui
+### Tarea principal: Medir ANTES/DESPUES del job mensual con hardcodeo
+
+**Paso 1 — Medir ANTES (sin cambios):**
+1. Conectar a QA (JOOGANDO@QAORACEL) en Toad
+2. Activar DBMS Output (View > DBMS Output)
+3. Abrir `historias/optimizaciones/scripts_medicion/MEDIR_JOB_ANULAR.sql`
+4. Ejecutar 3 veces — descartar la 1ra (cold cache), anotar 2da y 3ra como ANTES
+5. Copiar la linea "RESULTADO|..." del output
+
+**Paso 2 — Aplicar hardcodeo de los 3 cursores:**
+Modificar `P_Anular_Represtamos_Inactivos` en body.sql (linea 9368):
+
+*CUR_Anular (linea 9377) — cambiar:*
+```sql
+-- ANTES:
+and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
+-- DESPUES:
+and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
+-- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
+```
+
+*CUR_Anular_campana_especiales (linea 9388) — mismo cambio:*
+```sql
+-- ANTES:
+and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
+-- DESPUES:
+and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
+-- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
+```
+
+*CUR_Anular_creditos_cancelados (linea 9395-9399) — cambiar 2 lineas:*
+```sql
+-- ANTES (linea 9395):
+and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS_CANCELADOS')))
+-- DESPUES:
+and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','CP')
+-- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS_CANCELADOS
+
+-- ANTES (linea 9399):
+and estado in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS')))
+-- DESPUES:
+and estado IN ('D','V','M','E','J','C')
+-- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS
+```
+
+Compilar el paquete en Toad (sin errores).
+
+**Paso 3 — Medir DESPUES:**
+1. Ejecutar `MEDIR_JOB_ANULAR.sql` 3 veces — anotar 2da y 3ra como DESPUES
+2. Copiar la linea "RESULTADO|..." del output
+3. Comparar con los resultados del Paso 1
+
+**Paso 4 — Documentar:**
+1. Si mejora: crear carpeta OPT-014 y documentar con ANTES/DESPUES
+2. Si no mejora o es marginal: revertir body.sql y anotar en SESION_PENDIENTE
+
+**Paso 5 — Rollback (si algo sale mal):**
+Revertir los 3 cursores a la version original con TABLE(F_Obt_Valor_Parametros(...)) y recompilar.
+
+### Otros items pendientes (menor prioridad)
+1. Confirmar SQL 151/172 del Quest con companero
+2. Evaluar UPDATE MTO_CREDITO_ACTUAL set-based (preguntar volumen de lote)
+3. Evaluar COMMITs en loops (preguntar volumen de lote)
+
+### Al finalizar la sesion
+1. Actualizar este documento con los resultados de las mediciones
+2. Hacer commit y push de todo
+3. Si se creo OPT-014, agregar entrada al README.md de optimizaciones
