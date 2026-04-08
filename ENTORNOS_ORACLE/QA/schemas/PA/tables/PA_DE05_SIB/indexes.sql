@@ -1,0 +1,2 @@
+-- Sin indices registrados al momento (2026-04-07)
+-- La tabla no tiene PK ni indices definidos
