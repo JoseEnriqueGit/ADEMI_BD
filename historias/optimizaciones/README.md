@@ -19,3 +19,4 @@
 | OPT-010 | PR_PKG_REPRESTAMOS     | CREDITOS_PROCESAR (x3)      | N ctx sw   | ANTI JOIN    | QA      | 2026-03-19 |
 | OPT-011 | PR_PKG_REPRESTAMOS     | CUR_Anular_creditos_cancel  | 10,656     | 9,748        | QA      | 2026-04-07 |
 | OPT-012 | PR_PKG_REPRESTAMOS     | UPDATE PROMOCION_PERSONA    | 8,332      | NO OPTIMIZABLE| QA      | 2026-04-07 |
+| OPT-013 | PA.PA_DE05_SIB         | CUR_DE05_SIB (Dirigida+Campana) | 120,122 | 11           | QA      | 2026-04-07 |

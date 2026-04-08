@@ -1,2 +1,4 @@
--- Sin indices registrados al momento (2026-04-07)
--- La tabla no tiene PK ni indices definidos
+-- OPT-013: Indice covering para CUR_DE05_SIB (cost 120,122 -> 11)
+CREATE INDEX PA.IDX_DE05_SIB_CASTIGO_CEDULA
+ON PA.PA_DE05_SIB (FECHA_CASTIGO, CEDULA, ENTIDAD)
+TABLESPACE PA_DAT;
