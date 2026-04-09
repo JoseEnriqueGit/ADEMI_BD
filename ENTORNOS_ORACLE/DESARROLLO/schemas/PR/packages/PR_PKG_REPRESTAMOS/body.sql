@@ -1,70 +1,4 @@
-create or replace PACKAGE BODY       PR_PKG_REPRESTAMOS IS
-
-   TYPE t_api_log_ctx IS RECORD (
-       id_log   NUMBER,
-       start_ts TIMESTAMP
-   );
-
-   FUNCTION resolve_api_user RETURN VARCHAR2 IS
-   BEGIN
-       RETURN NVL(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), USER);
-   EXCEPTION
-       WHEN OTHERS THEN
-           RETURN USER;
-   END;
-
-   FUNCTION resolve_api_ip RETURN VARCHAR2 IS
-   BEGIN
-       RETURN SYS_CONTEXT('USERENV', 'IP_ADDRESS');
-   EXCEPTION
-       WHEN OTHERS THEN
-           RETURN NULL;
-   END;
-
-   PROCEDURE start_api_log(
-       p_endpoint     IN VARCHAR2,
-       p_metodo       IN VARCHAR2,
-       p_service_name IN VARCHAR2,
-       p_params       IN CLOB,
-       p_ctx          OUT t_api_log_ctx
-   ) IS
-       v_log IA_PKG_APIS.t_log_rec;
-   BEGIN
-       IA_PKG_APIS.begin_call(
-           p_endpoint     => p_endpoint,
-           p_metodo       => p_metodo,
-           p_usuario      => resolve_api_user,
-           p_ip_origen    => resolve_api_ip,
-           p_service_name => p_service_name,
-           p_params       => p_params,
-           p_log_rec      => v_log
-       );
-       p_ctx.id_log   := v_log.id_log;
-       p_ctx.start_ts := v_log.start_ts;
-   EXCEPTION
-       WHEN OTHERS THEN
-           p_ctx.id_log   := NULL;
-           p_ctx.start_ts := SYSTIMESTAMP;
-   END;
-
-   PROCEDURE finish_api_log(
-       p_ctx       IN t_api_log_ctx,
-       p_status    IN NUMBER,
-       p_error_msg IN VARCHAR2,
-       p_response  IN CLOB
-   ) IS
-   BEGIN
-       IA_PKG_APIS.end_call(
-           p_log_id      => p_ctx.id_log,
-           p_status_code => p_status,
-           p_error_msg   => p_error_msg,
-           p_response    => p_response,
-           p_start_ts    => p_ctx.start_ts
-       );
-   EXCEPTION
-       WHEN OTHERS THEN
-           NULL;
-   END;
+CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
 
    PROCEDURE Precalifica_Represtamo  IS 
        
@@ -86,250 +20,365 @@ create or replace PACKAGE BODY       PR_PKG_REPRESTAMOS IS
        -- 8 - Excluir cliente que tengas pr¿stamos desembolsados en los ¿ltimos 6 meses;
        --   - Se actualizar¿ el Campo 'ESTADO' con 'X1', y el Campo 'OBSERVACIONES' con 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||PA.PARAM.PARAMETRO_GENERAL
        --   - ('PRECAL_DESEMBOLSO_PR', 'PR')||' DIAS' en la Tabla PR_PRECALIFICADOS
-       v_fecha_corte             DATE;
-       v_fecha_proceso           DATE;
-       v_fecha_proceso_ejec      DATE := SYSDATE;
-       v_atraso_30               NUMBER(10);
-       v_lote_carga              NUMBER;
-       v_max_intentos_pin        NUMBER;
-       v_max_intentos_ident      NUMBER;
-       v_capital_pagado          NUMBER;
-       v_meses_max_desembolso    NUMBER;
-       v_dias_procesar           NUMBER;
-       v_persona_fisica          VARCHAR2(30);
-       v_clientes_sola_firma     VARCHAR2(1);
-       v_codigo_empresa          NUMBER;
-       v_param_deembolso_text    VARCHAR2(100);
-       v_param_deembolso_val     NUMBER;
-       v_param_mora_val          NUMBER;
-       pMensaje                  VARCHAR2(100);
-   BEGIN
-       v_atraso_30            := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIA_ATRASO_TC'));
-       v_lote_carga           := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO'));
-       v_max_intentos_pin     := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN'));
-       v_max_intentos_ident   := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION'));
-       v_capital_pagado       := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CAPITAL_PAGADO'));
-       v_meses_max_desembolso := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO'));
-       v_dias_procesar        := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIAS_PROCESAR'));
-       v_persona_fisica       := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PERSONA_FISICA');
-       v_clientes_sola_firma  := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CLIENTES_A_SOLA_FIRMA');
-       v_codigo_empresa       := PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo;
-       v_param_deembolso_text := OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR');
-       v_param_deembolso_val  := TO_NUMBER(v_param_deembolso_text);
-       v_param_mora_val       := TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR'));
 
-       BEGIN
-           SELECT P.FECHA_PROCESO
-             INTO v_fecha_proceso
-             FROM PR.PR_REPRESTAMOS P
-            WHERE P.FECHA_PROCESO IS NOT NULL
-              AND ROWNUM = 1;
-       EXCEPTION
-           WHEN NO_DATA_FOUND THEN
-               v_fecha_proceso := TRUNC(SYSDATE) - 30;
-       END;
-
-       v_fecha_proceso := v_fecha_proceso + v_dias_procesar;
-       IF v_fecha_proceso > TRUNC(v_fecha_proceso_ejec) THEN
-           DBMS_OUTPUT.PUT_LINE('v_fecha_proceso = ' || v_fecha_proceso);
-           RETURN;
-       END IF;
-
-       SELECT MAX(P.FECHA_CORTE)
-         INTO v_fecha_corte
-         FROM PA_DETALLADO_DE08 P
-        WHERE P.FUENTE      = 'PR'
-          AND P.FECHA_CORTE < (SELECT MAX(P2.FECHA_CORTE)
-                                 FROM PA_DETALLADO_DE08 P2
-                                WHERE P2.FUENTE = 'PR');
-
-       INSERT INTO PR.PR_REPRESTAMOS (
-           CODIGO_EMPRESA,
-           ID_REPRESTAMO,
-           CODIGO_CLIENTE,
-           FECHA_CORTE,
-           NO_CREDITO,
-           ESTADO,
-           CODIGO_PRECALIFICACION,
-           DIAS_ATRASO,
-           FECHA_PROCESO,
-           PIN,
-           INTENTOS_PIN,
-           INTENTOS_IDENTIFICACION,
-           IND_SOLICITA_AYUDA,
-           MTO_CREDITO_ACTUAL,
-           MTO_PREAPROBADO,
-           OBSERVACIONES,
-           ADICIONADO_POR,
-           FECHA_ADICION,
-           MODIFICADO_POR,
-           FECHA_MODIFICACION,
-           ESTADO_ORIGINAL,
-           XCORE_GLOBAL,
-           XCORE_CUSTOM,
-           ID_CARGA_DIRIGIDA,
-           ID_REPRE_CAMPANA_ESPECIALES,
-           ES_FIADOR)
-       SELECT a.codigo_empresa,
-              PR.PR_PKG_REPRESTAMOS.f_genera_secuencia,
-              a.codigo_cliente,
-              v_fecha_corte,
-              a.no_credito,
-              'RE',
-              NULL,
-              0,
-              v_fecha_proceso_ejec,
-              0,
-              v_max_intentos_pin,
-              v_max_intentos_ident,
-              'N',
-              b.monto_desembolsado,
-              0,
-              NULL,
-              USER,
-              v_fecha_proceso_ejec,
-              NULL,
-              NULL,
-              NULL,
-              NULL,
-              NULL,
-              NULL,
-              NULL,
-              'N'
+       CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS    
+       select a.codigo_empresa
+         CODIGO_EMPRESA, 
+         pr_pkg_represtamos.f_genera_secuencia ID_REPRESTAMO,
+         a.codigo_cliente, 
+         P_FECHA_CORTE FECHA_CORTE,
+         a.NO_CREDITO,           
+         'RE' ESTADO, 
+         NULL CODIGO_PRECALIFICACION, 
+         0 DIAS_ATRASO, 
+         sysdate FECHA_PROCESO, 
+         0 PIN,--lpad(PA.PKG_NOTIFICACIONES.GENERAR_PIN_RANDOM(100,999999),6, '0') PIN,
+         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN') INTENTOS_PIN,
+         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION') INTENTOS_IDENTIFICACION,    --   TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'INTENTOS_IDENT')) INTENTOS_IDENTIFICACION,    ---DEBE INSERTAR ESTE PARAMETRO 
+         'N' IND_SOLICITA_AYUDA,
+         --0 mto_aprobado,
+         b.monto_desembolsado mto_aprobado,
+         0 mto_preaprobado,
+         null OBSERVACIONES, 
+         USER ADICIONADO_POR, 
+         sysdate FECHA_ADICION, 
+         NULL MODIFICADO_POR, 
+         null FECHA_MODIFICACION,
+         NULL ESTADO_ORIGINAL,
+         NULL XCORE_GLOBAL,--NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE(PA.OBT_IDENTIFICACION_PERSONA(  a.codigo_cliente,'1')),0) XCORE_GLOBAL,
+         NULL XCORE_CUSTOM, --NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE_CUSTOM(PA.OBT_IDENTIFICACION_PERSONA( A.codigo_cliente,'1')),0) XCORE_CUSTOM
+         NULL ID_CARGA_DIRIGIDA,
+         NULL ID_CAMPANA_ESPECIALES,
+         'N'  ES_FIADOR
          FROM PR_CREDITOS a,
-              PA_DETALLADO_DE08 b,
-              PR_TIPO_CREDITO_REPRESTAMO c
-        WHERE ROWNUM <= v_lote_carga
-          AND a.tipo_credito = c.tipo_credito
-          AND (EXISTS (SELECT 1
-                         FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
-                        WHERE a.codigo_periodo_cuota = subq.COLUMN_VALUE)
-               OR NOT EXISTS (SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq))
-          AND b.tipo_credito = c.tipo_credito
-          AND b.fecha_corte = v_fecha_corte
-          AND b.no_credito = a.no_credito
-          AND b.fuente = 'PR'
-          AND c.carga = 'S'
-          AND b.dias_atraso <= v_param_mora_val
-          AND b.califica_cliente IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
-          AND ((b.mto_balance_capital / CASE WHEN b.monto_desembolsado = 0 THEN b.monto_credito ELSE b.monto_desembolsado END) * 100) <= 100 - v_capital_pagado
-          AND a.codigo_empresa = v_codigo_empresa
-          AND NOT EXISTS (SELECT 1
-                            FROM PR_CREDITOS c2
-                           WHERE c2.codigo_empresa      = a.codigo_empresa
-                             AND c2.no_credito          != a.no_credito
-                             AND c2.codigo_cliente      = a.codigo_cliente
-                             AND c2.f_primer_desembolso > ADD_MONTHS(SYSDATE, - v_meses_max_desembolso)
-                             AND c2.estado              IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))))
-          AND NOT EXISTS (SELECT 1
-                            FROM PR_CREDITOS c3
-                           WHERE c3.codigo_empresa = a.codigo_empresa
-                             AND c3.no_credito     != a.no_credito
-                             AND c3.codigo_cliente = a.codigo_cliente
-                             AND c3.estado         = 'E')
-          AND EXISTS (SELECT 1
-                        FROM PERSONAS per
-                       WHERE per.cod_persona = CAST(a.codigo_cliente AS VARCHAR2(15))
-                         AND per.es_fisica   = v_persona_fisica)
-          AND EXISTS (SELECT 1
-                        FROM ID_PERSONAS perid
-                       WHERE perid.cod_persona = CAST(a.codigo_cliente AS VARCHAR2(15))
-                         AND perid.cod_pais    IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('NACIONALIDAD')))
-                         AND perid.cod_tipo_id IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('TIPO_DOCUMENTO'))))
-          AND NOT EXISTS (SELECT 1
-                            FROM PR_REPRESTAMOS prs
-                           WHERE prs.codigo_empresa = a.codigo_empresa
-                             AND prs.no_credito     = a.no_credito
-                             AND prs.estado         IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_NO_REPROCESO'))))
-          AND NOT EXISTS (SELECT 1
-                            FROM PR_CREDITOS a1,
-                                 PR_AVAL_REPRE_X_CREDITO b1
-                           WHERE a1.codigo_empresa = v_codigo_empresa
-                             AND a1.no_credito     = a.no_credito
-                             AND b1.codigo_empresa = a1.codigo_empresa
-                             AND b1.no_credito     = a1.no_credito
-                             AND b1.codigo_aval_repre != a1.codigo_cliente
-                             AND v_clientes_sola_firma = 'S')
-          AND PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0
-          AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(v_codigo_empresa, a.codigo_cliente) = 0
-          AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(v_codigo_empresa, a.codigo_cliente) = 0;
+         pa_detallado_De08 b,
+              PR_tipo_credito_REPRESTAMO c 
+         WHERE ROWNUM <= TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO')) and  a.tipo_credito= c.tipo_credito  
+         AND (EXISTS (SELECT 1
+            FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
+            WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )
+         AND b.tipo_credito= c.tipo_credito 
+         AND  b.fecha_corte =  P_FECHA_CORTE
+         AND  b.no_credito = a.no_credito
+         AND  b.fuente = 'PR'
+         AND  c.CARGA = 'S'       
+         AND  b.dias_atraso <=PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_MORA_MAYOR_PR')
+         AND b.CALIFICA_CLIENTE  IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
+          
+           AND (( b.MTO_BALANCE_CAPITAL / 
+                     CASE WHEN b.MONTO_DESEMBOLSADO =0 then
+                         b.MONTO_CREDITO
+                         else b.MONTO_DESEMBOLSADO END )*100 )<= 100 - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CAPITAL_PAGADO'))
+         
+         and a.codigo_empresa =  PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+         and not exists (SELECT 1
+                                  FROM PR_CREDITOS C 
+                                 WHERE C.CODIGO_EMPRESA      =  a.CODIGO_EMPRESA
+                                   AND C.NO_CREDITO          != a.NO_CREDITO                       
+                                   AND C.CODIGO_CLIENTE      = a.CODIGO_CLIENTE                        
+                                   AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+                                   AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))))
+          AND not exists (SELECT 1
+                                  FROM PR_CREDITOS C 
+                                 WHERE C.CODIGO_EMPRESA      =  a.CODIGO_EMPRESA
+                                   AND C.NO_CREDITO          != a.NO_CREDITO                       
+                                   AND C.CODIGO_CLIENTE      = a.CODIGO_CLIENTE                        
+                                   AND C.ESTADO              = 'E')
+          -- validación para  solo pesonas físicas                     
+          AND exists (SELECT 1 
+                      FROM PERSONAS a
+                      WHERE COD_PERSONA = cast(a.codigo_cliente as varchar2(15))
+                      AND ES_FISICA = PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'PERSONA_FISICA' ))
+         -- validación la nacionalidad              
+         AND EXISTS ( SELECT 1
+                      FROM ID_PERSONAS a
+                      WHERE COD_PERSONA = cast(a.codigo_cliente as varchar2(15))
+                      AND   COD_PAIS    IN (SELECT COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS ( 'NACIONALIDAD')))
+                      AND   COD_TIPO_ID IN (SELECT COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS ( 'TIPO_DOCUMENTO'))))          
+         --  se valida que no exista el mismo crédito con un proceso iniciado de représtamo 
+         AND not exists (select 1
+                                 from pr_represtamos
+                                 where codigo_empresa = a.codigo_empresa 
+                                 and no_credito =  a.NO_CREDITO
+                                 and estado in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_NO_REPROCESO')))
+                                 --('RE','VR','NP','SC','CRB','CRS','CRD')
+                                 )
+         -- Se valida que solo se selecciones creditos que cumplan con el criterio del monto desembolsado se encuentre entre el parámetro
+        /* AND exists (select 1
+                            from PR_PLAZO_CREDITO_REPRESTAMO
+                            where codigo_empresa = a.codigo_empresa
+                            and tipo_credito = c.tipo_credito
+                            AND A.MONTO_DESEMBOLSADO between monto_min and monto_max
+                           )*/
+      -- Se valida que sea a una sola firma        
+        AND not EXISTS (select 1--a.no_credito---, a.codigo_cliente, b.codigo_aval_repre
+                        from PR_CREDITOS a1, 
+                            PR_AVAL_REPRE_X_CREDITO b
+                        where a1.codigo_empresa = 1
+                        and a1.no_credito = a.no_credito
+                        and b.codigo_empresa = a1.codigo_empresa
+                        and b.no_credito = a1.no_credito
+                        and b.codigo_aval_repre != a1.codigo_cliente
+                        AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
+        -- Se valida que los clientes no tengan no garantes 
+       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- Se valida que los clientes no esten en lista PEP
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        -- Se valida que los clientes no esten en lista NEGRA
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
+        ;
+           
+       TYPE tCREDITOS_PROCESAR IS TABLE OF CREDITOS_PROCESAR%ROWTYPE;
+       vCREDITOS_PROCESAR        tCREDITOS_PROCESAR := TCREDITOS_PROCESAR ();
+       
+       v_fecha_corte             DATE; 
+       v_fecha_proceso           DATE;
+       v_atraso_30               NUMBER(10); 
+       --agregue esta variable
+       pMensaje      VARCHAR2(100);
+       
+       --AGREGUE ESTA NUEVA VARIABLE   
+       --idCabeceraDet NUMBER;
+          
+    BEGIN
+    
+            
+            --VERIFICAR SI EXISTE EL REGISTRO
+           /* BEGIN
+                SELECT ID_APLICACION_PASO_DET
+                INTO idCabeceraDet
+                FROM PR.PR_APLICACION_PASO_DET
+                WHERE ID_APLICACION_PASO_DET = pIDAPLICACION;
+                
+                DBMS_OUTPUT.PUT_LINE ( 'qUE PASO AQUI = ' || idCabeceraDet );
+                
+                EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                    --SI NO SE ENCUENTRA NINGUN REGISTRO CREARA UNO NUEVO
+                     PR.PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_DET ( 'RD_CARGA_PRECALIFICACION', 'RD_CARGA.PRECALIFICA_REPRESTAMO', 'INICIADO', pMensaje ); 
+                        
+                        
+                     --OBTENER EL ID DEL NUEVO REGISTRO
+                     SELECT PR.SEQ_PR_APLICACION_PASO_DET.CURRVAL
+                     INTO idCabeceraDet
+                     FROM DUAL;  
+                     
+                     DBMS_OUTPUT.PUT_LINE ( 'idCabeceraDet = ' || idCabeceraDet );
+                     
+                     --ACTUALIZAR EL PARAMETRO DE ENTRADA CON EL NUEVO ID
+                     pIDAPLICACION := idCabeceraDet;
+                     
+                     DBMS_OUTPUT.PUT_LINE ( 'pIDAPLICACION PARA EL OTRO PASO = ' || pIDAPLICACION );
+                     DBMS_OUTPUT.PUT_LINE ('SE CREO EL REGISTRO CON ID: ' || idCabeceraDet);
+                                      
+                    WHEN OTHERS THEN
+                        DBMS_OUTPUT.PUT_LINE('Error inesperado al verificar o crear el registro: ' || SQLERRM);
+                    RETURN;                     
+                END;
+            
+            --ACTUALIZAR BITACORA SI YA EXISTE
+            IF idCabeceraDet IS NOT NULL THEN
+                PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 10, 'EN PROCESO', pMensaje );
+            END IF;*/
+    
+       
+       -- Asigna el valor del Par¿metro a la variable correspondioente 
+       v_atraso_30 := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIA_ATRASO_TC'));
+      -- Ejecuto un SELECT INTO de la FECHA_PROCESO en la tabla PR_REPRESTAMOS    
+      -- Calculo que la variable v_fecha_froceso + el Par¿metro de Fecha_a_Procesar(Que puede ser 10 d¿as)
+      -- Si la Fecha resultante es Mayor al trunc(Sysdate) Ejecuto el Package PR_PKG_PRECALIFICADOS;
+      -- de lo contrario ejecuto un Return, para que el Package CDG.P_CARGA_PRESTAMOS termine su Ejecuci¿n.  
+          BEGIN
+              SELECT P.FECHA_PROCESO
+               INTO v_fecha_proceso      
+               FROM PR.PR_REPRESTAMOS P
+              WHERE P.FECHA_PROCESO IS NOT NULL 
+                AND ROWNUM = 1;
+          EXCEPTION WHEN NO_DATA_FOUND THEN
+              v_fecha_proceso:= TRUNC(SYSDATE)-30;
+          END;      
+       --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 20, 'EN PROCESO', pMensaje );   
+          BEGIN
+              v_fecha_proceso:= v_fecha_proceso +  TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIAS_PROCESAR'));
+              IF v_fecha_proceso > TRUNC(SYSDATE) THEN
+                --PR_REPRESTAMOS.ACTUALIZA_PRECALIFICACION;
+                DBMS_OUTPUT.PUT_LINE ( 'v_fecha_proceso = ' || v_fecha_proceso );
+                RETURN;
+              END IF;
+          END; 
+       
+      
+        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 30, 'EN PROCESO', pMensaje );
+       
+       -- Para obtener la fecha m¿xima anterior
+        SELECT MAX (P.FECHA_CORTE)  
+          INTO v_fecha_corte
+          FROM PA_DETALLADO_DE08 P
+         WHERE P.FUENTE       = 'PR'
+           AND P.FECHA_CORTE  <  ( SELECT MAX(P.FECHA_CORTE)   
+                                     FROM PA_DETALLADO_DE08 P
+                                    WHERE P.FUENTE       = 'PR' );
+       
+       OPEN CREDITOS_PROCESAR(v_fecha_corte); 
 
-       UPDATE PR.PR_REPRESTAMOS y
-          SET y.dias_atraso = (SELECT MAX(d.dias_atraso)
-                                 FROM PA.PA_DETALLADO_DE08 d
-                                WHERE d.fuente         = 'PR'
-                                  AND d.fecha_corte    >= ADD_MONTHS(y.fecha_corte, -6)
-                                  AND d.no_credito     = y.no_credito
-                                  AND d.codigo_cliente = y.codigo_cliente)
-        WHERE y.fecha_proceso = v_fecha_proceso_ejec
-          AND y.estado = 'RE';
+        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 40, 'EN PROCESO', pMensaje );
+       LOOP
+          VCREDITOS_PROCESAR.DELETE;
+          FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
+          -- Inserta los Precalificados
+          FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
 
-       UPDATE PR.PR_REPRESTAMOS y
-          SET y.estado        = 'X3',
-              y.observaciones = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A ' || v_atraso_30 || ' DIAS'
-        WHERE y.fecha_proceso = v_fecha_proceso_ejec
-          AND y.estado = 'RE'
-          AND EXISTS (SELECT 1
-                        FROM PA_DETALLADO_DE08 d
-                       WHERE d.fuente         = 'TC'
-                         AND d.fecha_corte    = y.fecha_corte
-                         AND d.no_credito     != y.no_credito
-                         AND d.codigo_cliente = y.codigo_cliente
-                         AND d.codigo_empresa = y.codigo_empresa
-                         AND d.dias_atraso    >= v_atraso_30);
+         
 
-       UPDATE PR.PR_REPRESTAMOS y
-          SET y.estado        = 'X1',
-              y.observaciones = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS ' || v_param_deembolso_text || ' MESES'
-        WHERE y.fecha_proceso = v_fecha_proceso_ejec
-          AND y.estado = 'RE'
-          AND EXISTS (SELECT 1
-                        FROM PR_CREDITOS c
-                       WHERE c.codigo_empresa      = y.codigo_empresa
-                         AND c.no_credito          != y.no_credito
-                         AND c.codigo_cliente      = y.codigo_cliente
-                         AND c.f_primer_desembolso > ADD_MONTHS(SYSDATE, - v_param_deembolso_val)
-                         AND c.estado              IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
+           -- 7 - Excluir cr¿ditos con atraso mayor a 45 d¿as
+           -- 7 - en los ¿ltimos 6 meses = v_dias_180 
+           FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT                                 
+           -- Se actualiza el campo DIAS_ATRASO en la Tabla PR_REPRESTAMOS
+           -- con el M¿ximo d¿a de atraso en los ¿ltimos 6 meses   
+           UPDATE PR.PR_REPRESTAMOS y
+                SET     Y.DIAS_ATRASO   = (SELECT MAX(D.DIAS_ATRASO)
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.FECHA_CORTE      >= ADD_MONTHS(VCREDITOS_PROCESAR(x).FECHA_CORTE , -6) -- 7 - Excluir cr¿ditos con atraso mayor a 45 d¿as en los ¿ltimos 6 meses
+                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(x).NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                               --  AND D.DIAS_ATRASO      >= v_mayor_45 
+                                                 )
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE';   
+         
+       
+              
+            --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );  
+       
+              
+          -- 8 - Excluir cliente con TC con dias de atraso mayor a 30 d¿as 
+          -- Actualiza el estado cuando existe un detalle PA.PA_DETALLADO_DE08 de TC
+          -- Se actualizar¿ el Campo 'ESTADO' con 'X3'; y el Campo 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X3',
+                    Y.OBSERVACIONES  = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+              WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+                AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO
+                AND y.ESTADO         = 'RE'             
+                AND 1                IN (SELECT 1
+                                          FROM PA_DETALLADO_DE08 D
+                                         WHERE D.FUENTE           =  'TC'
+                                           AND D.FECHA_CORTE      =  VCREDITOS_PROCESAR(x).FECHA_CORTE
+                                           AND D.NO_CREDITO       != VCREDITOS_PROCESAR(x).NO_CREDITO                                      
+                                           AND D.CODIGO_CLIENTE   =  VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                           AND D.CODIGO_EMPRESA   =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                                           AND D.DIAS_ATRASO      >= v_atraso_30); 
+          
+            
+          --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 60, 'EN PROCESO', pMensaje );
+          -- Evalua si el cliente tiene otro Prestamo Desembolsados en los ¿ltimos 6 Meses
+          -- 9 - Excluir cliente que tengas prestamos desembolsados de los ¿ltimos 6 meses
+          -- Se actualizar¿ el Campo 'ESTADO' con 'X1'; y el Campo 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||PA.PARAMETROS_X_EMPRESA( 'PRECAL_DESEMBOLSO_PR', 'PR')||' MESES'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X1', 
+                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ¿LTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE'   
+               AND 1 = (SELECT DISTINCT 1
+                          FROM PR_CREDITOS C 
+                         WHERE C.CODIGO_EMPRESA      =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                           AND C.NO_CREDITO          != VCREDITOS_PROCESAR(x).NO_CREDITO                       
+                           AND C.CODIGO_CLIENTE      = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE                        
+                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los ¿ltimos 6 meses
+                           AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))));
 
-       UPDATE PR.PR_REPRESTAMOS p
-          SET p.estado        = 'X2',
-              p.observaciones = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A ' || p.dias_atraso || ' DIAS'
-        WHERE p.estado = 'RE'
-          AND p.dias_atraso > v_param_mora_val;
-
-       DELETE FROM PR.PR_REPRESTAMOS r
-        WHERE r.estado = 'RE'
-          AND EXISTS (SELECT 1
-                        FROM CUENTA_CLIENTE_RELACION rel
-                       WHERE rel.cod_sistema   = 'PR'
-                         AND rel.num_cuenta    = r.no_credito
-                         AND NVL(rel.tipo_relacion, 'x') = 'O');
-
-       DELETE FROM PR.PR_REPRESTAMOS r
-        WHERE r.estado = 'RE'
-          AND PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD(r.codigo_cliente, 'CARGA') = 0;
-
-       DELETE FROM PR_REPRESTAMOS
-        WHERE ESTADO LIKE 'X%';
-
-       COMMIT;
-   EXCEPTION
-       WHEN OTHERS THEN
-           DECLARE
-               vIdError PLS_INTEGER := 0;
-           BEGIN
-               pMensaje := 'ERROR CON EL STORE PROCEDURE PRECALIFICA_REPRESTAMO';
-               setError(pProgramUnit => 'Precalifica_Represtamo',
-                        pPieceCodeName => NULL,
-                        pErrorDescription => SQLERRM,
-                        pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
-                        pEmailNotification => NULL,
-                        pParamList => IA.LOGGER.vPARAMLIST,
-                        pOutputLogger => FALSE,
-                        pExecutionTime => NULL,
-                        pIdError => vIdError);
-           END;
-   END Precalifica_Represtamo;
+          EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
+       END LOOP;
+       
+       CLOSE CREDITOS_PROCESAR;
+       
+       
+       --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 70, 'EN PROCESO', pMensaje );
+       
+       -- Se actualiza el ESTADO con valor 'X2' y el campo OBSERVACIONES con 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
+       -- en la tabla PR_REPRESTAMOS para todos los Cr¿ditos precalificados con Estodo ='P'
+        UPDATE PR.PR_REPRESTAMOS P
+           SET P.ESTADO         = 'X2',
+               P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
+         WHERE P.DIAS_ATRASO    > OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
+           AND P.ESTADO         = 'RE';
+        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 80, 'EN PROCESO', pMensaje );   
+        -- Se eliminan los represtamos que tienen creditos mancomunados
+        DELETE  PR_REPRESTAMOS --PR_OPCIONES_REPRESTAMO
+        WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
+                    FROM PR_REPRESTAMOS A
+                    WHERE ESTADO = 'RE'
+                    AND EXISTS (SELECT 1
+                                FROM CUENTA_CLIENTE_RELACION
+                                WHERE COD_SISTEMA = 'PR'
+                                AND NUM_CUENTA = A.NO_CREDITO
+                                AND NVL(TIPO_RELACION,'x') = 'O'
+                                )
+                    ); 
+        --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 90, 'EN PROCESO', pMensaje ); 
+       -- Se valida que la edad este entre el rango de 18 a 75, definido por parametros
+       DELETE  PR_REPRESTAMOS
+        WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
+                    FROM PR_REPRESTAMOS A
+                    WHERE ESTADO = 'RE'
+                    AND   PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD ( A.CODIGO_CLIENTE,'CARGA' ) = 0
+                    ); 
+                
+     DELETE PR_REPRESTAMOS
+      WHERE ESTADO LIKE 'X%';  
+      
+      --Actualiza el detalle de la bitacora para cambiar el estado a proceso
+        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 100, 'EN PROCESO', pMensaje );
+         --Finalizo el proceso
+        --PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET ( pIDAPLICACION,'FINALIZADO', 'SE FINALIZO',pMensaje );
+        
+          
+      COMMIT;
+        -- PR.PR_PKG_REPRESTAMOS.ACTUALIZA_PRECALIFICACION;
+    EXCEPTION WHEN OTHERS THEN   
+        DECLARE
+            vIdError      PLS_INTEGER := 0;
+        BEGIN                                    
+          
+        pMensaje:='ERROR CON EL STORE PROCEDURE PRECALIFICA_REPRESTAMO';
+          setError(pProgramUnit => 'Precalifica_Represtamo', 
+                   pPieceCodeName => NULL, 
+                   pErrorDescription => SQLERRM,                                                              
+                   pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
+                   pEmailNotification => NULL, 
+                   pParamList => IA.LOGGER.vPARAMLIST, 
+                   pOutputLogger => FALSE, 
+                   pExecutionTime => NULL, 
+                   pIdError => vIdError); 
+                   
+        --Si da error actualizo el detalle de la bitacora para capturar el error           
+        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ERROR', 100, SQLERRM,pMensaje );
+        
+        END;
+        
+        
+    END Precalifica_Represtamo;
 PROCEDURE Precalifica_Repre_Cancelado IS 
     CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS
          select a.codigo_empresa
@@ -370,12 +419,12 @@ PROCEDURE Precalifica_Repre_Cancelado IS
          and A.TIPO_CREDITO = C.TIPO_CREDITO
          and  A.F_CANCELACION= ( SELECT  d.F_CANCELACION
                         FROM PR_CREDITOS d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(1000) --TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO
                         AND d.ESTADO = 'C'
                         ) 
-         AND c.CARGA = 'S'   
+         AND c.CARGA = 'S'  
          and a.codigo_empresa =  PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
          and not exists (SELECT 1
                                   FROM PR_CREDITOS C 
@@ -751,7 +800,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )   
           and  A.F_CANCELACION= ( SELECT  d.F_CANCELACION
                         FROM PR_CREDITOS_HI d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(1000) --TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO
                         AND d.ESTADO = 'C'
@@ -1028,7 +1077,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
         UPDATE PR.PR_REPRESTAMOS P
            SET P.ESTADO         = 'X2',
                P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
-         WHERE P.DIAS_ATRASO    > 1000--OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
+         WHERE P.DIAS_ATRASO    > OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
            AND P.ESTADO         = 'RE';
         -- Se eliminan los represtamos que tienen creditos mancomunados
         DELETE  PR_REPRESTAMOS --PR_OPCIONES_REPRESTAMO
@@ -1125,7 +1174,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
             WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )
          AND b.tipo_credito= c.tipo_credito 
-         AND  b.fecha_corte =  TO_DATE('19/11/2024', 'DD/MM/YYYY')
+         AND  b.fecha_corte =  P_FECHA_CORTE
          AND  b.no_credito = a.no_credito
          AND  b.fuente = 'PR'
          AND  c.CARGA = 'S'
@@ -1383,7 +1432,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
         UPDATE PR.PR_REPRESTAMOS P
            SET P.ESTADO         = 'X2',
                P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
-         WHERE P.DIAS_ATRASO    > 1000--OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
+         WHERE P.DIAS_ATRASO    > OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
            AND P.ESTADO         = 'RE';
         --Actualiza el detalle de la bitacora para cambiar el estado a proceso
        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION,'ENPROCESO', 80, 'EN PROCESO', pMensaje );   
@@ -1477,7 +1526,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )   
           and  A.F_CANCELACION= ( SELECT  d.F_CANCELACION
                         FROM PR_CREDITOS_HI d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(1000) --TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO
                         AND d.ESTADO = 'C'
@@ -1968,7 +2017,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        --Validar Capital pagado
        SELECT COUNT(*) INTO v_cancelacion 
                         FROM PR_CREDITOS d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(1000) --TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO  
                         AND d.ESTADO = 'C';
@@ -2332,7 +2381,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        --Validar Capital pagado
        SELECT COUNT(*) INTO v_cancelacion 
                         FROM PR_CREDITOS d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(1000)--TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION_CAMPANA_ESPECIAL'))
+                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION_CAMPANA_ESPECIAL'))
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO  
                         AND d.ESTADO = 'C';
@@ -2558,7 +2607,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
               WHERE a.codigo_empresa = vCodigoEmpresa
                 AND A.ID_REPRESTAMO= A.ID_REPRESTAMO+0
                 AND a.ESTADO ='RE' 
-                --AND a.DIAS_ATRASO BETWEEN P.DESDE AND P.HASTA
+                AND a.DIAS_ATRASO BETWEEN P.DESDE AND HASTA
                 AND P.CODIGO_EMPRESA   = a.CODIGO_EMPRESA;
        --
       -- Cursor para la validaci¿n de la super con respecto a la clasificaci¿n del cliente a nivel interbancario                       
@@ -2587,6 +2636,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
              AND B.ESTADO = 'RE'
              AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CASTIGOS_SIB' ) = 'S';
             
+        
            vClasificaion NUMBER :=0;
            vEstado       VARCHAR2(400);      
            vComentario   VARCHAR2(400);  
@@ -2668,19 +2718,15 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                AND R.ESTADO         = 'RE';
                --Actualizo el estado del detalle de la bitacora
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
-        
-        --CAMBIO AQUI
-        --COMMIT;     
-        --Hasta AQUI
+       
+         COMMIT;     
          
         UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO 
                 FROM PA_DETALLADO_DE08 
                 WHERE NO_CREDITO = y.NO_CREDITO 
                 AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
                 AND  fecha_corte = v_fecha_corte);
-        --CAMBIO AQUI
-        --COMMIT;     
-        --Hasta AQUI     
+           COMMIT;         
       END LOOP;
     
     
@@ -2694,45 +2740,41 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                 SET codigo_precalificacion = a.CODIGO_REPRESTAMO,
                     mto_preaprobado = a.mto_preaprobado
               WHERE rowid = a.id;
-        --CAMBIO AQUI
-        --COMMIT;     
-        --Hasta AQUI
+          COMMIT;
       END LOOP;
            
            
        --Validacion del DE08 FIADOR
-       --COMENTADO AQUI
---     FOR a in CUR_FIADOR LOOP
---
---       -- Validar si el cliente tiene un fiador
---        SELECT COUNT(1) INTO v_fiador_exist
---        FROM PR_CREDITOS a1
---            JOIN PR_AVAL_REPRE_X_CREDITO b 
---            ON a1.codigo_empresa = b.codigo_empresa AND a1.no_credito = b.no_credito
---        WHERE a1.codigo_empresa = 1
---          AND a1.no_credito = a.no_credito AND b.codigo_aval_repre != a1.codigo_cliente;
---          
---        -- Validar si el cliente tiene dos préstamos cancelados
---        SELECT COUNT(1) INTO v_dos_prestamos_cancelados
---        FROM (SELECT 1
---                FROM PR_CREDITOS c2
---               WHERE c2.codigo_cliente = a.codigo_cliente
---                 AND c2.estado = 'C'
---               GROUP BY c2.codigo_cliente
---              HAVING COUNT(*) = 2);
---              
---        -- Si cumple con ambos criterios, realiza el UPDATE
---        IF v_fiador_exist > 0 AND v_dos_prestamos_cancelados > 0 AND a.CODIGO_PRECALIFICACION !=  01 THEN
---         vEstado:= 'RSB'; 
---         vComentario:=' RECHAZO: Cliente no muy bueno con FIADOR ';
---         DBMS_OUTPUT.PUT_LINE('Antes de generar bitaciora de '||a.id_represtamo||' a '||vEstado);
---         PR_PKG_REPRESTAMOS.p_generar_bitacora(a.id_represtamo,NULL,vEstado,NULL,vComentario, USER);
---         DBMS_OUTPUT.PUT_LINE('Despues de generar bitacora '||a.id_represtamo);
---        END IF;
---       COMMIT; 
---
---          END LOOP;   
-          --HASTA AQUI
+     FOR a in CUR_FIADOR LOOP
+
+       -- Validar si el cliente tiene un fiador
+        SELECT COUNT(1) INTO v_fiador_exist
+        FROM PR_CREDITOS a1
+            JOIN PR_AVAL_REPRE_X_CREDITO b 
+            ON a1.codigo_empresa = b.codigo_empresa AND a1.no_credito = b.no_credito
+        WHERE a1.codigo_empresa = 1
+          AND a1.no_credito = a.no_credito AND b.codigo_aval_repre != a1.codigo_cliente;
+          
+        -- Validar si el cliente tiene dos préstamos cancelados
+        SELECT COUNT(1) INTO v_dos_prestamos_cancelados
+        FROM (SELECT 1
+                FROM PR_CREDITOS c2
+               WHERE c2.codigo_cliente = a.codigo_cliente
+                 AND c2.estado = 'C'
+               GROUP BY c2.codigo_cliente
+              HAVING COUNT(*) = 2);
+              
+        -- Si cumple con ambos criterios, realiza el UPDATE
+        IF v_fiador_exist > 0 AND v_dos_prestamos_cancelados > 0 AND a.CODIGO_PRECALIFICACION !=  01 THEN
+         vEstado:= 'RSB'; 
+         vComentario:=' RECHAZO: Cliente no muy bueno con FIADOR ';
+         DBMS_OUTPUT.PUT_LINE('Antes de generar bitaciora de '||a.id_represtamo||' a '||vEstado);
+         PR_PKG_REPRESTAMOS.p_generar_bitacora(a.id_represtamo,NULL,vEstado,NULL,vComentario, USER);
+         DBMS_OUTPUT.PUT_LINE('Despues de generar bitacora '||a.id_represtamo);
+        END IF;
+       COMMIT; 
+
+          END LOOP;   
            
        --Actualizo el estado del detalle de la bitacora
       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );
@@ -2742,60 +2784,39 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
       AND   CODIGO_PRECALIFICACION IS NULL;*/
     
    
-        --Se agrego este codigo sustituyendo el codigo comentado de arriba el cual eliminara los represtamos sin precalificacion.
-        -- CAMBIO AQUI
-        DECLARE
-            CURSOR cur_sin_precalificacion IS
-            SELECT
-                b.rowid id,
-                b.id_represtamo,
-                b.codigo_cliente
-            FROM
-                pr.pr_represtamos b
-            WHERE
-                b.codigo_precalificacion IS NULL
-                AND b.estado = 'RE';
-        
-            v_result BOOLEAN;
-        BEGIN --Cambio el estado del detalle de la bitacora
+   --Se agrego este codigo sustituyendo el codigo comentado de arriba el cual eliminara los represtamos sin precalificacion.
+      DECLARE
+        CURSOR CUR_SIN_PRECALIFICACION IS
+        SELECT B.ROWID ID, b.ID_REPRESTAMO,B.CODIGO_CLIENTE
+        FROM PR.PR_REPRESTAMOS B
+        WHERE B.CODIGO_PRECALIFICACION IS NULL
+        AND B.ESTADO = 'RE';
+       v_result BOOLEAN;
+      
+      
+      BEGIN
+        --Cambio el estado del detalle de la bitacora
         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 60, 'EN PROCESO', pMensaje ); 
-            FOR a IN cur_sin_precalificacion LOOP
-                DELETE FROM pr.pr_bitacora_represtamo
-                WHERE
-                    id_represtamo = a.id_represtamo;
+        FOR a IN CUR_SIN_PRECALIFICACION LOOP
+            DELETE FROM PR.PR_BITACORA_REPRESTAMO WHERE ID_REPRESTAMO=a.id_represtamo;
+            DELETE FROM PR.PR_CANALES_REPRESTAMO WHERE ID_REPRESTAMO=a.id_represtamo;
+            DELETE FROM PR.PR_REPRESTAMOS WHERE ID_REPRESTAMO=a.id_represtamo;
         
-                DELETE FROM pr.pr_canales_represtamo
-                WHERE
-                    id_represtamo = a.id_represtamo;
         
-                DELETE FROM pr.pr_represtamos
-                WHERE
-                    id_represtamo = a.id_represtamo;
-        
-                --v_result := pa.p_datos_persona.esta_en_lista_ofac('1', a.codigo_cliente);
---                IF v_result THEN
---                    DELETE FROM pr.pr_bitacora_represtamo
---                    WHERE
---                        id_represtamo = a.id_represtamo;
---        
---                    DELETE FROM pr.pr_canales_represtamo
---                    WHERE
---                        id_represtamo = a.id_represtamo;
---        
---                    DELETE FROM pr.pr_represtamos
---                    WHERE
---                        id_represtamo = a.id_represtamo;
---        
---                    dbms_output.put_line('La persona está en la lista OFAC.' || a.codigo_cliente);
---                ELSE
---                    dbms_output.put_line('La persona no está en la lista OFAC.' || a.codigo_cliente);
---                END IF;
-        
-            END LOOP;
-        
-            COMMIT;
-        END;
-        --HASTA AQUI
+            v_result := PA.P_DATOS_PERSONA.ESTA_EN_LISTA_OFAC('1',A.CODIGO_CLIENTE);
+            IF v_result THEN
+                DELETE FROM PR.PR_BITACORA_REPRESTAMO WHERE ID_REPRESTAMO=a.id_represtamo;
+                DELETE FROM PR.PR_CANALES_REPRESTAMO WHERE ID_REPRESTAMO=a.id_represtamo;
+                DELETE FROM PR.PR_REPRESTAMOS WHERE ID_REPRESTAMO=a.id_represtamo;
+                DBMS_OUTPUT.PUT_LINE('La persona está en la lista OFAC.'|| A.CODIGO_CLIENTE);
+            ELSE
+                DBMS_OUTPUT.PUT_LINE('La persona no está en la lista OFAC.'|| A.CODIGO_CLIENTE);
+            END IF;   
+        END LOOP;
+        COMMIT;
+      END;
+      
+      
       --Cambio el estado del detalle de la bitacora
        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 70, 'EN PROCESO', pMensaje ); 
        
@@ -3209,7 +3230,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                 vEstado := 'CLS';
                 vComentario := 'Cliente en clasificacion: ' || a.clasificacion;
 
-              ELSIF a.clasificacion = 'NULA' OR vClasificaion != 1 THEN
+              ELSIF a.clasificacion = 'NULA' OR a.clasificacion IS NULL OR vClasificaion != 1 THEN
                 -- Cliente sin clasificación
                 IF PR.PR_PKG_REPRESTAMOS.f_obt_parametro_represtamo('VALIDAR_CLASIFICACION_SIB_CAMPANA') = 'S' THEN
                   vEstado := 'RSB';
@@ -3368,7 +3389,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             
             
            BEGIN
-               xcore := 750;--NVL(TRIM(JSON_VALUE( PA.PA_PKG_CONSULTA_DATACREDITO.CONSULTAR_JSON(PA.OBT_IDENTIFICACION_PERSONA(a.codigo_cliente,'1') ,'C','COMPATIBILIDAD',NULL,NULL,NULL,NULL,0), '$.respuesta.valor.applicants.primaryConsumer.interconnectResponse.Xcore_PD12M_ALL_PC_NC_Global.Xcore')),0);
+               xcore := NVL(TRIM(JSON_VALUE( PA.PA_PKG_CONSULTA_DATACREDITO.CONSULTAR_JSON(PA.OBT_IDENTIFICACION_PERSONA(a.codigo_cliente,'1') ,'C','COMPATIBILIDAD',NULL,NULL,NULL,NULL,0), '$.respuesta.valor.applicants.primaryConsumer.interconnectResponse.Xcore_PD12M_ALL_PC_NC_Global.Xcore')),0);
                --NVL(PA_PKG_CONSULTA_DATACREDITO.OBTIENE_XCORE(PA.OBT_IDENTIFICACION_PERSONA(  a.codigo_cliente,'1')),0);
                IF xcore IS NULL THEN
                     xcore := 0;
@@ -3797,9 +3818,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
          SELECT COUNT(*) INTO vTotal_Carga FROM PR.PR_REPRESTAMOS A WHERE A.ESTADO = 'RE';
          EXCEPTION WHEN NO_DATA_FOUND THEN
          vTotal_Carga:= 0;   
-        --CAMBIO AQUI
-        --COMMIT;     
-        --Hasta AQUI
+         COMMIT;
         END; 
      
       --Cambio el estado del detalle de la bitacora
@@ -3911,7 +3930,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             vKey := PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('CIFRADO_MASTERKEY');
             vRutaWallet := PA.DECIFRAR (PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('RUTA_WALLET'), vKey);
             vPassWallet := PA.DECIFRAR (PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('CLAVE_WALLET'), vKey); 
-            vUrlAPI :=F_Obt_Parametro_Represtamo('RUTA_API_WorldCompliance')||'/api/WorldCompliance/GetReportURL?' ||'IdentificationNumber=' || P_Identificacion ||'&FIRSTNAME=' || P_Primer_Nombre ||'&LASTNAME=' || P_Primer_Apellido;
+            vUrlAPI :=F_Obt_Parametro_Represtamo('RUTA_API_WorldCompliance')||'/api/WorldCompliance/GetReportURL?' ||'IdentificationNumber=' || P_Identificacion ||'=' || P_Primer_Nombre ||'=' || P_Primer_Apellido;
            --https://bmaqa0178.bancoademi.local:81/api/WorldCompliance/GetReportURL?
             v_response :=
                 apex_web_service.make_rest_request (p_url           => vUrlAPI,
@@ -4061,60 +4080,50 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
         END;   
    END F_Obt_Parametro_Represtamo;
   --
-  FUNCTION F_Obt_Valor_Parametros(pParametro IN VARCHAR2) RETURN  string_table pipelined
-    as
-      delimited_string_cleaned varchar2(32767);
-      substring varchar2(4000);
-      pos       pls_integer;
-      separator        varchar2(2) default ',';
-      delimited_string varchar2(4000);
-    begin
-      delimited_string := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo(pParametro);
-      delimited_string_cleaned :=trim ( both separator from delimited_string ) ||separator;
-      pos := instr ( delimited_string_cleaned, separator );
-      substring := substr ( delimited_string_cleaned, 1, pos - 1 );
- 
-      loop
-        exit when substring is null;
-        pipe row ( substring );
-      
-        substring := substr ( 
-          delimited_string_cleaned, 
-          pos + 1, 
-          instr ( 
-            delimited_string_cleaned, separator, pos + 1 
-          ) - pos - 1 
-        );
-        pos := instr ( delimited_string_cleaned, separator, pos + 1 );   
-      end loop;
-
-      return;
-EXCEPTION
-    WHEN NO_DATA_NEEDED THEN
-      -- Esta excepción ocurre cuando el consumidor de la función
-      -- (como un EXISTS) ya tiene suficientes filas y le dice a la función que pare.
-      -- No es un error, así que simplemente salimos.
-      RETURN;
-
-    WHEN OTHERS THEN -- Tu bloque de logging actual se queda aquí
-      DECLARE
-        vIdError PLS_INTEGER := 0;
-      BEGIN
-        IA.LOGGER.ADDPARAMVALUEV('pParametro', pParametro);
-        setError(pProgramUnit => 'F_Obt_Valor_Parametros',
-           pPieceCodeName => NULL, 
-                   pErrorDescription => SQLERRM,                                                              
-                   pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
-                   pEmailNotification => NULL, 
-                   pParamList => IA.LOGGER.vPARAMLIST, 
-                   pOutputLogger => FALSE, 
-                   pExecutionTime => NULL, 
-                   pIdError => vIdError); 
-      END;
-      -- Es importante relanzar el error para que el proceso principal sepa que algo falló
-      RAISE;
-
-END F_Obt_Valor_Parametros;
+  FUNCTION F_Obt_Valor_Parametros(pParametro IN VARCHAR2) RETURN string_table PIPELINED AS
+        delimited_string_cleaned VARCHAR2(32767);
+        substring                VARCHAR2(4000);
+        pos                      PLS_INTEGER;
+        separator                VARCHAR2(2) DEFAULT ',';
+        delimited_string         VARCHAR2(4000);
+    BEGIN
+        delimited_string := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo(pParametro);
+        delimited_string_cleaned := TRIM(BOTH separator FROM delimited_string) || separator;
+        pos := INSTR(delimited_string_cleaned, separator);
+        substring := SUBSTR(delimited_string_cleaned, 1, pos - 1);
+        LOOP
+            EXIT WHEN substring IS NULL;
+            PIPE ROW (substring);
+            substring := SUBSTR(
+                delimited_string_cleaned,
+                pos + 1,
+                INSTR(delimited_string_cleaned, separator, pos + 1) - pos - 1
+            );
+            pos := INSTR(delimited_string_cleaned, separator, pos + 1);
+        END LOOP;
+        RETURN;
+    EXCEPTION
+        WHEN NO_DATA_NEEDED THEN
+            RETURN;
+        WHEN OTHERS THEN
+            DECLARE
+                vIdError PLS_INTEGER := 0;
+            BEGIN
+                IA.LOGGER.ADDPARAMVALUEV('pParametro', pParametro);
+                setError(
+                    pProgramUnit       => 'F_Obt_Valor_Parametros',
+                    pPieceCodeName     => NULL,
+                    pErrorDescription  => SQLERRM,
+                    pErrorTrace        => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
+                    pEmailNotification => NULL,
+                    pParamList         => IA.LOGGER.vPARAMLIST,
+                    pOutputLogger      => FALSE,
+                    pExecutionTime     => NULL,
+                    pIdError           => vIdError
+                );
+                RAISE;
+            END;
+    END F_Obt_Valor_Parametros;
   
   FUNCTION F_Obt_Parametro_Represtamo_Raw(pCodigo IN VARCHAR) RETURN RAW IS
      CURSOR CUR_parametro IS
@@ -5606,11 +5615,9 @@ PRAGMA AUTONOMOUS_TRANSACTION;
                                 pMensaje            IN OUT VARCHAR2) IS                                   
   CURSOR CUR_email IS
       SELECT C.EMAIL_USUARIO, 
-                -- CAMBIO AQUI
-                 NVL(OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
-                 NVL(NVL(OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'D'), NVL(OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'R'), OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
-                 NVL(NVL(OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'O'), OBT_TELEFONO_PERSONA(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
-                -- DESDE AQUI
+                 NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
+                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'D'), NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'R'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
+                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'O'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
                  obt_direccion_actualizada(C.COD_PER_FISICA) detalle--D.DETALLE DIRECCION-- D.COD_DIRECCION, D.TIP_DIRECCION
             FROM PERSONAS_FISICAS c
            WHERE C.COD_PER_FISICA = pCodCliente;
@@ -5965,7 +5972,7 @@ PRAGMA AUTONOMOUS_TRANSACTION;
                                  pUsuario          IN VARCHAR2
                                  ) IS
                                  
-         --PRAGMA AUTONOMOUS_TRANSACTION;
+         PRAGMA AUTONOMOUS_TRANSACTION;
          
                                  
         vMensaje            VARCHAR2(4000);               
@@ -5982,7 +5989,7 @@ PRAGMA AUTONOMOUS_TRANSACTION;
      -- Cambiar el estado del represtamo
         PR_PKG_REPRESTAMOS.P_Validar_Cambio_Estado(pIdReprestamo, pEstado);
         --DBMS_OUTPUT.PUT_LINE('Cambiar estado de la Bitacora de '||pIdReprestamo||' a '||pEstado);
-        --COMMIT; 
+        COMMIT; 
         OPEN  CUR_SECUENCIA;
         FETCH CUR_SECUENCIA INTO vSecuencia; 
         CLOSE CUR_SECUENCIA;
@@ -5991,14 +5998,14 @@ PRAGMA AUTONOMOUS_TRANSACTION;
             INSERT INTO PR_BITACORA_REPRESTAMO (CODIGO_EMPRESA, ID_REPRESTAMO, ID_BITACORA, FECHA_BITACORA, CODIGO_ESTADO, STEP, OBSERVACIONES, CANAL, ADICIONADO_POR, FECHA_ADICION)
               VALUES (f_obt_Empresa_Represtamo, pIdReprestamo, vSecuencia, TRUNC(SYSDATE), pEstado, pStep, pObservaciones, pCanal, pUsuario, SYSDATE );  
               
-            --COMMIT; 
+            COMMIT; 
                        
         EXCEPTION WHEN OTHERS THEN
             vMensaje := 'Fallo, Ingresando Bitacora del Represtamo.'; 
              ROLLBACK;
             RAISE_APPLICATION_ERROR(-20010, vMensaje||' '||SQLERRM);  
         END;
-        --COMMIT;
+        COMMIT;
         --DBMS_OUTPUT.PUT_LINE('Insertar Bitacora de '||pIdReprestamo||' a '||pEstado);
         --DBMS_OUTPUT.PUT_LINE('Antes de Cambiar estado de la Bitacora de '||pIdReprestamo||' a '||pEstado);
        
@@ -7105,7 +7112,7 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
                      NULL,
                      NULL,
                      NULL,
-                     'A',
+                     'RE',
                      pUsuario,
                      SYSDATE,
                      '1',
@@ -7919,18 +7926,16 @@ END P_Registra_Solicitud_Campana;
    END P_Carga_Precalifica_Represtamo;
    
    PROCEDURE P_REGISTRO_SOLICITUD IS
-       
-       VMSG          VARCHAR2(4000);
+        
+       VMSG  VARCHAR2(4000);
        pMensaje      VARCHAR2(100);  
-       idCabeceraDet NUMBER;
-       --CAMBIO AQUI
-       vUsuario      VARCHAR2(30) := NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'), USER);
-       --HASTA AQUI
-       CURSOR CUR_REPRESTAMO IS
-         SELECT ID_REPRESTAMO, ESTADO, XCORE_GLOBAL
-           FROM PR_REPRESTAMOS
-          WHERE ESTADO = 'RE';
-           
+       idCabeceraDet NUMBER; 
+            
+       CURSOR CUR_REPRESTAMO IS 
+       SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
+       FROM PR_REPRESTAMOS
+       WHERE ESTADO = 'RE';
+            
       BEGIN
          
              --VERIFICAR SI EXISTE EL REGISTRO
@@ -7939,15 +7944,15 @@ END P_Registra_Solicitud_Campana;
                 INTO idCabeceraDet
                 FROM PR.PR_APLICACION_PASO_DET
                 WHERE ID_APLICACION_PASO_DET = pIDAPLICACION;
-               
+                
                 DBMS_OUTPUT.PUT_LINE ( 'qUE PASO AQUI = ' || idCabeceraDet );
-               
+                
             EXCEPTION
                 WHEN NO_DATA_FOUND THEN
                     --SI NO SE ENCUENTRA NINGUN REGISTRO CREARA UNO NUEVO
-                  PR.PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_DET ( 'RD_CARGA_PRECALIFICACION', 'RD_CARGA.REGISTRAR_SOLICITUD', 'INICIADO', pMensaje );
-                       
-                       
+                  PR.PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_DET ( 'RD_CARGA_PRECALIFICACION', 'RD_CARGA.REGISTRAR_SOLICITUD', 'INICIADO', pMensaje ); 
+                        
+                        
                      --OBTENER EL ID DEL NUEVO REGISTRO
                      SELECT PR.SEQ_PR_APLICACION_PASO_DET.CURRVAL
                      INTO idCabeceraDet
@@ -7960,235 +7965,237 @@ END P_Registra_Solicitud_Campana;
                      
                      DBMS_OUTPUT.PUT_LINE ( 'pIDAPLICACION PARA EL OTRO PASO = ' || pIDAPLICACION );
                      DBMS_OUTPUT.PUT_LINE ('SE CREO EL REGISTRO CON ID: ' || idCabeceraDet);
-                                     
+                                      
                     WHEN OTHERS THEN
                         DBMS_OUTPUT.PUT_LINE('Error inesperado al verificar o crear el registro: ' || SQLERRM);
-                    RETURN;                    
+                    RETURN;                     
             END;
-               
+                
                 --ACTUALIZAR BITACORA SI YA EXISTE
                 IF idCabeceraDet IS NOT NULL THEN
                     PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );
-                END IF;          
+                END IF;           
                 */
-               
+                
                 FOR A IN CUR_REPRESTAMO LOOP
-                    VMSG := NULL;
-                    PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO, vUsuario, VMSG);
-                    PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO, NULL, 'RE', NULL, '', vUsuario);
-                END LOOP;
-                COMMIT;
+                PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+                        
+                        PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
+                        
+                    COMMIT;
+                END LOOP ;
                 /*PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 100, 'SE ACTUALIZO', pMensaje );
                 PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET (pIDAPLICACION, 'FINALIZADO', 'SE FINALIZO', pMensaje );*/
-                     
-                EXCEPTION WHEN OTHERS THEN  
+                      
+                EXCEPTION WHEN OTHERS THEN   
                     DECLARE
                        vIdError      PLS_INTEGER := 0;
                      BEGIN                                    
                         pMensaje:='ERROR CON EL STORE PROCEDURE REGISTRAR_SOLICITUD';
-                        setError(pProgramUnit => 'P_REGISTRO_SOLICITUD',
-                           pPieceCodeName => NULL,
+                        setError(pProgramUnit => 'P_REGISTRO_SOLICITUD', 
+                           pPieceCodeName => NULL, 
                            pErrorDescription => SQLERRM ,                                                              
-                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
-                           pEmailNotification => NULL,
-                           pParamList => IA.LOGGER.vPARAMLIST,
-                           pOutputLogger => FALSE,
-                           pExecutionTime => NULL,
-                           pIdError => vIdError);
+                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
+                           pEmailNotification => NULL, 
+                           pParamList => IA.LOGGER.vPARAMLIST, 
+                           pOutputLogger => FALSE, 
+                           pExecutionTime => NULL, 
+                           pIdError => vIdError); 
                            --Capturo el error del detalle de la bitacora
                            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ERROR', 100, SQLERRM, pMensaje );
                      END;    
-            --END;    
+            --END;     
        
                  
   END P_REGISTRO_SOLICITUD;
-  --EJECUCIONES_ERROR NUEVO
-    PROCEDURE P_Registrar_Ejecucion_Param (
-        pCodigoParametro IN VARCHAR2,
-        pTotalRegistros  IN NUMBER
-    ) IS
-        vHistorial   VARCHAR2(32767);
-        vTrabajo     VARCHAR2(32767);
-        vNuevoValor  VARCHAR2(32767);
-        vEntrada     VARCHAR2(32767);
-        vPosicion    PLS_INTEGER;
-        vSecuencia   NUMBER;
-    BEGIN
-        BEGIN
-            SELECT VALOR
-              INTO vHistorial
-              FROM PA.PA_PARAMETROS_MVP
-             WHERE CODIGO_MVP = 'REPRESTAMOS'
-               AND CODIGO_PARAMETRO = pCodigoParametro;
-        EXCEPTION
-            WHEN NO_DATA_FOUND THEN
-                vHistorial := NULL;
-        END;
-    
-        vHistorial := NVL(vHistorial, '');
-
-        vSecuencia := NVL(REGEXP_COUNT(vHistorial, '}'), 0) + 1;
-
-        vEntrada := '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') ||
-                    '","R":'  || NVL(pTotalRegistros, 0) ||
-                    ',"E":'   || vSecuencia || '}';
-    
-        IF vHistorial IS NULL OR vHistorial = '' THEN
-            vNuevoValor := vEntrada;
-        ELSE
-            vNuevoValor := vHistorial || ',' || vEntrada;
-        END IF;
-    
-        IF LENGTHB(vNuevoValor) > 4000 THEN
-            vTrabajo := vHistorial;
-    
-            LOOP
-                EXIT WHEN vTrabajo IS NULL OR vTrabajo = '';
-    
-                vPosicion := INSTRB(vTrabajo, '}');
-                EXIT WHEN vPosicion = 0;
-    
-                vTrabajo := SUBSTRB(vTrabajo, vPosicion + 1);
-                vTrabajo := LTRIM(vTrabajo, ',');              
-    
-                IF vTrabajo IS NULL OR vTrabajo = '' THEN
-                    vNuevoValor := vEntrada;
-                ELSE
-                    vNuevoValor := vTrabajo || ',' || vEntrada;
-                END IF;
-    
-                EXIT WHEN LENGTHB(vNuevoValor) <= 4000;
-            END LOOP;
-    
-            IF LENGTHB(vNuevoValor) > 4000 THEN
-                vNuevoValor := SUBSTRB(vEntrada, 1, 4000);
-            END IF;
-        END IF;
-
-        UPDATE PA.PA_PARAMETROS_MVP
-           SET VALOR = vNuevoValor
-         WHERE CODIGO_MVP = 'REPRESTAMOS'
-           AND CODIGO_PARAMETRO = pCodigoParametro;
-    END P_Registrar_Ejecucion_Param;
-  --EJECUCIONES_ERROR HASTA AQUI
+   
   PROCEDURE P_Carga_Precalifica_Cancelado ( pMensaje IN OUT VARCHAR2) IS
-  -- Variable para guardar el ID de la ejecución del profiler
-  v_profiler_run_id BINARY_INTEGER;
-BEGIN
-  -- ===================================================================
-  -- PASO 1: INICIAMOS EL PROFILER AL COMIENZO DEL PROCESO
-  -- ===================================================================
-  v_profiler_run_id := DBMS_PROFILER.START_PROFILER(
-    run_comment => 'Ejecucion de P_Carga_Precalifica_Cancelado'
-  );
 
-  -- Tu lógica de negocio original comienza aquí
-  DECLARE
-    CURSOR CUR_REPRESTAMO IS
-      SELECT ID_REPRESTAMO, ESTADO, XCORE_GLOBAL
-      FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE';
-
-    CURSOR CUR_REPRESTAMO_XCORE IS
-      SELECT ID_REPRESTAMO, ESTADO, XCORE_GLOBAL
-      FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE';
-
-    VMSG            VARCHAR2(4000);
-    v_Id_Represtamo VARCHAR2(400);
-    v_conteo        NUMBER(10);
-    v_ini           DATE;
-    v_fin           DATE;
-    v_seg           NUMBER(10);
-    VALOR           VARCHAR(400);
-  BEGIN
-    -- 1
-    PR.PR_PKG_REPRESTAMOS.P_Actualizar_Anular_Represtamo(pMensaje);
-    -- 2
-    PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo();
-    -- 3
-    PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores();
-    -- 4
-    PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores_hi();
-    -- 5
-    PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado();
-    -- 6
-    PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado_hi();
-
+  
     BEGIN
-      SELECT COUNT(*) INTO v_conteo FROM PR.PR_REPRESTAMOS R WHERE ESTADO = 'RE';
-    END;
-    -- 5
-    PR.PR_PKG_REPRESTAMOS.Actualiza_Precalificacion();
-    -- 6
-    PR.PR_PKG_REPRESTAMOS.Actualiza_XCORE_CUSTOM();
-    -- 7
-    PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
-
-    PR.PR_PKG_REPRESTAMOS.PVALIDA_WORLD_COMPLIANCE();
-    COMMIT;
-
-    PR.PR_PKG_REPRESTAMOS.PVALIDA_XCORE();
-    COMMIT;
-
-    FOR A IN CUR_REPRESTAMO LOOP
-      DBMS_OUTPUT.PUT_LINE('Entra AL CURSOR CUR_REPRESTAMO = ' || A.ID_REPRESTAMO);
-      IF PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) THEN
-        PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'NP', NULL, 'Notificacion Pendiente', USER);
-      ELSE
-        IF PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) = FALSE THEN
-          PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
-        ELSE
-          IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO(A.ID_REPRESTAMO) THEN
-            PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
-          ELSE
-            PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
-          END IF;
-        END IF;
-      END IF;
-    END LOOP;
     
-    UPDATE PA.PA_PARAMETROS_MVP SET VALOR = VALOR || (CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'), 0) > 0 THEN ',' ELSE '' END) || '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') || '","R":' || v_conteo || ',"E":' || NVL(REGEXP_COUNT(VALOR, '}') + 1, 1) || '}'
-    WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO = 'EJECUCIONES';
-    COMMIT;
-  END;
+          --Crear bitacora Cabecera
+        /*PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_CAB ( 'RD_CARGA_PRECALIFICACION', 'ACTIVO', Null,pMensaje);
+        
+        DECLARE
+        VIDCABECERA NUMBER;
+        BEGIN
+        SELECT MAX(APC.ID_APLICACION_PASO_CAB) 
+            INTO VIDCABECERA 
+            FROM PR.PR_APLICACION_PASO_CAB APC 
+            JOIN PR.PR_APLICACION A ON A.ID_APLICACION=APC.ID_APLICACION 
+            WHERE CODIGO_APLICACION='RD_CARGA_PRECALIFICACION';
+            
+             --INICIALIZO EL PROCESO
+        PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_CAB ( VIDCABECERA, 'INICIADO',0, 'PROCESO INICIADO', PMENSAJE );
+        
+        END;*/
+        
+        DECLARE
+        
+        CURSOR CUR_REPRESTAMO IS 
+            SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
+            FROM PR_REPRESTAMOS
+            WHERE ESTADO = 'RE';
+                         
+        CURSOR CUR_REPRESTAMO_XCORE IS 
+         SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
+         FROM PR_REPRESTAMOS
+         WHERE ESTADO = 'RE';
+           
+         VMSG  VARCHAR2(4000);
+         v_Id_Represtamo  VARCHAR2(400);
+         v_conteo  NUMBER(10);
+         v_ini DATE;
+         v_fin DATE;
+         v_seg NUMBER(10);
+         VALOR VARCHAR(400);
+         /*pIDAPLICACION1 NUMBER;
+         pIDAPLICACION2 NUMBER;
+         pIDAPLICACION3 NUMBER;
+         pIDAPLICACION4 NUMBER;
+         pIDAPLICACION5 NUMBER;
+         pIDAPLICACION6 NUMBER;
+         pIDAPLICACION7 NUMBER;
+         pIDAPLICACION8 NUMBER;
+         pIDAPLICACION9 NUMBER;*/
+         
+                  BEGIN
+                  
+                      -- Inicio del proceso de trazabilidad
+                      
+                       --1  
+                       PR.PR_PKG_REPRESTAMOS.P_Actualizar_Anular_Represtamo( pMensaje);
+                                            
+                       --2
+                        PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo();
+                       --3                        
+                        PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores();
+                       --4
+                        PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores_hi();                                        
+                       --5
+                        PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado();
+                       --6
+                        PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado_hi();
 
-  -- ===================================================================
-  -- PASO 2: DETENEMOS EL PROFILER Y PROCESAMOS LOS DATOS
-  -- ===================================================================
-  DBMS_PROFILER.STOP_PROFILER;
-  -- Procesamos los resultados usando el ID que guardamos al inicio
-  SROBLES.TOAD_PROFILER.rollup_run(run_number => v_profiler_run_id);
-  COMMIT;
+                      
+                        BEGIN
+                          SELECT COUNT(*) INTO v_conteo  FROM PR.PR_REPRESTAMOS R  WHERE ESTADO = 'RE';
+                       END;
+                       --5
+                      PR.PR_PKG_REPRESTAMOS.Actualiza_Precalificacion();
+                      
+                      --6
+                      PR.PR_PKG_REPRESTAMOS.Actualiza_XCORE_CUSTOM();
+                     
+                      --7
+                      PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
+                     /*BEGIN
+                      PR.PR_PKG_TRAZABILIDAD.PR_CREAR_BITACORA_DET ( 'RD_CARGA_PRECALIFICACION', 'RD_CARGA.REGISTRAR_SOLICITUD', 'INICIADO', pMensaje );
+                      --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( 'ENPROCESO', 50, 'SE ACTUALIZO', pMensaje );
+                      FOR A IN CUR_REPRESTAMO LOOP
+                        PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(A.ID_REPRESTAMO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+                        
+                        p_generar_bitacora(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
+                        
+                        COMMIT;
+                      END LOOP ;
+                      --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( 'ENPROCESO', 100, 'SE ACTUALIZO', pMensaje );
+                      --PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET ( 'FINALIZADO', 'SE FINALIZO', pMensaje );
+                      
+                      EXCEPTION WHEN OTHERS THEN   
+                        DECLARE
+                        vIdError      PLS_INTEGER := 0;
+                            BEGIN                                    
+                        pMensaje:='ERROR CON EL STORE PROCEDURE REGISTRAR_SOLICITUD';
+                        setError(pProgramUnit => 'P_Carga_Precalifica_Cancelado', 
+                           pPieceCodeName => NULL, 
+                           pErrorDescription => SQLERRM ,                                                              
+                           pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
+                           pEmailNotification => NULL, 
+                           pParamList => IA.LOGGER.vPARAMLIST, 
+                           pOutputLogger => FALSE, 
+                           pExecutionTime => NULL, 
+                           pIdError => vIdError); 
+                           --Capturo el error del detalle de la bitacora
+                            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( 'ERROR', 100, SQLERRM, pMensaje );
+                        END; 
+                      END;*/
+                      
+                      --8
+                      --CREANDO EL DETALLE TRAZABILIDAD VALIDA_XCORE      
+                         
+                      PR.PR_PKG_REPRESTAMOS.PVALIDA_WORLD_COMPLIANCE();
+                      COMMIT;     
 
-EXCEPTION
-  WHEN OTHERS THEN
-    -- ===================================================================
-    -- PASO 3: ¡CRÍTICO! ASEGURAMOS DETENER EL PROFILER SI HAY UN ERROR
-    -- ===================================================================
-    DBMS_PROFILER.STOP_PROFILER;
-    -- Procesamos los resultados del error para poder analizarlos
-    SROBLES.TOAD_PROFILER.rollup_run(run_number => v_profiler_run_id);
-    COMMIT;
-    
-    -- Tu manejo de errores original va aquí
-    DECLARE
-      vIdError PLS_INTEGER := 0;
-    BEGIN
-      IA.LOGGER.ADDPARAMVALUEV('pMensaje', pMensaje);
-      setError(pProgramUnit      => 'P_Carga_Precalifica_Cancelado',
-               pPieceCodeName    => NULL,
-               pErrorDescription => SQLERRM,
-               pErrorTrace       => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
-               pEmailNotification=> NULL,
-               pParamList        => IA.LOGGER.vPARAMLIST,
-               pOutputLogger     => FALSE,
-               pExecutionTime    => NULL,
-               pIdError          => vIdError);
-    END;
-    -- Es importante relanzar el error para que el job quede como 'FAILED'
-    RAISE;
-END P_Carga_Precalifica_Cancelado;
+                      
+                      PR.PR_PKG_REPRESTAMOS.PVALIDA_XCORE();  
+                      COMMIT;
+
+                    
+                      
+                      FOR A IN CUR_REPRESTAMO LOOP
+                      DBMS_OUTPUT.PUT_LINE ( 'Entra AL CURSOR CUR_REPRESTAMO = '|| A.ID_REPRESTAMO  );
+
+                        -- validar que tenga solicitud, que tenga canales
+                        IF  PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO)AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN 
+                         PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'NP', NULL, 'Notificaci¿n Pendiente', USER);
+                         
+                         ELSE
+                         
+                            IF  PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) = FALSE THEN
+                             PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
+                            ELSE
+                                IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN
+                                    PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
+                                ELSE
+                                PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
+                                END IF;
+                
+                        END IF; 
+                       
+                       END IF;
+                      
+                      END LOOP;
+                UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
+                WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='EJECUCIONES';
+                COMMIT;
+
+        --FINALIZO EL PROCESO DE LA CABECERA
+        /*DECLARE
+        VIDCABECERA NUMBER;
+        BEGIN
+        SELECT MAX(APC.ID_APLICACION_PASO_CAB) 
+            INTO VIDCABECERA 
+            FROM PR.PR_APLICACION_PASO_CAB APC 
+            JOIN PR.PR_APLICACION A ON A.ID_APLICACION=APC.ID_APLICACION 
+            WHERE CODIGO_APLICACION='RD_CARGA_PRECALIFICACION';
+        PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_CAB (VIDCABECERA, 'FINALIZADO',9, 'PROCESO FINALIZADO', PMENSAJE );
+        END;
+        */
+       COMMIT;
+      END;
+                
+           
+   
+       EXCEPTION WHEN OTHERS THEN
+            DECLARE
+                vIdError      PLS_INTEGER := 0;
+            BEGIN
+              
+              IA.LOGGER.ADDPARAMVALUEV('pMensaje',          pMensaje);          
+              
+              setError(pProgramUnit => 'P_Carga_Precalifica_Cancelado', 
+                       pPieceCodeName => NULL, 
+                       pErrorDescription => SQLERRM,                                                              
+                       pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
+                       pEmailNotification => NULL, 
+                       pParamList => IA.LOGGER.vPARAMLIST, 
+                       pOutputLogger => FALSE, 
+                       pExecutionTime => NULL, 
+                       pIdError => vIdError); 
+            END;          
+   END P_Carga_Precalifica_Cancelado; 
    
    PROCEDURE P_Carga_Precalifica_Manual(pMensaje             IN OUT VARCHAR2) IS
    
@@ -8211,8 +8218,8 @@ END P_Carga_Precalifica_Cancelado;
             v_proceso_activo:= PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CARGA_DIRIGIDA_PROCESO_ACTIVO');
             IF  v_proceso_activo='S' THEN 
             
-                UPDATE PA.PA_PARAMETROS_MVP SET VALOR='S' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_PROCESO_ACTIVO';
-                COMMIT;
+                --UPDATE PA.PA_PARAMETROS_MVP SET VALOR='S' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_PROCESO_ACTIVO';
+                --COMMIT;
                 
             
                   --1
@@ -8270,15 +8277,13 @@ END P_Carga_Precalifica_Cancelado;
                   END LOOP;
                   
                  
-                --EJECUCIONES_ERROR NUEVO
-                P_Registrar_Ejecucion_Param('CARGA_DIRIGIDA_EJECUCIONES', v_conteo);
---                UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
---                WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_EJECUCIONES';
-                --EJECUCIONES_ERROR HASTA AQUI
+                  
+                UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
+                WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_EJECUCIONES';
                 COMMIT;
                 
-                UPDATE PA.PA_PARAMETROS_MVP SET VALOR='N' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_PROCESO_ACTIVO';
-                COMMIT;
+                --UPDATE PA.PA_PARAMETROS_MVP SET VALOR='N' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CARGA_DIRIGIDA_PROCESO_ACTIVO';
+                --COMMIT;
                 
           END IF;
 
@@ -8304,209 +8309,125 @@ END P_Carga_Precalifica_Cancelado;
                        pIdError => vIdError); 
             END; 
     END P_Carga_Precalifica_Manual;  
-    PROCEDURE P_Carga_Precalifica_Campana_Especial(pMensaje IN OUT VARCHAR2) IS BEGIN DECLARE CURSOR CUR_REPRESTAMO IS
-        SELECT
-            R.ID_REPRESTAMO,
-            C.TIPO_CREDITO,
-            R.ESTADO,
-            R.XCORE_GLOBAL,
-            R.NO_CREDITO
-        FROM
-            PR_REPRESTAMOS R
-            LEFT JOIN PR_CAMPANA_ESPECIALES C ON C.NO_CREDITO = R.NO_CREDITO
-            AND C.ID_CAMPANA_ESPECIALES = R.ID_REPRE_CAMPANA_ESPECIALES
-        WHERE
-            R.ESTADO = 'RE';
-        
-        VMSG VARCHAR2(4000);
-        
-        v_Id_Represtamo VARCHAR2(400);
-        
-        v_conteo NUMBER(10);
-        
-        v_ini DATE;
-        
-        v_fin DATE;
-        
-        v_seg NUMBER(10);
-        
-        v_proceso_activo VARCHAR2(4000);
-        
-        BEGIN v_proceso_activo := PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ('CAMPANA_ESPECIAL_PROCESO_ACTIVO');
-        
-        IF v_proceso_activo = 'S' THEN
-        UPDATE
-            PA.PA_PARAMETROS_MVP
-        SET
-            VALOR = 'S'
-        WHERE
-            CODIGO_MVP = 'REPRESTAMOS'
-            AND CODIGO_PARAMETRO = 'CAMPANA_ESPECIAL_PROCESO_ACTIVO';
-        
-        COMMIT;
-        
-        --1
-        PR.PR_PKG_REPRESTAMOS.Precalifica_Campana_Especiales;
-        
-        BEGIN
-        SELECT
-            COUNT(*) INTO v_conteo
-        FROM
-            PR.PR_REPRESTAMOS R
-        WHERE
-            ESTADO = 'RE';
-        
-        DBMS_OUTPUT.PUT_LINE ('v_conteo = ' || v_conteo);
-        
-        END;
-        
-        --2
-        PR.PR_PKG_REPRESTAMOS.Actualiza_Preca_Campana_Especiale;
-        
-        --3
-        PR_PKG_REPRESTAMOS.ACTUALIZA_XCORE_CAMPANA_ESPECIAL;
-        
-        FOR A IN CUR_REPRESTAMO LOOP PR.PR_PKG_REPRESTAMOS.P_Registra_Solicitud_Campana(
-            A.ID_REPRESTAMO,
-            A.TIPO_CREDITO,
-            NVL(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), USER),
-            VMSG
-        );
-        
-        COMMIT;
-        
-        END LOOP;
-        
-        --5
-        IF PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('VALIDAR_XCORE_CAMPANA') = 'S' THEN PR.PR_PKG_REPRESTAMOS.PVALIDA_XCORE();
-        
-        DBMS_OUTPUT.PUT_LINE ('VALIDO EL XCORE');
-        
-        COMMIT;
-        
-        END IF;
-        
-        FOR A IN CUR_REPRESTAMO LOOP -- IF A.ESTADO = 'RE' THEN
-        p_generar_bitacora(
-            A.ID_REPRESTAMO,
-            NULL,
-            'RE',
-            NULL,
-            '',
-            NVL(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), USER)
-        );
-        
-        UPDATE
-            PR.PR_CAMPANA_ESPECIALES
-        SET
-            ESTADO = 'F',
-            FECHA_MODIFICACION = SYSDATE,
-            MODIFICADO_POR = NVL(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), USER)
-        WHERE
-            NO_CREDITO = A.NO_CREDITO
-            AND ESTADO = 'T';
-        
-        COMMIT;
-        
-        -- END IF;
-        -- validar que tenga solicitud, que tenga canales
-        IF F_Existe_Solicitudes(A.ID_REPRESTAMO)
-        AND F_Existe_Canales(A.ID_REPRESTAMO)
-        AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO (A.ID_REPRESTAMO) THEN PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(
-            A.ID_REPRESTAMO,
-            NULL,
-            'NP',
-            NULL,
-            'Notificaci¿n Pendiente',
-            USER
-        );
-        
-        ELSE IF PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO (A.ID_REPRESTAMO) = FALSE THEN PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(
-            A.ID_REPRESTAMO,
-            NULL,
-            'RXT',
-            NULL,
-            'No cumple con los criterios: Tipo de Credito ',
-            USER
-        );
-        
-        ELSE IF F_Existe_Solicitudes(A.ID_REPRESTAMO)
-        AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE
-        AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO (A.ID_REPRESTAMO) THEN PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(
-            A.ID_REPRESTAMO,
-            NULL,
-            'CP',
-            NULL,
-            'Solicitud Pendiente de Canal',
-            USER
-        );
-        
-        ELSE PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(
-            A.ID_REPRESTAMO,
-            NULL,
-            'AN',
-            NULL,
-            'No cumple con los criterios: Solicitudes,Opciones',
-            USER
-        );
-        
-        END IF;
-        
-        END IF;
-        
-        END IF;
-        
-        END LOOP;
-        --EJECUCIONES_ERROR NUEVO
-        P_Registrar_Ejecucion_Param('CAMPANA_ESPECIAL_EJECUCIONES', v_conteo);
---                UPDATE
---            PA.PA_PARAMETROS_MVP
---        SET
---            VALOR = VALOR ||(
---                CASE
---                    WHEN NVL(REGEXP_COUNT(VALOR, '}'), 0) > 0 THEN ','
---                    ELSE ''
---                END
---            ) || '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') || '","R":' || v_conteo || ',"E":' || NVL(REGEXP_COUNT(VALOR, '}') + 1, 1) || '}'
---        WHERE
---            CODIGO_MVP = 'REPRESTAMOS'
---            AND CODIGO_PARAMETRO = 'CAMPANA_ESPECIAL_EJECUCIONES';
---        COMMIT;
---        
---        UPDATE
---            PA.PA_PARAMETROS_MVP
---        SET
---            VALOR = 'N'
---        WHERE
---            CODIGO_MVP = 'REPRESTAMOS'
---            AND CODIGO_PARAMETRO = 'CAMPANA_ESPECIAL_PROCESO_ACTIVO';
-        --EJECUCIONES_ERROR HASTA AQUI
-        COMMIT;
-        
-        END IF;
-        
-        END;
-        
-        EXCEPTION
-        WHEN OTHERS THEN DECLARE vIdError PLS_INTEGER := 0;
-        
-        BEGIN IA.LOGGER.ADDPARAMVALUEV('pMensaje', pMensaje);
-        
-        setError(
-            pProgramUnit => 'P_Carga_Precalifica_Campana_Especial',
-            pPieceCodeName => NULL,
-            pErrorDescription => SQLERRM,
-            pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
-            pEmailNotification => NULL,
-            pParamList => IA.LOGGER.vPARAMLIST,
-            pOutputLogger => FALSE,
-            pExecutionTime => NULL,
-            pIdError => vIdError
-        );
-        
-        END;
+    PROCEDURE P_Carga_Precalifica_Campana_Especial(pMensaje             IN OUT VARCHAR2)IS
+   
+     BEGIN
+          DECLARE
+          CURSOR CUR_REPRESTAMO IS 
+          SELECT R.ID_REPRESTAMO,C.TIPO_CREDITO,R.ESTADO,R.XCORE_GLOBAL,R.NO_CREDITO
+          FROM PR_REPRESTAMOS R
+          LEFT JOIN PR_CAMPANA_ESPECIALES C ON C.NO_CREDITO = R.NO_CREDITO AND C.ID_CAMPANA_ESPECIALES =R.ID_REPRE_CAMPANA_ESPECIALES
+          WHERE R.ESTADO = 'RE';
 
-    END P_Carga_Precalifica_Campana_Especial;
+          VMSG  VARCHAR2(4000);
+          v_Id_Represtamo  VARCHAR2(400);
+          v_conteo  NUMBER(10);
+          v_ini DATE;
+          v_fin DATE;
+          v_seg NUMBER(10);
+          v_proceso_activo VARCHAR2(4000);
+          BEGIN
+          
+            v_proceso_activo:= PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CAMPANA_ESPECIAL_PROCESO_ACTIVO');
+            IF  v_proceso_activo='S' THEN 
+            
+                --UPDATE PA.PA_PARAMETROS_MVP SET VALOR='S' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CAMPANA_ESPECIAL_PROCESO_ACTIVO';
+                --COMMIT;
+                
+            
+                  --1
+                  PR.PR_PKG_REPRESTAMOS.Precalifica_Campana_Especiales;
+                  
+                     
+                    BEGIN
+                      SELECT COUNT(*) INTO v_conteo  FROM PR.PR_REPRESTAMOS R  WHERE ESTADO = 'RE';
+                   DBMS_OUTPUT.PUT_LINE ( 'v_conteo = ' || v_conteo );
+                   END;
+                  --2
+                  PR.PR_PKG_REPRESTAMOS.Actualiza_Preca_Campana_Especiale;
+                 
+                  --3
+                  PR_PKG_REPRESTAMOS.ACTUALIZA_XCORE_CAMPANA_ESPECIAL;
+                   
+
+                                 
+                  FOR A IN CUR_REPRESTAMO LOOP
+                    PR.PR_PKG_REPRESTAMOS.P_Registra_Solicitud_Campana(A.ID_REPRESTAMO,A.TIPO_CREDITO,NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+                    COMMIT;
+                  END LOOP;
+                  
+                   --5
+                  IF PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('VALIDAR_XCORE_CAMPANA') = 'S' THEN
+                  PR.PR_PKG_REPRESTAMOS.PVALIDA_XCORE();
+                    DBMS_OUTPUT.PUT_LINE ( 'VALIDO EL XCORE' );
+                    COMMIT;
+                  END IF;
+                    
+                 FOR A IN CUR_REPRESTAMO LOOP
+                  -- IF A.ESTADO = 'RE' THEN
+                   
+                    p_generar_bitacora(A.ID_REPRESTAMO, NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
+                    UPDATE PR.PR_CAMPANA_ESPECIALES SET ESTADO = 'F',FECHA_MODIFICACION = SYSDATE, MODIFICADO_POR=NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER) WHERE NO_CREDITO = A.NO_CREDITO AND ESTADO='T';
+                    COMMIT;
+                   -- END IF;
+
+                       
+                    -- validar que tenga solicitud, que tenga canales
+                    IF  F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO)AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN 
+                     PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'NP', NULL, 'Notificaci¿n Pendiente', USER);
+                         
+                     ELSE
+                         
+                        IF  PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) = FALSE THEN
+                         PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
+                        ELSE
+                            IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN
+                                PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
+                            ELSE
+                            PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
+                            END IF;
+                
+                    END IF; 
+                       
+                   END IF;
+                       
+                  END LOOP;
+                  
+                  
+                  
+                UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
+                WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='CAMPANA_ESPECIAL_EJECUCIONES';
+                COMMIT;
+                
+                --UPDATE PA.PA_PARAMETROS_MVP SET VALOR='N' WHERE CODIGO_MVP='REPRESTAMOS' AND CODIGO_PARAMETRO='CAMPANA_ESPECIAL_PROCESO_ACTIVO';
+                --COMMIT;
+                
+          END IF;
+
+          END;
+                
+           
+   
+            EXCEPTION WHEN OTHERS THEN
+            DECLARE
+                vIdError      PLS_INTEGER := 0;
+            BEGIN
+              
+              IA.LOGGER.ADDPARAMVALUEV('pMensaje',          pMensaje);          
+              
+              setError(pProgramUnit => 'P_Carga_Precalifica_Campana_Especial', 
+                       pPieceCodeName => NULL, 
+                       pErrorDescription => SQLERRM,                                                              
+                       pErrorTrace => DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, 
+                       pEmailNotification => NULL, 
+                       pParamList => IA.LOGGER.vPARAMLIST, 
+                       pOutputLogger => FALSE, 
+                       pExecutionTime => NULL, 
+                       pIdError => vIdError); 
+            END; 
+    
+    
+    END P_Carga_Precalifica_Campana_Especial;       
     PROCEDURE P_Registrar_Rechazo(pIdReprestamo   IN     VARCHAR2,
                                   pCanal          IN     VARCHAR2,
                                   pIdRechazo      IN     VARCHAR2,
@@ -9368,7 +9289,7 @@ END P_Carga_Precalifica_Cancelado;
                             select 1
                             from pr_creditos_hi h
                             where h.no_credito = a.no_credito
-                            and h.F_CANCELACION >= SYSDATE - 1000 --TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                            and h.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
                             and h.F_CANCELACION <= SYSDATE
                             and h.estado = 'C');
     BEGIN
@@ -9543,12 +9464,8 @@ END P_Carga_Precalifica_Cancelado;
   FUNCTION F_Validar_Listas_PEP (
     p_codempresa IN VARCHAR2,
     p_codpersona IN VARCHAR2) RETURN NUMBER IS
-    PRAGMA UDF;
         BEGIN
-        -- CAMBIO AQUI
-            --IF PA.P_DATOS_PERSONA.esta_en_lista_pep(p_codempresa, p_codpersona) THEN
-            IF esta_en_lista_pep(p_codempresa, p_codpersona) THEN
-            -- HASTA AQUI
+            IF PA.P_DATOS_PERSONA.esta_en_lista_pep(p_codempresa, p_codpersona) THEN
                 RETURN 1;
             ELSE
                 RETURN 0;
@@ -9558,12 +9475,8 @@ END P_Carga_Precalifica_Cancelado;
   FUNCTION F_Validar_Lista_NEGRA (
     p_codempresa IN VARCHAR2,
     p_codpersona IN VARCHAR2) RETURN NUMBER IS
-    PRAGMA UDF;
         BEGIN
-        -- CAMBIO AQUI
-            --IF PA.P_DATOS_PERSONA.esta_en_lista_negra(p_codempresa, p_codpersona) THEN
-            IF esta_en_lista_negra(p_codempresa, p_codpersona) THEN
-            -- HASTA AQUI
+            IF PA.P_DATOS_PERSONA.esta_en_lista_negra(p_codempresa, p_codpersona) THEN
                 RETURN 1;
             ELSE
                 RETURN 0;
@@ -9662,7 +9575,7 @@ END P_Carga_Precalifica_Cancelado;
         APEX_WEB_SERVICE.g_request_headers.delete ();
         APEX_WEB_SERVICE.g_request_headers (1).name  := 'Content-Type';
         APEX_WEB_SERVICE.g_request_headers (1).value := 'application/json';          
-        vUrlAPI := F_Obt_Parametro_Represtamo('RUTA_API_MANAGER') || 'api/Notification/GetNotificationLogs?sessionId='||pIdReprestamo||'&codeOpt=SMS_Sendiu&CodeIdentity=ReloanId';
+        vUrlAPI := F_Obt_Parametro_Represtamo('RUTA_API_MANAGER') || 'api/Notification/GetNotificationLogs?sessionId='||pIdReprestamo||'=SMS_Sendiu=ReloanId';
          
         SELECT COUNT(*) INTO TOTAL  
         FROM xmltable (
@@ -9717,14 +9630,44 @@ END P_Carga_Precalifica_Cancelado;
         ELSE 
             
             BEGIN
-                SELECT (SELECT NT.TIPO_CREDITO FROM PR_TIPO_CREDITO NT WHERE R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) AND R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) 
+                /*SELECT (SELECT NT.TIPO_CREDITO FROM PR_TIPO_CREDITO NT WHERE R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) AND R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = NT.TIPO_CREDITO) 
                 AND T.CODIGO_SUB_APLICACION = NT.CODIGO_SUB_APLICACION AND T.GRUPO_TIPO_CREDITO = NT.GRUPO_TIPO_CREDITO AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC
                 AND EXISTS (SELECT 1 FROM PR.PR_TIPO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO IN (NT.TIPO_CREDITO) AND OBSOLETO = 0  AND (CREDITO_CAMPANA_ESPECIAL != 'S' OR CREDITO_CAMPANA_ESPECIAL IS NULL))) INTO NUEVO_TIPO
                 FROM PR.PR_REPRESTAMOS R
                 LEFT JOIN PR.PR_CREDITOS C ON C.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR.PR_CREDITOS_HI H ON H.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR.PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
-                WHERE R.ID_REPRESTAMO = pIdReprestamo ;
+                WHERE R.ID_REPRESTAMO = pIdReprestamo ;*/
+                SELECT (
+                    SELECT MIN(NT.TIPO_CREDITO)
+                    FROM   PR_TIPO_CREDITO                NT
+                    JOIN   PR_PLAZO_CREDITO_REPRESTAMO    P 
+                         ON  P.TIPO_CREDITO = NT.TIPO_CREDITO
+                    WHERE R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                      AND NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
+                      AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
+                      --AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC
+                      /*  Regla de FACILIDAD: Si el ORIGEN (T) es FMO se ignora
+                                              Si no es FMO debe coincidir           */
+                      AND ( T.TIPO_CREDITO IN (SELECT TIPO_CREDITO
+                                               FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                               WHERE  CREDITO_FMO = 'S')
+                            OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC )
+                      -- Excluir tipos de crédito FMO
+                      AND NT.TIPO_CREDITO NOT IN (SELECT TIPO_CREDITO
+                                                  FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                                  WHERE  CREDITO_FMO = 'S')
+                      -- Vigente y sin campaña especial
+                      AND EXISTS ( SELECT 1
+                            FROM   PR_TIPO_CREDITO_REPRESTAMO R
+                            WHERE  R.TIPO_CREDITO = NT.TIPO_CREDITO AND  R.OBSOLETO = 0 AND  NVL(R.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
+                      )
+                ) INTO NUEVO_TIPO
+                FROM PR_REPRESTAMOS   R
+                LEFT JOIN PR_CREDITOS      C ON C.NO_CREDITO = R.NO_CREDITO
+                LEFT JOIN PR_CREDITOS_HI   H ON H.NO_CREDITO = R.NO_CREDITO
+                LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+                WHERE R.ID_REPRESTAMO = pIdReprestamo;
                 RETURN NUEVO_TIPO;
                 DBMS_OUTPUT.PUT_LINE ( 'NUEVO CREDITO '|| NUEVO_TIPO || 'REPRESTAMOS' || pIdReprestamo);
             EXCEPTION
@@ -9900,6 +9843,42 @@ END P_Carga_Precalifica_Cancelado;
                 WHERE
                     R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
                     AND R.TIPO_CREDITO = (
+                        SELECT (SELECT NT.TIPO_CREDITO             
+                            FROM   PR_TIPO_CREDITO                NT
+                            JOIN   PR_PLAZO_CREDITO_REPRESTAMO    P  
+                                   ON  P.TIPO_CREDITO = NT.TIPO_CREDITO
+                            WHERE  pMtoSeleccionado BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                              -- Coincidencias obligatorias
+                              AND NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
+                              AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
+                              /*  Regla de FACILIDAD: Si el ORIGEN (T) es FMO se ignora
+                                      Si no es FMO debe coincidir           */
+                              AND ( T.TIPO_CREDITO IN (SELECT TIPO_CREDITO
+                                                       FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                                       WHERE  CREDITO_FMO = 'S')
+                              OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC )
+                              --  El candidato final nunca puede ser FMO
+                              AND NT.TIPO_CREDITO NOT IN (SELECT TIPO_CREDITO
+                                                          FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                                          WHERE  CREDITO_FMO = 'S')
+                              --  Vigente y sin campaña especial
+                              AND EXISTS ( SELECT 1
+                                     FROM   PR_TIPO_CREDITO_REPRESTAMO R
+                                     WHERE  R.TIPO_CREDITO = NT.TIPO_CREDITO AND  R.OBSOLETO = 0 AND  NVL(R.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
+                              ))
+                        FROM PR.PR_REPRESTAMOS R
+                        LEFT JOIN PR.PR_CREDITOS C ON C.NO_CREDITO = R.NO_CREDITO
+                        LEFT JOIN PR.PR_CREDITOS_HI H ON H.NO_CREDITO = R.NO_CREDITO
+                        LEFT JOIN PR.PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+                        WHERE R.ID_REPRESTAMO = pIdReprestamo
+                        )
+                AND pMtoSeleccionado BETWEEN R.MONTO_MIN AND R.MONTO_MAX
+                GROUP BY R.TIPO_CREDITO;
+                /*SELECT MAX(R.PLAZO) INTO NUEVO_PLAZO
+                FROM PR_PLAZO_CREDITO_REPRESTAMO R
+                WHERE
+                    R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+                    AND R.TIPO_CREDITO = (
                         SELECT (SELECT NT.TIPO_CREDITO FROM PR_TIPO_CREDITO NT WHERE pMtoSeleccionado>=(SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO=NT.TIPO_CREDITO) AND pMtoSeleccionado<= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO=NT.TIPO_CREDITO)
                         AND T.CODIGO_SUB_APLICACION=NT.CODIGO_SUB_APLICACION AND T.GRUPO_TIPO_CREDITO=NT.GRUPO_TIPO_CREDITO AND T.FACILIDAD_CREDITIC=NT.FACILIDAD_CREDITIC
                         AND EXISTS (SELECT 1 FROM PR.PR_TIPO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO IN (NT.TIPO_CREDITO) AND OBSOLETO = 0 and (CREDITO_CAMPANA_ESPECIAL != 'S' OR CREDITO_CAMPANA_ESPECIAL IS NULL)))
@@ -9910,7 +9889,7 @@ END P_Carga_Precalifica_Cancelado;
                         WHERE R.ID_REPRESTAMO=pIdReprestamo
                         )
                 AND pMtoSeleccionado BETWEEN R.MONTO_MIN AND R.MONTO_MAX
-                GROUP BY R.TIPO_CREDITO;
+                GROUP BY R.TIPO_CREDITO;*/
             
                  EXCEPTION WHEN OTHERS THEN   
             DECLARE
@@ -9950,7 +9929,6 @@ END P_Carga_Precalifica_Cancelado;
     FUNCTION F_TIENE_GARANTIA(pNoCredito IN NUMBER)
    
    RETURN NUMBER IS
-   PRAGMA UDF;
    vExiste     NUMBER := 0;
    BEGIN
            SELECT COUNT(1) INTO vExiste
@@ -9973,7 +9951,7 @@ END P_Carga_Precalifica_Cancelado;
   FUNCTION F_TIENE_GARANTIA_HISTORICO(pNoCredito IN NUMBER)
   
    
-   RETURN NUMBER IS PRAGMA UDF;
+   RETURN NUMBER IS
    vExiste     NUMBER := 0;
    BEGIN
            SELECT COUNT(1) INTO vExiste
@@ -10931,6 +10909,7 @@ END F_HORARIO_VALIDO_NOTIFICACION;
         COD_AGENCIA          VARCHAR2(10);
         vSucursal           VARCHAR2(10);
         vFECHA_PROCESADA VARCHAR2(50);
+        vIdDocReutilizar VARCHAR2(50);
     BEGIN
         OPEN  CUR_tipo_PROYECTO;
         FETCH CUR_tipo_PROYECTO INTO vTipoProyecto, vCodigoEjecutivo;
@@ -11375,12 +11354,19 @@ END F_HORARIO_VALIDO_NOTIFICACION;
                          pError := 'Linea ' || $$plsql_line || ' No se ha generado la Fud Correctamente pNuevo_credito: '||pNuevo_credito ||' vID_TEMPFUD: '||vid_tempfudGenerado || 'vNombreArchivoNuevo: '||vNombreArchivoNuevoGenerado;
                          p_depura (pError);
                           DBMS_OUTPUT.put_line (pError);
-                    END IF;                                
+                    END IF;             
+                    
+                     -- Para identificar los Represtamos que son de origen Campana Especiales y pueda activar la reutilizacion de la cedula.
+                    IF PR_PKG_REPRESTAMOS.F_VALIDAR_TIPO_REPRESTAMO(pNum_Represtamo) THEN
+                       SELECT PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CODIGOS_DOCUMENTOS_REUTILIZAR') 
+                        INTO vIdDocReutilizar
+                        FROM DUAL;
+                    END IF;                   
                     
                     
                             vIdTipoDocumento := '450'; -- CONSULTA LEXIS NEXIS SROBLES 28/11/2023
                             vDocumento := 'LEXISNEXIS';
-                            vCodigoReferencia := '1:'||vRow_Repre.identificacion||':'||vpNOCREDITOGenerado||':'||vRow_Repre.no_credito||':LEXISNEXIS'|| ':' || vid_tempfudGenerado;
+                            vCodigoReferencia := '1:'||vRow_Repre.identificacion||':'||vpNOCREDITOGenerado||':'||vRow_Repre.no_credito||':LEXISNEXIS'|| ':' || vid_tempfudGenerado || ':' ||vIdDocReutilizar;
                             vNombreArchivo := vDocumento || '_' || vpNOCREDITOGenerado || '_' || vRow_Repre.no_credito;
                             PA.PKG_TIPO_DOCUMENTO_PKM.InsertUrlReporte(
                                 pCodigoReferencia   => vCodigoReferencia,
@@ -11965,14 +11951,14 @@ END F_HORARIO_VALIDO_NOTIFICACION;
                                                     pEstado             => 'R',
                                                     pRespuesta          => pError
                                                    );            
-                               
+                              */ 
                               
                          BEGIN
                            SELECT COUNT(*) INTO vTipo_Vida FROM PR_POLIZAS_X_CREDITO WHERE TO_NUMBER(NO_CREDITO) = TO_NUMBER(vRow.CREDITO_NUEVO) AND TO_NUMBER(TIPO_POLIZA) = 2;
                          EXCEPTION WHEN NO_DATA_FOUND THEN
                            vTipo_Vida:= 0;   
                            COMMIT;
-                          END;   */    
+                          END;  
                                 
                      IF vTipo_Vida > 0 THEN
                             vIdTipoDocumento := '204';
@@ -13519,585 +13505,73 @@ BEGIN
         WHERE FECHA_ADICION = vUltimaFecha;
         
 COMMIT;
-END; 
-FUNCTION OBT_TELEFONO_PERSONA(
-    inCodPersona   IN NUMBER,
-    inTipoTelefono IN VARCHAR2
-  ) RETURN VARCHAR2 IS
-    PRAGMA UDF;
-    vLabTel VARCHAR2(30);
-  BEGIN
-    -- C: Celular
-    -- R: Central Telefonica
-    -- F: Fax
-    -- D: Linea Directa
-    -- O: Otro
-    -- T: Telefax
-    -- X: Telefono/Fax    
-    IF inTipoTelefono IN ('X','O') THEN -- Telefono Laboral
-      BEGIN
-        SELECT CASE
-                 WHEN l.cod_area IS NULL THEN l.num_telefono
-                 WHEN l.extension_tel IS NULL THEN '(' || l.cod_area || ')' || l.num_telefono
-                 ELSE '(' || l.cod_area || ')' || l.num_telefono || ' ' || l.extension_tel
-               END
-          INTO vLabTel
-          FROM (
-                 SELECT l.cod_area, l.num_telefono, l.extension_tel
-                 FROM   info_laboral l
-                 WHERE  l.cod_per_fisica = inCodPersona
-                 ORDER  BY l.cod_laboral DESC
-               ) l
-         WHERE ROWNUM = 1;
+END;    
 
-      EXCEPTION
-        WHEN NO_DATA_FOUND THEN vLabTel := NULL;
-        WHEN OTHERS        THEN vLabTel := NULL;
-      END;
-
-    ELSE
-      BEGIN
-        SELECT CASE
-                 WHEN t.cod_area IS NULL THEN t.num_telefono
-                 WHEN t.extension IS NULL THEN '(' || t.cod_area || ')' || t.num_telefono
-                 ELSE '(' || t.cod_area || ')' || t.num_telefono || ' ' || t.extension
-               END
-          INTO vLabTel
-          FROM   tel_personas t
-          WHERE  t.cod_persona  = inCodPersona
-            AND  t.tip_telefono = inTipoTelefono
-            AND  ROWNUM = 1;
-
-      EXCEPTION
-        WHEN OTHERS THEN vLabTel := NULL;
-      END;
-
-    END IF;
-
-    RETURN vLabTel;
-  END OBT_TELEFONO_PERSONA;
-  
-FUNCTION esta_en_lista_ofac(
-   p_codempresa VARCHAR2,
-   p_codpersona VARCHAR2)
-   RETURN BOOLEAN IS
-   --OBJETIVO : Devuelve true si el nombre la persona se encuentra en la Lista ofac.
-   --REQUIERE : p_codempresa- codigo de la empresa; p_codPersona -- Codigo de la persona
-   --HISTORIA : Dfatule 27/09/2007 CREACION
-   
-   v_es_fisica          personas.es_fisica%TYPE;
-   v_primer_nombre      VARCHAR2(30);
-   v_segundo_nombre     VARCHAR2(30);
-   v_primer_apellido    VARCHAR2(30);
-   v_segundo_apellido   VARCHAR2(30);
-   v_nombre_completo    VARCHAR2(61);
-   v_apellido_completo  VARCHAR2(61);
-   v_nom_comercial      personas_juridicas.nom_comercial%TYPE;
-   v_existe             PLS_INTEGER;
-   
-BEGIN
-   IF p_codpersona IS NULL THEN
-      RETURN FALSE;
-   END IF;
-   
-   BEGIN
-      SELECT es_fisica
-        INTO v_es_fisica
-        FROM personas
-       WHERE cod_persona = p_codpersona;
-   EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-         RETURN FALSE;
-      WHEN OTHERS THEN
-         RETURN FALSE;
-   END;
-   
-   IF v_es_fisica IS NULL THEN
-      RETURN FALSE;
-   END IF;
-   
-   IF v_es_fisica = 'S' THEN
-      BEGIN
-         SELECT TRIM(primer_nombre),
-                TRIM(segundo_nombre),
-                TRIM(primer_apellido),
-                TRIM(segundo_apellido)
-           INTO v_primer_nombre,
-                v_segundo_nombre,
-                v_primer_apellido,
-                v_segundo_apellido
-           FROM personas_fisicas
-          WHERE cod_per_fisica = p_codpersona;
-      EXCEPTION
-         WHEN NO_DATA_FOUND THEN
-            RETURN FALSE;
-         WHEN OTHERS THEN
-            RETURN FALSE;
-      END;
-      
-      v_nombre_completo := TRIM(v_primer_nombre || ' ' || NVL(v_segundo_nombre, ''));
-      v_apellido_completo := TRIM(v_primer_apellido || ' ' || NVL(v_segundo_apellido, ''));
-      
-      --Fisicas
-      BEGIN
-         SELECT 1
-           INTO v_existe
-           FROM ofac_datos_generales
-          WHERE UPPER(tipo_persona) = 'INDIVIDUAL'
-            AND ROWNUM = 1
-            AND (
-                  (INSTR(nombre, ',') > 0
-                   AND TRIM(UPPER(SUBSTR(nombre, INSTR(nombre, ',') + 1))) LIKE UPPER(v_nombre_completo)
-                   AND TRIM(UPPER(SUBSTR(nombre, 1, INSTR(nombre, ',') - 1))) LIKE UPPER(v_apellido_completo))
-                  OR
-                  (INSTR(nombre, ',') = 0
-                   AND TRIM(UPPER(SUBSTR(nombre, INSTR(nombre, ' ') + 1))) LIKE UPPER(v_nombre_completo)
-                   AND TRIM(UPPER(SUBSTR(nombre, 1, INSTR(nombre, ' ') - 1))) LIKE UPPER(v_apellido_completo))
-                );
-         
-         RETURN TRUE;
-         
-      EXCEPTION
-         WHEN NO_DATA_FOUND THEN
-            RETURN FALSE;
-         WHEN OTHERS THEN
-            RETURN FALSE;
-      END;
-      
-   ELSIF v_es_fisica = 'N' THEN
-      BEGIN
-         SELECT nom_comercial
-           INTO v_nom_comercial
-           FROM personas_juridicas
-          WHERE cod_per_juridica = p_codpersona;
-      EXCEPTION
-         WHEN NO_DATA_FOUND THEN
-            RETURN FALSE;
-         WHEN OTHERS THEN
-            RETURN FALSE;
-      END;
-      
-      --Juridicas
-      BEGIN
-         SELECT 1
-           INTO v_existe
-           FROM ofac_datos_generales
-          WHERE UPPER(tipo_persona) IS NULL
-            AND UPPER(SUBSTR(nombre, 1, 65)) LIKE UPPER(v_nom_comercial)
-            AND ROWNUM = 1;
-         
-         RETURN TRUE;
-         
-      EXCEPTION
-         WHEN NO_DATA_FOUND THEN
-            RETURN FALSE;
-         WHEN OTHERS THEN
-            RETURN FALSE;
-      END;
-      
-   END IF;
-   
-   RETURN FALSE;
-   
-END esta_en_lista_ofac;
-FUNCTION esta_en_lista_negra(
-      p_codempresa                        VARCHAR2,
-      p_codpersona                        VARCHAR2 )
-      RETURN BOOLEAN IS
-      /*
-         OBJETIVO
-          Devuelve true si la persona se encuenta en la lista
-          negra.
-        [...]
-      */
-      l_dummy NUMBER;
-   BEGIN
-      -- Consultamos directamente la tabla, parando en el primer registro
-      SELECT 1
-        INTO l_dummy
-        FROM lista_negra ln
-       WHERE ln.cod_persona = p_codpersona
-         AND ln.fec_vencimiento >= TRUNC(SYSDATE) + 1
-         AND ln.incluido = 'S'
-         AND ROWNUM = 1; -- Detener la búsqueda al encontrar la primera coincidencia
-
-      -- Si la consulta es exitosa (encontró una fila), devuelve TRUE
-      RETURN TRUE;
-      
-   EXCEPTION
-      -- Manejo explícito para el caso "no encontrado", que es un resultado de negocio válido
-      WHEN NO_DATA_FOUND THEN
-         RETURN FALSE;
-      -- Opcional: Manejar otros errores. Por ahora, mantenemos la lógica original.
-      WHEN OTHERS THEN
-         -- En un escenario ideal, aquí se registraría el error (e.g., SQLERRM)
-         RETURN FALSE; 
-   END;
-FUNCTION esta_en_lista_pep(
-      p_codempresa                        VARCHAR2,
-      p_codpersona                        VARCHAR2 )
-      RETURN BOOLEAN IS
-      --  OBJETIVO :    Devuelve true si la persona se encuenta en la Lista PEP.
-      --  [...]
-      l_dummy NUMBER;
-   BEGIN
-      -- Mismo patrón: consulta directa y ROWNUM = 1
-      SELECT 1
-        INTO l_dummy
-        FROM PA.lista_pep lp
-       WHERE lp.cod_persona = p_codpersona
-         AND lp.fec_vencimiento >= TRUNC(SYSDATE) + 1
-         AND ROWNUM = 1;
-
-      -- Encontrado
-      RETURN TRUE;
-
-   EXCEPTION
-      -- No encontrado
-      WHEN NO_DATA_FOUND THEN
-         RETURN FALSE;
-      -- Error inesperado
-      WHEN OTHERS THEN
-         RETURN FALSE;
-   END;
-PROCEDURE PR_AUDIT_TRACK
-(
-  p_empresa      IN NUMBER   DEFAULT 1,
-  p_id_campana   IN NUMBER   DEFAULT TO_NUMBER(TO_CHAR(SYSDATE,'YYYYMM')),
-  p_SP_name      IN VARCHAR2,
-  p_tag          IN VARCHAR2 DEFAULT NULL,
-  p_bind_date    IN DATE     DEFAULT NULL,
-  p_bind_num     IN NUMBER   DEFAULT NULL,
-  p_object_name  IN VARCHAR2 DEFAULT NULL,
-  p_object_type  IN VARCHAR2 DEFAULT 'PACKAGE BODY',
-  p_log_descartes  IN VARCHAR2 DEFAULT 'N'               -- 'S' = inserta Dxx (descartados)
-)
-IS
-  --------------------------------------------------------------------
-  -- Variables del procedimiento
-  --------------------------------------------------------------------
-  l_obj_name   VARCHAR2(200);
-  l_sql_src    CLOB;   -- SELECT completo entre START/END
-  l_sql_work   CLOB;   -- SELECT limpio para parsing
-  l_base_from  CLOB;   -- " FROM ... WHERE 1=1"
-  l_cnt        NUMBER;
-
-  --------------------------------------------------------------------
-  -- Flags / utilidades
-  --------------------------------------------------------------------
-  c_debug CONSTANT BOOLEAN := TRUE;  -- pon FALSE cuando termines de depurar
-
-  -- Extrae filtros /*Fnn: Nombre*/ y devuelve nombres y condiciones AND...
-  TYPE t_conds IS TABLE OF CLOB INDEX BY PLS_INTEGER;
-  TYPE t_names IS TABLE OF VARCHAR2(200) INDEX BY PLS_INTEGER;
-
-  PROCEDURE debug_put(p_label VARCHAR2, p_txt CLOB) IS
-    l_pos PLS_INTEGER := 1;
-  BEGIN
-    IF NOT c_debug OR p_txt IS NULL THEN RETURN; END IF;
-    DBMS_OUTPUT.PUT_LINE('>>> '||p_label||' ('||NVL(DBMS_LOB.GETLENGTH(p_txt),0)||' bytes) >>>');
-    WHILE l_pos <= DBMS_LOB.GETLENGTH(p_txt) LOOP
-      DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(p_txt, 32000, l_pos));
-      l_pos := l_pos + 32000;
-    END LOOP;
-      DBMS_OUTPUT.PUT_LINE('<<< '||p_label||' <<<');
-  END;
-  
-  --------------------------------------------------------------------
-  -- Inserta una fila de tracking (transacción autónoma)
-  --------------------------------------------------------------------
-  PROCEDURE ins_row(p_emp NUMBER, p_nom VARCHAR2, p_cnt NUMBER, p_camp NUMBER) IS
-    PRAGMA AUTONOMOUS_TRANSACTION;
-  BEGIN
-    INSERT INTO PR.PR_TRACKING_FILTROS_REPRESTAMOS
-          (CODIGO_TRACKING, CODIGO_EMPRESA, NOMBRE_FILTRO, CANTIDAD_CLIENTES,
-     ADICIONADO_POR, FECHA_ADICION, IDENTIFICADOR_CAMPANA,NOMBRE_PROCEDIMIENTO)
-    VALUES (PR.SEQ_PR_TRACKING_FILTROS.NEXTVAL, p_emp, p_nom, p_cnt,
-     SYS_CONTEXT('USERENV','SESSION_USER'), SYSDATE, p_camp,p_SP_name);
-    COMMIT;
-  END ins_row;
-
-  --------------------------------------------------------------------
-  -- Log de error (transacción autónoma)
-  --------------------------------------------------------------------
-  PROCEDURE log_err(p_emp NUMBER, p_msg VARCHAR2, p_camp NUMBER) IS
-    PRAGMA AUTONOMOUS_TRANSACTION;
-  BEGIN
-    INSERT INTO PR.PR_TRACKING_FILTROS_REPRESTAMOS
-      (CODIGO_TRACKING, CODIGO_EMPRESA, NOMBRE_FILTRO, CANTIDAD_CLIENTES,
-       ADICIONADO_POR, FECHA_ADICION, IDENTIFICADOR_CAMPANA, NOMBRE_PROCEDIMIENTO)
-    VALUES (PR.SEQ_PR_TRACKING_FILTROS.NEXTVAL, NVL(p_emp,1),
-        'ERR: '||SUBSTR(p_msg,1,300), NULL,
-       SYS_CONTEXT('USERENV','SESSION_USER'), SYSDATE, p_camp, p_SP_name);
-    COMMIT;
-  END log_err;
-
-  --------------------------------------------------------------------
-  -- Inferir el nombre del objeto llamador (este package)
-  --------------------------------------------------------------------
-    FUNCTION infer_object_name RETURN VARCHAR2 IS
+    PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
+                                        pTotalRegistros  IN NUMBER) IS
+        vHistorial   PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vTrabajo     PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vNuevoValor  PA.PA_PARAMETROS_MVP.VALOR%TYPE;
+        vEntrada     VARCHAR2(4000);
+        vPosicion    PLS_INTEGER;
+        vSecuencia   NUMBER;
     BEGIN
-      RETURN REPLACE(UPPER($$PLSQL_UNIT), '"', '');
-    END infer_object_name;
+        BEGIN
+            SELECT VALOR
+              INTO vHistorial
+              FROM PA.PA_PARAMETROS_MVP
+             WHERE CODIGO_MVP = 'REPRESTAMOS'
+               AND CODIGO_PARAMETRO = pCodigoParametro;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                vHistorial := NULL;
+        END;
 
-  --------------------------------------------------------------------
-  -- Extraer del fuente el bloque SELECT entre los marcadores
-  --------------------------------------------------------------------
-  FUNCTION get_select_from_source(p_obj_name IN VARCHAR2,
-    p_obj_type IN VARCHAR2,
-    p_tag      IN VARCHAR2) RETURN CLOB IS
-    l_text   CLOB := NULL;
-    s_tag_pos PLS_INTEGER := 0;
-    s_pos     PLS_INTEGER := 0;
-    e_pos     PLS_INTEGER := 0;
-  BEGIN
-      FOR r IN (SELECT text
-      FROM user_source
-      WHERE name = UPPER(p_obj_name)
-      AND type = UPPER(p_obj_type)
-      ORDER BY line)
-      LOOP
-        l_text := NVL(l_text,'') || r.text;
-      END LOOP;
+        vHistorial := NVL(vHistorial, '');
+        vSecuencia := NVL(REGEXP_COUNT(vHistorial, '}'), 0) + 1;
+        vEntrada   := '{"F":"' || TO_CHAR(SYSDATE, 'dd/mm/yyyy hh:mi:ss') ||
+                      '","R":' || NVL(pTotalRegistros, 0) ||
+                      ',"E":'  || vSecuencia || '}';
 
-    IF p_tag IS NOT NULL THEN
-      s_tag_pos := INSTR(l_text, '-- AUDIT TAG: '||p_tag);
-      IF s_tag_pos = 0 THEN
-        RAISE_APPLICATION_ERROR(-20010, 'No se encontró "-- AUDIT TAG: '||p_tag||'".');
-      END IF;
-      s_pos := INSTR(l_text, '-- AUDIT SELECT START', s_tag_pos);
-      e_pos := INSTR(l_text, '-- AUDIT SELECT END',   s_pos);
-    ELSE
-      s_pos := INSTR(l_text, '-- AUDIT SELECT START');
-      e_pos := INSTR(l_text, '-- AUDIT SELECT END', s_pos);
-    END IF;
-
-    IF s_pos = 0 OR e_pos = 0 OR e_pos <= s_pos THEN
-      RAISE_APPLICATION_ERROR(-20011, 'Faltan "-- AUDIT SELECT START/END".');
-    END IF;
-
-       RETURN REPLACE(
-             REPLACE(SUBSTR(l_text, s_pos, e_pos - s_pos),
-                     '-- AUDIT SELECT START',''),
-             '-- AUDIT SELECT END','');
-  END get_select_from_source;
-
-  --------------------------------------------------------------------
-  -- Parseo de filtros /*F..: ...*/
-  --------------------------------------------------------------------
-  PROCEDURE parse_filters(p_sql IN CLOB, p_first_after_where IN PLS_INTEGER,
-                          o_names OUT t_names, o_conds OUT t_conds, o_n OUT PLS_INTEGER) IS
-    l_start PLS_INTEGER;
-    l_endc  PLS_INTEGER;
-    l_next  PLS_INTEGER;
-    l_name  VARCHAR2(200);
-    l_cond  CLOB;
-    v_n     PLS_INTEGER := 0;       
-    BEGIN
-    l_start := REGEXP_INSTR(p_sql, '/\*F[0-9]{2}\s*:', p_first_after_where, 1, 0, 'i');
-    WHILE l_start > 0 LOOP
-      l_endc := INSTR(p_sql, '*/', l_start);
-      IF l_endc = 0 THEN
-        RAISE_APPLICATION_ERROR(-20013, 'Comentario de filtro sin cierre "*/".');
-      END IF;
-
-      l_name := REGEXP_SUBSTR(p_sql, '/\*F[0-9]{2}\s*:\s*([^*]+)\*/',
-                              p_first_after_where, v_n+1, NULL, 1);
-      l_name := TRIM(l_name);
-
-      l_next := REGEXP_INSTR(p_sql, '/\*F[0-9]{2}\s*:', l_endc+2, 1, 0, 'i');
-      IF l_next = 0 THEN
-        l_cond := SUBSTR(p_sql, l_endc+2);
-      ELSE
-        l_cond := SUBSTR(p_sql, l_endc+2, l_next - (l_endc+2));
-      END IF;
-
-      l_cond := TRIM(l_cond);  -- debe empezar por AND ...
-      v_n := v_n + 1;
-      o_conds(v_n) := l_cond;
-      o_names(v_n) := NVL(l_name, 'Filtro '||TO_CHAR(v_n,'FM00'));
-      l_start := l_next;
-    END LOOP;
-    o_n := v_n;
-  END parse_filters;
-
-  --------------------------------------------------------------------
-  -- Construye " FROM ... WHERE 1=1"
-  --------------------------------------------------------------------
-  PROCEDURE build_base_fragment(p_sql IN CLOB, o_base OUT CLOB) IS
-    p_where  PLS_INTEGER := INSTR(UPPER(p_sql), 'WHERE 1=1');
-    p_from   PLS_INTEGER := 0;
-    BEGIN
-    IF p_where = 0 THEN
-      RAISE_APPLICATION_ERROR(-20022, 'No se encontró "WHERE 1=1" en el SELECT auditado.');
-    END IF;
-
-    p_from := REGEXP_INSTR(SUBSTR(p_sql,1,p_where-1), '\bFROM\b', 1, 1, 0, 'i');
-    IF p_from = 0 THEN
-      p_from := INSTR(UPPER(SUBSTR(p_sql,1,p_where-1)), ' FROM ');
-    END IF;
-
-    IF p_from = 0 THEN
-      debug_put('SELECT LIMPIO (no se halló FROM)', p_sql);
-      RAISE_APPLICATION_ERROR(-20021, 'No se encontró FROM en el SELECT auditado.');
-    END IF;
-
-    o_base := SUBSTR(p_sql, p_from, p_where + LENGTH('WHERE 1=1') - p_from);
-  END build_base_fragment;
-
-  --------------------------------------------------------------------
-  -- Ejecuta COUNT(*) con binds (muestra el SQL)
-  --------------------------------------------------------------------
-  PROCEDURE exec_count(p_label IN VARCHAR2,
-                       p_base  IN CLOB, 
-                       p_acc   IN CLOB,
-                       p_date  IN DATE, 
-                       p_num   IN NUMBER,
-                       o_cnt   OUT NUMBER) IS
-    sql_txt   CLOB;
-    has_date  BOOLEAN;
-    has_num   BOOLEAN;
-    cur       INTEGER;
-    ret       INTEGER;
-    v_cnt     NUMBER;
-  BEGIN
-      sql_txt  := 'SELECT COUNT(*) '|| p_base || NVL(p_acc, '');
-      -- por si alguna variante de P_FECHA_CORTE quedó sin normalizar:
-      sql_txt  := REGEXP_REPLACE(sql_txt, '\bP_FECHA_CORTE\b', ':v_fecha_corte', 1, 0, 'i');
-
-      has_date := REGEXP_LIKE(sql_txt, ':[[:space:]]*v_fecha_corte', 'i');
-      has_num  := REGEXP_LIKE(sql_txt, ':[[:space:]]*p1',            'i');
-
-    IF c_debug THEN
-        DBMS_OUTPUT.PUT_LINE('>>> '||p_label||' COUNT SQL >>>');
-        DBMS_OUTPUT.PUT_LINE(sql_txt);
-        IF has_date THEN DBMS_OUTPUT.PUT_LINE('    :v_fecha_corte = '||TO_CHAR(p_date,'YYYY-MM-DD')); END IF;
-        IF has_num  THEN DBMS_OUTPUT.PUT_LINE('    :p1 = '||NVL(TO_CHAR(p_num),'NULL')); END IF;
-        DBMS_OUTPUT.PUT_LINE('<<< '||p_label||' COUNT SQL <<<');
-    END IF;
-
-        cur := DBMS_SQL.OPEN_CURSOR;
-    BEGIN
-        -- ... dentro de exec_count, justo antes de DBMS_SQL.PARSE:
-        --sql_txt := REGEXP_REPLACE(sql_txt, '\bP_FECHA_CORTE\b', ':v_fecha_corte', 1, 0, 'i');
-        DBMS_SQL.PARSE(cur, sql_txt, DBMS_SQL.NATIVE);
-
-        -- bind por nombre UNA sola vez, aunque aparezca varias veces en el texto
-        IF has_date THEN DBMS_SQL.BIND_VARIABLE(cur, 'v_fecha_corte', p_date); END IF;
-        IF has_num  THEN DBMS_SQL.BIND_VARIABLE(cur, 'p1',            p_num);  END IF;
-
-        DBMS_SQL.DEFINE_COLUMN(cur, 1, v_cnt);
-        ret := DBMS_SQL.EXECUTE(cur);
-        IF DBMS_SQL.FETCH_ROWS(cur) > 0 THEN
-          DBMS_SQL.COLUMN_VALUE(cur, 1, v_cnt);
+        IF vHistorial IS NULL OR vHistorial = '' THEN
+            vNuevoValor := vEntrada;
+        ELSE
+            vNuevoValor := vHistorial || ',' || vEntrada;
         END IF;
-        o_cnt := v_cnt;
-        DBMS_SQL.CLOSE_CURSOR(cur);
-    EXCEPTION
-    WHEN OTHERS THEN
-      IF DBMS_SQL.IS_OPEN(cur) THEN DBMS_SQL.CLOSE_CURSOR(cur); END IF;
-      RAISE;
-    END;
- END exec_count;
+
+        IF LENGTH(vNuevoValor) > 4000 THEN
+            vTrabajo := vHistorial;
+            LOOP
+                EXIT WHEN vTrabajo IS NULL OR vTrabajo = '';
+                vPosicion := INSTR(vTrabajo, '}');
+                EXIT WHEN vPosicion = 0;
+                vTrabajo := SUBSTR(vTrabajo, vPosicion + 1);
+                vTrabajo := LTRIM(vTrabajo, ',');
+                IF vTrabajo IS NULL OR vTrabajo = '' THEN
+                    vNuevoValor := vEntrada;
+                ELSE
+                    vNuevoValor := vTrabajo || ',' || vEntrada;
+                END IF;
+                EXIT WHEN LENGTH(vNuevoValor) <= 4000;
+            END LOOP;
+
+            IF LENGTH(vNuevoValor) > 4000 THEN
+                vNuevoValor := SUBSTR(vEntrada, 1, 4000);
+            END IF;
+        END IF;
+
+        UPDATE PA.PA_PARAMETROS_MVP
+           SET VALOR = vNuevoValor
+         WHERE CODIGO_MVP = 'REPRESTAMOS'
+           AND CODIGO_PARAMETRO = pCodigoParametro;
+    END P_Registrar_Ejecucion_Param;
+    
+PROCEDURE P_ACTUALIZAR_CAMPO_APPADEMI(pIdReprestamo IN VARCHAR2, pOrigen IN VARCHAR2) IS
 BEGIN
-  -- 1) Objeto llamador
-  l_obj_name := NVL(p_object_name, infer_object_name);
-  IF l_obj_name IS NULL THEN
-    RAISE_APPLICATION_ERROR(-20020,
-      'No pude inferir el objeto llamador. Pasa p_object_name => ''PR_PKG_REPRESTAMOS''.');
-  END IF;
-
-  -- 2) SELECT del fuente
-  l_sql_src := get_select_from_source(l_obj_name, p_object_type, p_tag);
-
-  -- 3) Limpieza + normalización de binds (ROBUSTA)
-  l_sql_work := REGEXP_REPLACE(l_sql_src, '--.*$', '', 1, 0, 'm');
-
-   -- Mapear de forma segura cualquier variante de P_FECHA_CORTE
-   -- 1) Casos tipo: b.fecha_corte =  P_FECHA_CORTE
-  --l_sql_work := REGEXP_REPLACE(l_sql_work,'b\.fecha_corte\s*=\s*P_FECHA_CORTE','b.fecha_corte = :v_fecha_corte',1, 0, 'i');
-    l_sql_work := REGEXP_REPLACE(
-                      l_sql_work,
-                      '(\band\s+b\.fecha_corte\s*=\s*)P_FECHA_CORTE\b',
-                      '\1:v_fecha_corte',
-                      1, 0, 'i');
-
--- Casos genéricos "= P_FECHA_CORTE" o "=:P_FECHA_CORTE"
-  l_sql_work := REGEXP_REPLACE(l_sql_work, '=\s*:?\s*P_FECHA_CORTE\b', ' = :v_fecha_corte', 1, 0, 'i');
-
-  --l_sql_work := REGEXP_REPLACE(l_sql_work,'=\s*:?\s*P_FECHA_CORTE\b',' = :v_fecha_corte',1, 0, 'i');
-  l_sql_work := REGEXP_REPLACE(l_sql_work, '(^|[^A-Z0-9_])P_FECHA_CORTE([^A-Z0-9_]|$)', '\1:v_fecha_corte\2', 1, 0, 'i');
-
-  -- V_ATRASO_30 -> :p1
-  l_sql_work := REGEXP_REPLACE(l_sql_work, '\bV_ATRASO_?30\b', ':p1', 1, 0, 'i');
-
-  -- Sanity check final por si quedara alguno sin mapear
-  IF REGEXP_LIKE(l_sql_work, '\bP_FECHA_CORTE\b', 'i') THEN
-    debug_put('WARN', 'Quedó P_FECHA_CORTE sin mapear. Reemplazo forzado...');
-    l_sql_work := REGEXP_REPLACE(l_sql_work, '\bP_FECHA_CORTE\b', ':v_fecha_corte', 1, 0, 'i');
-  END IF;
-
-  debug_put('SELECT COMPLETO LIMPIO', l_sql_work);
-
-  -- 4) Fragmento base: " FROM ... WHERE 1=1"
-  build_base_fragment(l_sql_work, l_base_from);
-  debug_put('BASE FROM', l_base_from);
-
-  -- 5) F00 = Base ya con fecha & fuente (alias b es PA.PA_DETALLADO_DE08)
-  DECLARE
-    base_seed  CLOB := ' AND b.fecha_corte = :v_fecha_corte AND b.fuente = ''PR''';
-    v_names t_names; v_conds t_conds; v_n PLS_INTEGER := 0;
-    p_where PLS_INTEGER := INSTR(UPPER(l_sql_work), 'WHERE 1=1');
-    acc CLOB;
-    prev_cnt NUMBER := NULL;
-    v_delta  NUMBER := 0;    -- <--- nueva
-  BEGIN
-      -- F00 (universo base)
-    exec_count('F00', l_base_from, base_seed, p_bind_date, p_bind_num, l_cnt);
-    ins_row(p_empresa, 'F00 - Base (fecha & fuente)', l_cnt, p_id_campana);
-    prev_cnt := l_cnt;
-
-      -- 6) Parseo de filtros y acumulación desde la semilla
-    parse_filters(l_sql_work, p_where + LENGTH('WHERE 1=1'), v_names, v_conds, v_n);
-
-    acc := base_seed;  -- empezamos a acumular desde la base (fecha & fuente)
-    FOR i IN 1 .. v_n LOOP
-      acc := acc || ' ' || v_conds(i);
-      exec_count('F'||TO_CHAR(i,'FM00'), l_base_from, acc, p_bind_date, p_bind_num, l_cnt);
-      
-      -- DESCARTADOS en este filtro:
-      v_delta := CASE WHEN prev_cnt IS NULL THEN 0 ELSE GREATEST(prev_cnt - l_cnt, 0) END;
-      
-      -- Guardar el delta en el renglón Fxx
-      ins_row(p_empresa, 'F'||TO_CHAR(i,'FM00')||' - '||v_names(i), l_cnt, p_id_campana);
-
-      -- Avanzamos el acumulado
-      prev_cnt := l_cnt;
-    END LOOP;
-  END;
-
-EXCEPTION
-  WHEN OTHERS THEN
-    log_err(p_empresa, SQLERRM, p_id_campana);
-END PR_AUDIT_TRACK;
--- =========================================================
--- TRACK: helper para guardar conteos en PR_TRACKING_FILTROS_REPRESTAMOS
--- =========================================================
-PROCEDURE PR_AUDIT_PUSH_STEP(
-  p_empresa          IN NUMBER,
-  p_id_campana       IN NUMBER,
-  p_sp_name          IN VARCHAR2,
-  p_nombre_filtro    IN VARCHAR2,
-  p_cantidad         IN NUMBER
-) IS
-  PRAGMA AUTONOMOUS_TRANSACTION;
-BEGIN
-  INSERT INTO PR.PR_TRACKING_FILTROS_REPRESTAMOS
-    (CODIGO_TRACKING, CODIGO_EMPRESA, NOMBRE_FILTRO, CANTIDAD_CLIENTES,
-     ADICIONADO_POR, FECHA_ADICION, IDENTIFICADOR_CAMPANA, NOMBRE_PROCEDIMIENTO)
-  VALUES
-    (PR.SEQ_PR_TRACKING_FILTROS.NEXTVAL, p_empresa, p_nombre_filtro, p_cantidad,
-     SYS_CONTEXT('USERENV','SESSION_USER'), SYSDATE, p_id_campana, p_sp_name);
-  COMMIT;
-END PR_AUDIT_PUSH_STEP;
+    UPDATE PR.PR_SOLICITUD_REPRESTAMO
+    SET ORIGEN = pOrigen
+    WHERE ID_REPRESTAMO = pIdReprestamo;
+    COMMIT;
+END;
 END PR_PKG_REPRESTAMOS;
+/
