@@ -3930,7 +3930,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
             vKey := PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('CIFRADO_MASTERKEY');
             vRutaWallet := PA.DECIFRAR (PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('RUTA_WALLET'), vKey);
             vPassWallet := PA.DECIFRAR (PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo_Raw ('CLAVE_WALLET'), vKey); 
-            vUrlAPI :=F_Obt_Parametro_Represtamo('RUTA_API_WorldCompliance')||'/api/WorldCompliance/GetReportURL?' ||'IdentificationNumber=' || P_Identificacion ||'=' || P_Primer_Nombre ||'=' || P_Primer_Apellido;
+            vUrlAPI :=F_Obt_Parametro_Represtamo('RUTA_API_WorldCompliance')||'/api/WorldCompliance/GetReportURL?' ||'IdentificationNumber=' || P_Identificacion ||'&FIRSTNAME=' || P_Primer_Nombre ||'&LASTNAME=' || P_Primer_Apellido;
            --https://bmaqa0178.bancoademi.local:81/api/WorldCompliance/GetReportURL?
             v_response :=
                 apex_web_service.make_rest_request (p_url           => vUrlAPI,
@@ -9575,7 +9575,7 @@ END P_Registra_Solicitud_Campana;
         APEX_WEB_SERVICE.g_request_headers.delete ();
         APEX_WEB_SERVICE.g_request_headers (1).name  := 'Content-Type';
         APEX_WEB_SERVICE.g_request_headers (1).value := 'application/json';          
-        vUrlAPI := F_Obt_Parametro_Represtamo('RUTA_API_MANAGER') || 'api/Notification/GetNotificationLogs?sessionId='||pIdReprestamo||'=SMS_Sendiu=ReloanId';
+        vUrlAPI := F_Obt_Parametro_Represtamo('RUTA_API_MANAGER') || 'api/Notification/GetNotificationLogs?sessionId='||pIdReprestamo||'&codeOpt=SMS_Sendiu&CodeIdentity=ReloanId';
          
         SELECT COUNT(*) INTO TOTAL  
         FROM xmltable (

@@ -1,4 +1,4 @@
-create or replace PACKAGE                PR_PKG_REPRESTAMOS IS
+CREATE OR REPLACE PACKAGE PR.PR_PKG_REPRESTAMOS IS
     vTipo_parametro CONSTANT VARCHAR2(30):= 'REPRESTAMOS';
     vCodigoEmpresa  CONSTANT number(1):=1;
     vEstadoNotificacionPendiente  CONSTANT VARCHAR2(5):='NP';
@@ -507,8 +507,6 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                                                          p_SubirFileFlow    IN     BOOLEAN DEFAULT TRUE,
                                                          pError             IN OUT VARCHAR2);  
    PROCEDURE P_REGISTRO_SOLICITUD;
-   PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
-                                         pTotalRegistros  IN NUMBER);
    PROCEDURE P_Insertar_Campana(
                                 p_codigoEmpresa IN NUMBER,
                                 p_nombre IN VARCHAR2,
@@ -758,21 +756,9 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                     p_rel_cuota_exced_fam    OUT VARCHAR2,
                     p_ventas_mensual         OUT VARCHAR2 );
                     
-PROCEDURE P_ACTUALIZA_COMENTARIO_CAMPANA(pComentario in VARCHAR2);  
-FUNCTION OBT_TELEFONO_PERSONA(
-inCodPersona   IN NUMBER,
-inTipoTelefono IN VARCHAR2
-) RETURN VARCHAR2;
-FUNCTION esta_en_lista_ofac(
-p_codempresa VARCHAR2,
-p_codpersona VARCHAR2)
-RETURN BOOLEAN;
-FUNCTION esta_en_lista_negra(
-p_codempresa  VARCHAR2,
-p_codpersona  VARCHAR2 )
-RETURN BOOLEAN;
-FUNCTION esta_en_lista_pep(
-p_codempresa  VARCHAR2,
-p_codpersona  VARCHAR2 )
-RETURN BOOLEAN;
+PROCEDURE P_ACTUALIZA_COMENTARIO_CAMPANA(pComentario in VARCHAR2);       
+PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
+                                     pTotalRegistros  IN NUMBER);    
+PROCEDURE P_ACTUALIZAR_CAMPO_APPADEMI(pIdReprestamo IN VARCHAR2, pOrigen IN VARCHAR2);
 END PR_PKG_REPRESTAMOS;
+/
