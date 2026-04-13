@@ -20,3 +20,4 @@
 | OPT-011 | PR_PKG_REPRESTAMOS     | CUR_Anular_creditos_cancel  | 10,656     | 9,748        | QA      | 2026-04-07 |
 | OPT-012 | PR_PKG_REPRESTAMOS     | UPDATE PROMOCION_PERSONA    | 8,332      | NO OPTIMIZABLE| QA      | 2026-04-07 |
 | OPT-013 | PA.PA_DE05_SIB         | CUR_DE05_SIB (Dirigida+Campana) | 120,122 | 11           | QA      | 2026-04-07 |
+| OPT-014 | PR_PKG_REPRESTAMOS     | Medicion real indices (002,009,011,013) | 24.2 min | 14.2 min (-41%) | DESA | 2026-04-13 |

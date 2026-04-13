@@ -1,12 +1,23 @@
 # Sesion Pendiente — Continuacion de mediciones OPT
 
 > Documento de contexto para continuar el trabajo de optimizacion en otra PC/sesion.
-> Fecha: 2026-04-07
-> Sesion anterior: Claude Code Desktop
+> Fecha: 2026-04-13 (actualizado)
+> Sesion anterior: Claude Code VS Code Extension
 
 ---
 
-## Resumen de lo completado
+## Resumen de lo completado (sesion 2026-04-13)
+
+### OPT-014: Medicion real de indices en DESARROLLO (COMPLETADO)
+- **Resultado**: 24.2 min → 14.2 min (**-41%**) solo con 4 indices
+- **Entorno**: DESARROLLO (ADMQA1 / bmadev0004) — QA estaba ocupado por otro desarrollador
+- **Detalle**: Ver `historias/optimizaciones/OPT-014_INDICES_MEDICION_REAL/README.md`
+- **Hallazgo importante**: Precalifica_Repre_Cancelado_hi NO mejoro (LIO subio 19%). Requiere investigacion.
+- **Indices creados en DESARROLLO**: Los 4 indices quedaron creados y VALID
+
+---
+
+## Resumen de lo completado (sesion anterior 2026-04-07)
 
 ### OPT-013 (COMPLETADO)
 - **Indice**: `PA.IDX_DE05_SIB_CASTIGO_CEDULA` en PA.PA_DE05_SIB (FECHA_CASTIGO, CEDULA, ENTIDAD)
