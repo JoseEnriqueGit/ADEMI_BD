@@ -12,8 +12,53 @@
 - **Resultado**: 24.2 min → 14.2 min (**-41%**) solo con 4 indices
 - **Entorno**: DESARROLLO (ADMQA1 / bmadev0004) — QA estaba ocupado por otro desarrollador
 - **Detalle**: Ver `historias/optimizaciones/OPT-014_INDICES_MEDICION_REAL/README.md`
-- **Hallazgo importante**: Precalifica_Repre_Cancelado_hi NO mejoro (LIO subio 19%). Requiere investigacion.
 - **Indices creados en DESARROLLO**: Los 4 indices quedaron creados y VALID
+
+### Investigacion pasos 5-6 (CERRADA para indices)
+- Se probo 5to indice en PA_DETALLADO_DE08 → descartado (empeoro paso 5)
+- Causa raiz: CPU/PL/SQL (funciones por fila, context switching), no I/O
+- La solucion requiere cambios de codigo, no indices adicionales
+
+---
+
+## Instrucciones para la proxima sesion
+
+### Tarea principal: Rewrite de codigo en Precalifica_Repre_Cancelado y Cancelado_hi
+
+Los pasos 5 y 6 consumen el **53% del tiempo total** (702 seg de 1,454 sin indices, 624 seg de 854 con indices). No se optimizan con indices — requieren rewrite de codigo.
+
+**Que hacer:**
+1. Replicar **OPT-004** (convertir loops row-by-row a UPDATE set-based) en:
+   - `Precalifica_Repre_Cancelado` (~linea 412 del body.sql DESARROLLO)
+   - `Precalifica_Repre_Cancelado_hi` (~linea 795 del body.sql DESARROLLO)
+2. Replicar **OPT-010** (inline de `F_TIENE_GARANTIA` / `F_TIENE_GARANTIA_HISTORICO` como NOT EXISTS) en los mismos procedimientos
+3. Medir con el script `05_MEDIR_JOB_CANCELADO_DETALLADO.sql` (restaurar 190 RE antes)
+
+**Patron de cambio (referencia):**
+- OPT-004: Loop con UPDATE por fila → 1-2 UPDATEs set-based con subquery
+- OPT-010: Llamada a F_TIENE_GARANTIA() en cursor → NOT EXISTS inline en el cursor/query
+
+**Cuello de botella especifico:**
+- FORALL UPDATE con `SELECT MAX(DIAS_ATRASO) FROM PA_DETALLADO_DE08` ejecutado en batches de 100
+- Funciones `F_TIENE_GARANTIA` / `F_TIENE_GARANTIA_HISTORICO` llamadas por cada fila del cursor
+- COMMITs dentro de loops (patron OPT-003)
+
+**Archivos de referencia:**
+- Body DESARROLLO: `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`
+- OPT-004: `historias/optimizaciones/OPT-004_SETBASED_ACTUALIZAR_MTO_CREDITO/README.md`
+- OPT-010: `historias/optimizaciones/OPT-010_INLINE_F_TIENE_GARANTIA/README.md`
+- Medicion: `historias/optimizaciones/scripts_medicion/05_MEDIR_JOB_CANCELADO_DETALLADO.sql`
+
+**Estado de DESARROLLO:**
+- 4 indices OPT creados y VALID
+- Paquete de produccion compilado (procedimientos activos)
+- Tablas backup: `JOOGANDO.PR_REPRESTAMOS_POST`, `PR.OPT_HIWATER_MARKS`
+- Restaurar RE antes de medir: `UPDATE PR.PR_REPRESTAMOS SET ESTADO='RE' WHERE MODIFICADO_POR IS NULL AND FECHA_MODIFICACION >= DATE '2026-04-10' AND ESTADO IN ('AN','NP','CP','RXT','RXC');`
+
+### Otros pendientes (menor prioridad)
+- Medir en QA cuando este disponible
+- Propuestas de hardcodeo de 3 cursores del job mensual (pendiente aprobacion del jefe)
+- Confirmar SQL 151/172 del Quest con companero
 
 ---
 
