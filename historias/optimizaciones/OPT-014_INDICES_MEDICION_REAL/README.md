@@ -101,17 +101,34 @@ la precalificacion rechaza menos registros, dejando mas trabajo para XCORE y REG
 
 ## Pendientes
 
-1. **Paso 6 (Precalifica_Repre_Cancelado_hi) — INVESTIGADO**:
-   - Causa raiz: los indices creados NO cubren los queries de este procedimiento.
-   - Usa `PR_CREDITOS_HI` (no `PR_CREDITOS`) y `PA.PA_DETALLADO_DE08` (no `PA_DE08_SIB`).
-   - El FORALL UPDATE hace `SELECT MAX(DIAS_ATRASO) FROM PA_DETALLADO_DE08` sin indice adecuado.
-   - LIO subio porque Oracle eligio indice IDX_REPRESTAMOS_EMP_EST_NOCRED con mas buffer reads
-     que el full table scan para el patron de acceso historico.
-   - **Accion futura**: Crear indice en PA_DETALLADO_DE08 (FUENTE, NO_CREDITO, FECHA_CORTE DESC),
-     revisar F_TIENE_GARANTIA_HISTORICO, evaluar rewrite del FORALL a MERGE/set-based.
+1. **Paso 5-6 (Cancelado + Cancelado_hi) — INVESTIGADO Y CERRADO para indices**:
+   - Causa raiz: el cuello de botella es CPU (32K-38K centiseg), no I/O.
+   - Se probo indice `IDX_DE08_FUENTE_NOCRED_FECHA ON PA_DETALLADO_DE08 (FUENTE, NO_CREDITO, FECHA_CORTE DESC)`.
+   - **Resultado**: paso 5 empeoro (+43%), paso 6 mejoro marginalmente (-5%). Indice eliminado.
+   - **Conclusion**: estos pasos NO se optimizan con indices. El problema es:
+     - Funciones PL/SQL por fila (F_TIENE_GARANTIA, F_TIENE_GARANTIA_HISTORICO)
+     - Context switching SQL↔PL/SQL en los loops
+     - FORALL con subqueries correladas
+   - **Accion futura**: Rewrite de codigo (inline funciones, set-based UPDATE, MERGE).
+     Equivalente a replicar OPT-004/OPT-010 en Cancelado/Cancelado_hi.
 2. **Medir en QA**: Repetir la medicion cuando QA este disponible (actualmente en uso por otro desarrollador).
 3. **Medir con cambios de codigo**: OPT-004 (set-based) + OPT-010 (inline NOT EXISTS) son cambios
    de codigo que no se midieron aqui. Solo se midieron los indices.
+
+## Medicion adicional: 5to indice en PA_DETALLADO_DE08 (DESCARTADO)
+
+Se creo y probo `IDX_DE08_FUENTE_NOCRED_FECHA ON PA.PA_DETALLADO_DE08 (FUENTE, NO_CREDITO, FECHA_CORTE DESC)`
+para intentar mejorar los pasos 5 y 6. Resultado con 5 indices vs 4 indices:
+
+| Paso | 4 indices | 5 indices | Cambio |
+|------|-----------|-----------|--------|
+| 5. Precalifica_Repre_Cancelado | 231.5 s | 330.5 s | +43% (peor) |
+| 6. Precalifica_Repre_Cancelado_hi | 392.5 s | 371.8 s | -5% (marginal) |
+| **TOTAL** | **854 s** | **942 s** | **+10% (peor)** |
+
+**Decision**: Indice eliminado. Oracle lo usaba ineficientemente para el patron de acceso de estos
+procedimientos, causando mas buffer reads que el full table scan. El cuello de botella es CPU
+(funciones PL/SQL por fila), no I/O.
 
 ## Como revertir
 
