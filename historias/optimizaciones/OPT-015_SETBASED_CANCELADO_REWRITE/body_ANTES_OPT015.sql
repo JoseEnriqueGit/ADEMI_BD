@@ -475,30 +475,22 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- OPT-015: NOT EXISTS inline (reemplaza F_TIENE_GARANTIA)
-        AND NOT EXISTS (
-            SELECT 1
-            FROM PR_CREDITOS cr
-            JOIN PR_GARANTIAS_X_CREDITO gx ON gx.CODIGO_EMPRESA = cr.CODIGO_EMPRESA
-                                           AND gx.NO_CREDITO = cr.NO_CREDITO
-            JOIN PR_GARANTIAS g ON g.CODIGO_EMPRESA = gx.CODIGO_EMPRESA
-                                AND g.NUMERO_GARANTIA = gx.NUMERO_GARANTIA
-            WHERE cr.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-              AND cr.NO_CREDITO = a.NO_CREDITO
-              AND cr.ESTADO IN ('D','V','M','E','J')
-              AND g.CODIGO_TIPO_GARANTIA_SB != 'NA'
-        )
-        -- OPT-015: PEP y NEGRA movidos a DELETE post-INSERT (D1/D2)
+        -- Se valida que los clientes no tengan no garantes 
+        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        -- Se valida que los clientes no esten en lista PEP
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        -- Se valida que los clientes no esten en lista NEGRA
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
         ;
-
-
+        
+                         
        TYPE tCREDITOS_PROCESAR IS TABLE OF CREDITOS_PROCESAR%ROWTYPE;
        vCREDITOS_PROCESAR        tCREDITOS_PROCESAR := TCREDITOS_PROCESAR ();
-
-       v_fecha_corte             DATE;
+       
+       v_fecha_corte             DATE; 
        v_fecha_proceso           DATE;
-       v_atraso_30               NUMBER(10);
-       v_conteo                  NUMBER(10);
+       v_atraso_30               NUMBER(10); 
+       v_conteo                  NUMBER(10); 
        --agregue esta variable
        pMensaje      VARCHAR2(100);
        --Defino la variable para capturar si existe un detalle
@@ -606,101 +598,113 @@ PROCEDURE Precalifica_Repre_Cancelado IS
        OPEN CREDITOS_PROCESAR(v_fecha_corte); 
         --Cambio el estado del detalle de la bitacora
       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 40, 'EN PROCESO', pMensaje );
-       -- OPT-015: Loop simplificado - solo INSERT, UPDATEs movidos a set-based
        LOOP
           VCREDITOS_PROCESAR.DELETE;
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
 
+            
+            --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje );
+            
+           -- 7 - Excluir créditos con atraso mayor a 45 días
+           -- 7 - en los últimos 6 meses = v_dias_180 
+           FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT                                 
+           -- Se actualiza el campo DIAS_ATRASO en la Tabla PR_REPRESTAMOS
+           -- con el Máximo día de atraso en los últimos 6 meses   
+           
+           UPDATE PR.PR_REPRESTAMOS y
+                SET     Y.DIAS_ATRASO   = (SELECT MAX(D.DIAS_ATRASO)
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.FECHA_CORTE      >= ADD_MONTHS(VCREDITOS_PROCESAR(x).FECHA_CORTE , -6) -- 7 - Excluir créditos con atraso mayor a 45 días en los últimos 6 meses
+                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(x).NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                                 --AND D.DIAS_ATRASO      >= v_mayor_45 
+                                                 )
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE';  
+               
+               --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 60, 'EN PROCESO', pMensaje );
+               
+         --SE actualiza el MTO_CREDITO_ACTUAL      
+          FORALL y IN 1 .. VCREDITOS_PROCESAR.COUNT     
+             UPDATE PR.PR_REPRESTAMOS R SET  R.MTO_CREDITO_ACTUAL = (SELECT monto_desembolsado
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(y).NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE
+                                                 AND D.FECHA_CORTE   = ( SELECT MAX(P.FECHA_CORTE)   
+                                                                                                FROM PA_DETALLADO_DE08 P
+                                                                                                WHERE P.FUENTE       = 'PR' 
+                                                                                                AND P.NO_CREDITO     = VCREDITOS_PROCESAR(y).NO_CREDITO 
+                                                                                                AND P.CODIGO_CLIENTE = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE))
+             WHERE R.CODIGO_EMPRESA = VCREDITOS_PROCESAR(y).CODIGO_EMPRESA
+               AND R.CODIGO_CLIENTE = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE
+               AND R.NO_CREDITO     = VCREDITOS_PROCESAR(y).NO_CREDITO 
+               AND R.ESTADO         = 'RE';  
+               
+            --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 70, 'EN PROCESO', pMensaje );   
+               
+          -- 8 - Excluir cliente con TC con dias de atraso mayor a 30 días 
+          -- Actualiza el estado cuando existe un detalle PA.PA_DETALLADO_DE08 de TC
+          -- Se actualizará el Campo 'ESTADO' con 'X3'; y el Campo 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X3',
+                    Y.OBSERVACIONES  = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+              WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+                AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO
+                AND y.ESTADO         = 'RE'             
+                AND 1                IN (SELECT 1
+                                          FROM PA_DETALLADO_DE08 D
+                                         WHERE D.FUENTE           =  'TC'
+                                           AND D.FECHA_CORTE      =  VCREDITOS_PROCESAR(x).FECHA_CORTE
+                                           AND D.NO_CREDITO       != VCREDITOS_PROCESAR(x).NO_CREDITO                                      
+                                           AND D.CODIGO_CLIENTE   =  VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                           AND D.CODIGO_EMPRESA   =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                                           AND D.DIAS_ATRASO      >= v_atraso_30); 
+              --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET ( pIDAPLICACION, 'ENPROCESO', 80, 'EN PROCESO', pMensaje );              
+          -- Evalua si el cliente tiene otro Prestamo Desembolsados en los últimos 6 Meses
+          -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+          -- Se actualizará el Campo 'ESTADO' con 'X1'; y el Campo 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||PA.PARAMETROS_X_EMPRESA( 'PRECAL_DESEMBOLSO_PR', 'PR')||' MESES'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X1', 
+                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE'   
+               AND 1 = (SELECT DISTINCT 1
+                          FROM PR_CREDITOS C 
+                         WHERE C.CODIGO_EMPRESA      =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                           AND C.NO_CREDITO          != VCREDITOS_PROCESAR(x).NO_CREDITO                       
+                           AND C.CODIGO_CLIENTE      = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE                        
+                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+                           AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))));
+  
           EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
 
        END LOOP;
 
      CLOSE CREDITOS_PROCESAR;
-
-     -- =================================================================
-     -- OPT-015: UPDATEs set-based (reemplazan 4 FORALL row-by-row)
-     -- Filtros defensivos: ADICIONADO_POR=USER + FECHA_ADICION>=TRUNC(SYSDATE)
-     -- =================================================================
-
-     -- U1: Actualizar DIAS_ATRASO con maximo de ultimos 6 meses
-     UPDATE PR.PR_REPRESTAMOS y
-        SET Y.DIAS_ATRASO = (SELECT MAX(D.DIAS_ATRASO)
-                             FROM PA.PA_DETALLADO_DE08 D
-                             WHERE D.FUENTE = 'PR'
-                               AND D.FECHA_CORTE >= ADD_MONTHS(y.FECHA_CORTE, -6)
-                               AND D.NO_CREDITO = y.NO_CREDITO
-                               AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE)
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE);
-
-     -- U2: Actualizar MTO_CREDITO_ACTUAL con monto desembolsado de ultima fecha corte
-     UPDATE PR.PR_REPRESTAMOS R
-        SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
-                                    FROM PA.PA_DETALLADO_DE08 D
-                                    WHERE D.FUENTE = 'PR'
-                                      AND D.NO_CREDITO = R.NO_CREDITO
-                                      AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
-                                      AND D.FECHA_CORTE = (SELECT MAX(P.FECHA_CORTE)
-                                                           FROM PA_DETALLADO_DE08 P
-                                                           WHERE P.FUENTE = 'PR'
-                                                             AND P.NO_CREDITO = R.NO_CREDITO
-                                                             AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-      WHERE R.ESTADO = 'RE'
-        AND R.ADICIONADO_POR = USER
-        AND R.FECHA_ADICION >= TRUNC(SYSDATE);
-
-     -- U3: Excluir cliente con TC con atraso mayor a v_atraso_30 dias
-     UPDATE PR.PR_REPRESTAMOS y
-        SET y.ESTADO = 'X3',
-            Y.OBSERVACIONES = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PA_DETALLADO_DE08 D
-                    WHERE D.FUENTE = 'TC'
-                      AND D.FECHA_CORTE = y.FECHA_CORTE
-                      AND D.NO_CREDITO != y.NO_CREDITO
-                      AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND D.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND D.DIAS_ATRASO >= v_atraso_30);
-
-     -- U4: Excluir cliente con otro prestamo desembolsado en ultimos meses
-     UPDATE PR.PR_REPRESTAMOS y
-        SET y.ESTADO = 'X1',
-            Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PR_CREDITOS C
-                    WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND C.NO_CREDITO != y.NO_CREDITO
-                      AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
-                      AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
-
-     -- =================================================================
-     -- OPT-015: DELETEs post-INSERT (PEP/NEGRA movidos del cursor)
-     -- =================================================================
-
-     -- D1: Eliminar clientes en lista PEP
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, CODIGO_CLIENTE) = 1;
-
-     -- D2: Eliminar clientes en lista NEGRA
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, CODIGO_CLIENTE) = 1;
-
+     
+     --Cambio el estado del detalle de la bitacora
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 90, 'EN PROCESO', pMensaje );
+     
   -- Se actualiza el ESTADO con valor 'X2' y el campo OBSERVACIONES con 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
        -- en la tabla PR_REPRESTAMOS para todos los Créditos precalificados con Estodo ='P'
         UPDATE PR.PR_REPRESTAMOS P
@@ -853,29 +857,21 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- OPT-015: NOT EXISTS inline (reemplaza F_TIENE_GARANTIA_HISTORICO)
-        AND NOT EXISTS (
-            SELECT 1
-            FROM PR_CREDITOS_HI cr
-            JOIN PR_GARANTIAS_X_CREDITO gx ON gx.CODIGO_EMPRESA = cr.CODIGO_EMPRESA
-                                           AND gx.NO_CREDITO = cr.NO_CREDITO
-            JOIN PR_GARANTIAS g ON g.CODIGO_EMPRESA = gx.CODIGO_EMPRESA
-                                AND g.NUMERO_GARANTIA = gx.NUMERO_GARANTIA
-            WHERE cr.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-              AND cr.NO_CREDITO = a.NO_CREDITO
-              AND cr.ESTADO IN ('D','V','M','E','J')
-              AND g.CODIGO_TIPO_GARANTIA_SB != 'NA'
-        )
-        -- OPT-015: PEP y NEGRA movidos a DELETE post-INSERT (D1/D2)
-        ;
-
+        -- Se valida que los clientes no tengan no garantes 
+        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA_HISTORICO(a.no_credito) = 0
+        -- Se valida que los clientes no esten en lista PEP
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
+        -- Se valida que los clientes no esten en lista NEGRA
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 ;
+                         
+      
        TYPE tCREDITOS_PROCESAR IS TABLE OF CREDITOS_PROCESAR%ROWTYPE;
        vCREDITOS_PROCESAR        tCREDITOS_PROCESAR := TCREDITOS_PROCESAR ();
-
-       v_fecha_corte             DATE;
+       
+       v_fecha_corte             DATE; 
        v_fecha_proceso           DATE;
-       v_atraso_30               NUMBER(10);
-       v_conteo                  NUMBER(10);
+       v_atraso_30               NUMBER(10); 
+       v_conteo                  NUMBER(10);  
        --agregue esta variable
        pMensaje      VARCHAR2(100);
        --Defino la variable para capturar si existe un detalle
@@ -966,109 +962,125 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        
        OPEN CREDITOS_PROCESAR(v_fecha_corte); 
         
-       -- OPT-015: Loop simplificado - solo INSERT, UPDATEs movidos a set-based
        LOOP
           VCREDITOS_PROCESAR.DELETE;
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
 
+            --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
+
+           -- 7 - Excluir créditos con atraso mayor a 45 días
+           -- 7 - en los últimos 6 meses = v_dias_180 
+           FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT                                 
+           -- Se actualiza el campo DIAS_ATRASO en la Tabla PR_REPRESTAMOS
+           -- con el Máximo día de atraso en los últimos 6 meses   
+           UPDATE PR.PR_REPRESTAMOS y
+                SET     Y.DIAS_ATRASO   = (SELECT MAX(D.DIAS_ATRASO)
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.FECHA_CORTE      >= ADD_MONTHS(VCREDITOS_PROCESAR(x).FECHA_CORTE , -6) -- 7 - Excluir créditos con atraso mayor a 45 días en los últimos 6 meses
+                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(x).NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                                 --AND D.DIAS_ATRASO      >= v_mayor_45 
+                                                 )
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE';  
+               
+               --Cambio el estado del detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 40, 'EN PROCESO', pMensaje );
+               
+         --SE actualiza el MTO_CREDITO_ACTUAL      
+          FORALL y IN 1 .. VCREDITOS_PROCESAR.COUNT     
+             UPDATE PR.PR_REPRESTAMOS R SET  R.MTO_CREDITO_ACTUAL = (SELECT monto_desembolsado
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.NO_CREDITO       = VCREDITOS_PROCESAR(y).NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE
+                                                 AND D.FECHA_CORTE   = ( SELECT MAX(P.FECHA_CORTE)   
+                                                                                                FROM PA_DETALLADO_DE08 P
+                                                                                                WHERE P.FUENTE       = 'PR' 
+                                                                                                AND P.NO_CREDITO     = VCREDITOS_PROCESAR(y).NO_CREDITO 
+                                                                                                AND P.CODIGO_CLIENTE = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE))
+             WHERE R.CODIGO_EMPRESA = VCREDITOS_PROCESAR(y).CODIGO_EMPRESA
+               AND R.CODIGO_CLIENTE = VCREDITOS_PROCESAR(y).CODIGO_CLIENTE
+               AND R.NO_CREDITO     = VCREDITOS_PROCESAR(y).NO_CREDITO 
+               AND R.ESTADO         = 'RE';  
+               
+              --Actualizo el detalle de la bitacora
+            --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 50, 'EN PROCESO', pMensaje ); 
+               
+          -- 8 - Excluir cliente con TC con dias de atraso mayor a 30 días 
+          -- Actualiza el estado cuando existe un detalle PA.PA_DETALLADO_DE08 de TC
+          -- Se actualizará el Campo 'ESTADO' con 'X3'; y el Campo 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X3',
+                    Y.OBSERVACIONES  = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
+              WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+                AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO
+                AND y.ESTADO         = 'RE'             
+                AND 1                IN (SELECT 1
+                                          FROM PA_DETALLADO_DE08 D
+                                         WHERE D.FUENTE           =  'TC'
+                                           AND D.FECHA_CORTE      =  VCREDITOS_PROCESAR(x).FECHA_CORTE
+                                           AND D.NO_CREDITO       != VCREDITOS_PROCESAR(x).NO_CREDITO                                      
+                                           AND D.CODIGO_CLIENTE   =  VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+                                           AND D.CODIGO_EMPRESA   =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                                           AND D.DIAS_ATRASO      >= v_atraso_30); 
+                                           
+                                           
+           --Cambio el estado del detalle de la bitacora
+           --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 60, 'EN PROCESO', pMensaje );  
+            
+                           
+          -- Evalua si el cliente tiene otro Prestamo Desembolsados en los últimos 6 Meses
+          -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+          -- Se actualizará el Campo 'ESTADO' con 'X1'; y el Campo 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||PA.PARAMETROS_X_EMPRESA( 'PRECAL_DESEMBOLSO_PR', 'PR')||' MESES'
+          -- en la Tabla PR_REPRESTAMOS
+          FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
+             UPDATE PR.PR_REPRESTAMOS y
+                SET y.ESTADO         = 'X1', 
+                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
+             WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+               AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
+               AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
+               AND y.NO_CREDITO     = VCREDITOS_PROCESAR(x).NO_CREDITO 
+               AND y.ESTADO         = 'RE'   
+               AND 1 = (SELECT DISTINCT 1
+                          FROM PR_CREDITOS C 
+                         WHERE C.CODIGO_EMPRESA      =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
+                           AND C.NO_CREDITO          != VCREDITOS_PROCESAR(x).NO_CREDITO                       
+                           AND C.CODIGO_CLIENTE      = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE                        
+                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+                           AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))));
+  
           EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
 
        END LOOP;
 
      CLOSE CREDITOS_PROCESAR;
-
-     -- =================================================================
-     -- OPT-015: UPDATEs set-based (reemplazan 4 FORALL row-by-row)
-     -- Filtros defensivos: ADICIONADO_POR=USER + FECHA_ADICION>=TRUNC(SYSDATE)
-     -- =================================================================
-
-     -- U1: Actualizar DIAS_ATRASO con maximo de ultimos 6 meses
-     UPDATE PR.PR_REPRESTAMOS y
-        SET Y.DIAS_ATRASO = (SELECT MAX(D.DIAS_ATRASO)
-                             FROM PA.PA_DETALLADO_DE08 D
-                             WHERE D.FUENTE = 'PR'
-                               AND D.FECHA_CORTE >= ADD_MONTHS(y.FECHA_CORTE, -6)
-                               AND D.NO_CREDITO = y.NO_CREDITO
-                               AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE)
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE);
-
-     -- U2: Actualizar MTO_CREDITO_ACTUAL con monto desembolsado de ultima fecha corte
-     UPDATE PR.PR_REPRESTAMOS R
-        SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
-                                    FROM PA.PA_DETALLADO_DE08 D
-                                    WHERE D.FUENTE = 'PR'
-                                      AND D.NO_CREDITO = R.NO_CREDITO
-                                      AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
-                                      AND D.FECHA_CORTE = (SELECT MAX(P.FECHA_CORTE)
-                                                           FROM PA_DETALLADO_DE08 P
-                                                           WHERE P.FUENTE = 'PR'
-                                                             AND P.NO_CREDITO = R.NO_CREDITO
-                                                             AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-      WHERE R.ESTADO = 'RE'
-        AND R.ADICIONADO_POR = USER
-        AND R.FECHA_ADICION >= TRUNC(SYSDATE);
-
-     -- U3: Excluir cliente con TC con atraso mayor a v_atraso_30 dias
-     UPDATE PR.PR_REPRESTAMOS y
-        SET y.ESTADO = 'X3',
-            Y.OBSERVACIONES = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PA_DETALLADO_DE08 D
-                    WHERE D.FUENTE = 'TC'
-                      AND D.FECHA_CORTE = y.FECHA_CORTE
-                      AND D.NO_CREDITO != y.NO_CREDITO
-                      AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND D.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND D.DIAS_ATRASO >= v_atraso_30);
-
-     -- U4: Excluir cliente con otro prestamo desembolsado en ultimos meses
-     UPDATE PR.PR_REPRESTAMOS y
-        SET y.ESTADO = 'X1',
-            Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PR_CREDITOS C
-                    WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND C.NO_CREDITO != y.NO_CREDITO
-                      AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
-                      AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
-
-     -- =================================================================
-     -- OPT-015: DELETEs post-INSERT (PEP/NEGRA movidos del cursor)
-     -- =================================================================
-
-     -- D1: Eliminar clientes en lista PEP
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, CODIGO_CLIENTE) = 1;
-
-     -- D2: Eliminar clientes en lista NEGRA
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, CODIGO_CLIENTE) = 1;
-
-  -- Se actualiza el ESTADO con valor 'X2'
+     
+         --Actualizo el detalle de la bitacora
+         --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 70, 'EN PROCESO', pMensaje ); 
+     
+     
+  -- Se actualiza el ESTADO con valor 'X2' y el campo OBSERVACIONES con 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
+       -- en la tabla PR_REPRESTAMOS para todos los Créditos precalificados con Estodo ='P'
         UPDATE PR.PR_REPRESTAMOS P
            SET P.ESTADO         = 'X2',
                P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
          WHERE P.DIAS_ATRASO    > OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
            AND P.ESTADO         = 'RE';
         -- Se eliminan los represtamos que tienen creditos mancomunados
-        DELETE  PR_REPRESTAMOS
+        DELETE  PR_REPRESTAMOS --PR_OPCIONES_REPRESTAMO
         WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
                     FROM PR_REPRESTAMOS A
                     WHERE ESTADO = 'RE'
@@ -1078,22 +1090,31 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                                 AND NUM_CUENTA = A.NO_CREDITO
                                 AND NVL(TIPO_RELACION,'x') = 'O'
                                 )
-                    );
+                    );  
+        --Cambio el estado del detalle de la bitacora
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 80, 'EN PROCESO', pMensaje );
        -- Se valida que la edad este entre el rango de 18 a 75, definido por parametros
        DELETE  PR_REPRESTAMOS
         WHERE ID_REPRESTAMO IN (SELECT ID_REPRESTAMO
                     FROM PR_REPRESTAMOS A
                     WHERE ESTADO = 'RE'
                     AND   PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD ( A.CODIGO_CLIENTE,'CARGA' ) = 0
-                    );
-
+                    ); 
+    --Cambio el estado del detalle de la bitacora
+    --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 90, 'EN PROCESO', pMensaje );            
     DELETE PR_REPRESTAMOS
-      WHERE ESTADO LIKE 'X%';
+      WHERE ESTADO LIKE 'X%'; 
+              
+          --Actualizo el detalle de la bitacora
+       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 100, 'EN PROCESO', pMensaje );
+        --Finalizo el detalle de la bitacora
+       --PR.PR_PKG_TRAZABILIDAD.PR_FINALIZAR_BITACORA_DET (pIDAPLICACION, 'FINALIZADO', 'SE FINALIZO', pMensaje );
+       
 
-    EXCEPTION WHEN OTHERS THEN
+    EXCEPTION WHEN OTHERS THEN   
         DECLARE
             vIdError      PLS_INTEGER := 0;
-        BEGIN
+        BEGIN                                    
           pMensaje:='ERROR CON EL STORE PROCEDURE PRECALIFICA_REPRE_CANCELADO_HI';
           
           setError(pProgramUnit => 'Precalifica_Represtamo', 
