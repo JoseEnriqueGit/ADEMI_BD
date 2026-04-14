@@ -1,33 +1,64 @@
 # Mapa de Jobs y Orquestadores — PR_PKG_REPRESTAMOS (QA)
 
 > Arbol de llamadas de cada job scheduler que invoca procedimientos del paquete.
-> Los procedimientos marcados con ✅ ya fueron optimizados en OPT-001 a OPT-012.
+> Los procedimientos marcados con ✅ ya fueron optimizados en OPT-001 a OPT-013.
+> La columna "Medido OPT-014" indica si el impacto se valido en tiempo real (no solo Explain Plan).
 > Los marcados con 🔍 requieren analisis con Explain Plan en Toad.
 
 ---
 
 ## 1. JOB_CARGA_PRECALIFICA_RD → `P_Carga_Precalifica_Cancelado` (linea 8115)
 
-**Estado: COMPLETADO** — Todas las optimizaciones implementadas (OPT-001 a OPT-012).
+**Estado: OPTIMIZACIONES APLICADAS (OPT-001 a OPT-013) — medicion real parcial en OPT-014.**
 
-Arbol de llamadas:
+### Tabla maestra: pasos del orquestador con OPTs aplicadas y medicion real
+
+> Orden segun la medicion real de OPT-014 en DESARROLLO (2026-04-13, 190 represtamos en estado RE).
+> **Medido real** = impacto validado en tiempo real en OPT-014. **Explain Plan** = validado solo con cost teorico.
+
+| # | Procedimiento | OPTs aplicadas | Tipo | Medido OPT-014 (solo indices) | ANTES (s) | DESPUES (s) | Δ |
+|---|---------------|----------------|------|-------------------------------|-----------|-------------|---|
+| 1 | P_Actualizar_Anular_Represtamo       | OPT-011 (indice IDX_REPRESTAMOS_EMP_EST_NOCRED) | Indice | ✅ | 1.4 | 1.3 | = |
+| 2 | Precalifica_Represtamo               | OPT-009 (indice+codigo), OPT-010 (codigo NOT EXISTS en CREDITOS_PROCESAR) | Indice + Codigo | Indice ✅ / Codigo ❌ no medido | 278.7 | 98.0 | **-65%** |
+| 3 | Precalifica_Represtamo_fiadores      | OPT-010 (codigo), OPT-002 (indirecto PA_DE08_SIB) | Indice + Codigo | Indice ✅ / Codigo ❌ no medido | 190.8 | 53.8 | **-72%** |
+| 4 | Precalifica_Represtamo_fiadores_hi   | OPT-002 (indice PA_DE08_SIB) | Indice | ✅ | 177.9 | 36.9 | **-79%** |
+| 5 | Precalifica_Repre_Cancelado          | OPT-010 (codigo), OPT-009 (indirecto) | Indice + Codigo | Indice ✅ / Codigo ❌ no medido | 391.7 | 231.5 | **-41%** |
+| 6 | Precalifica_Repre_Cancelado_hi       | (ninguna efectiva) | — | N/A | 381.6 | 392.5 | +3% (NO MEJORO — requiere rewrite) |
+| 7 | Actualiza_Precalificacion            | OPT-002 (indice+codigo), OPT-003 (commits), OPT-004 (set-based), OPT-013 (indice PA_DE05_SIB) | Indice + Codigo + Estructural | Indices ✅ / Codigo ❌ no medido | 13.3 | 3.2 | **-76%** |
+| 8 | Actualiza_XCORE_CUSTOM               | OPT-005 (loop→1 UPDATE) | Codigo | ❌ no medido (codigo no aplicado en DESA) | 0 | 12.5 | n/a |
+| 9 | P_REGISTRO_SOLICITUD                 | OPT-006 (commits), OPT-012 (UPDATE PROMOCION_PERSONA no optimizable) | Estructural | ❌ no medido | 18.6 | 23.9 | +28% (mas RE procesados) |
+| 10 | PVALIDA_WORLD_COMPLIANCE            | OPT-001 (cost 18,293→15) | Codigo + Estructural | ❌ no medido | 0.1 | 0.8 | n/a |
+| 11 | PVALIDA_XCORE                       | OPT-007 (commits) | Estructural | ❌ no medido | 0 | 0 | = |
+| 12 | Loop Bitacora+Validaciones          | OPT-008 (cache F_Existe_*) | Codigo | ❌ no medido | 0 | 0 | = |
+|    | **TOTAL**                           |                | | | **1,454 s (24.2 min)** | **854 s (14.2 min)** | **-41%** |
+
+### Arbol de llamadas (orden de ejecucion)
+
 ```
 P_Carga_Precalifica_Cancelado
-├── 1. P_Actualizar_Anular_Represtamo        ✅ OPT-011 (SQL 371)
-├── 2. PVALIDA_WORLD_COMPLIANCE              ✅ OPT-001 (cost 18,293→15)
-├── 3. Precalifica_Represtamo                ✅ OPT-002 (cursores SIB)
-├── 4. Actualiza_Precalificacion             ✅ OPT-003 + OPT-004 (commits + set-based)
-├── 5. Actualiza_XCORE_CUSTOM                ✅ OPT-005 (N*M→1 UPDATE)
-├── 6. LOOP: P_Registrar_Solicitud           ✅ OPT-006 (commits)
-├── 7. PVALIDA_XCORE (condicional)           ✅ OPT-007 (commits)
-├── 8. LOOP: F_Existe_Solicitudes            ✅ OPT-008 (cache)
-├── 8. LOOP: F_Existe_Canales                ✅ OPT-008 (cache)
-├── 8. LOOP: F_Existe_Opciones               ✅ OPT-008 (cache)
-├── 9. F_Obtener_Nuevo_Credito               ✅ OPT-009 (cost 17,232→909)
-├── 10. CREDITOS_PROCESAR cursores (x3)      ✅ OPT-010 (inline + ANTI JOIN)
-├── 11. UPDATE PROMOCION_PERSONA             ✅ OPT-012 (no optimizable)
-└── CUR_Anular_creditos_cancelados           ✅ OPT-011 (cost 10,656→9,748)
+├── 1. P_Actualizar_Anular_Represtamo        ✅ OPT-011 (indice, medido real)
+├── 2. Precalifica_Represtamo                ✅ OPT-009 + OPT-010
+├── 3. Precalifica_Represtamo_fiadores       ✅ OPT-010
+├── 4. Precalifica_Represtamo_fiadores_hi    ✅ OPT-002 (indice PA_DE08_SIB)
+├── 5. Precalifica_Repre_Cancelado           ✅ OPT-010 / ⚠️ requiere rewrite (codigo)
+├── 6. Precalifica_Repre_Cancelado_hi        ⚠️ NO MEJORO con indices — requiere rewrite (OPT-004 + OPT-010)
+├── 7. Actualiza_Precalificacion             ✅ OPT-002 + OPT-003 + OPT-004 + OPT-013
+├── 8. Actualiza_XCORE_CUSTOM                ✅ OPT-005
+├── 9. P_REGISTRO_SOLICITUD                  ✅ OPT-006 + OPT-012
+├── 10. PVALIDA_WORLD_COMPLIANCE             ✅ OPT-001 (cost 18,293→15)
+├── 11. PVALIDA_XCORE                        ✅ OPT-007
+├── 12. LOOP Bitacora:
+│     ├── F_Existe_Solicitudes               ✅ OPT-008 (cache)
+│     ├── F_Existe_Canales                   ✅ OPT-008 (cache)
+│     └── F_EXISTE_CREDITO                   ✅ OPT-008 (cache)
+└── (interno) CUR_Anular_creditos_cancelados ✅ OPT-011 (cost 10,656→9,748) — dentro de P_Actualizar_Anular_Represtamo
 ```
+
+### Proximo trabajo pendiente (desde OPT-014)
+
+- **Pasos 5 y 6 consumen 53% del tiempo total (624 s de 854 s con indices)** — no se optimizan con indices adicionales (5to indice descartado: empeoro paso 5 +43%).
+- **Rewrite requerido**: replicar OPT-004 (set-based UPDATE) + OPT-010 (inline NOT EXISTS) en `Precalifica_Repre_Cancelado` y `Precalifica_Repre_Cancelado_hi`.
+- **Cuello de botella real**: funciones PL/SQL por fila (F_TIENE_GARANTIA, F_TIENE_GARANTIA_HISTORICO), context switching SQL↔PL/SQL, FORALL con subqueries correladas. Ver `SESION_PENDIENTE.md`.
 
 ---
 
