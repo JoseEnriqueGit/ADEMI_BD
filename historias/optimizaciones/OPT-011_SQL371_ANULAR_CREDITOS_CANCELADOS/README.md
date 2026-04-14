@@ -6,6 +6,9 @@
 - **Entorno**: QA
 - **Fecha**: 2026-04-07
 - **SQL Quest**: SQL 371 (cost original 10,656)
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 1 P_Actualizar_Anular_Represtamo), JOB_ACTUALIZAR_ANULAR_RD (mensual)
+- **Tipo**: Indice (IDX_REPRESTAMOS_EMP_EST_NOCRED)
+- **Medido real**: ✅ (OPT-014 paso 1: 1.4→1.3s — el paso ya era rapido, mejora no significativa en tiempo absoluto pero cost bajo 78% en Explain)
 
 ## Lo que se hizo
 

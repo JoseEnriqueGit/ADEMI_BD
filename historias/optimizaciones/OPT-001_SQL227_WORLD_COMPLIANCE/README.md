@@ -8,6 +8,9 @@
 - **SQL ID en Quest Optimizer**: SQL 227
 - **Cost**: 18,293 -> 15 (reduccion del 99.9%)
 - **Commit Git**: ac552c5
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 10)
+- **Tipo**: Codigo + Estructural (COMMIT fuera de loop)
+- **Medido real**: No (OPT-014 midio solo impacto de indices; en paso 10 el tiempo fue 0.1→0.8s por procesar mas RE, no regresion)
 
 ---
 

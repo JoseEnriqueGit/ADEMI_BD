@@ -5,7 +5,9 @@
 - **Seccion**: Loop Actualizar_Mto_Credito_Actual (lineas ~2704-2731 originales)
 - **Entorno**: QA
 - **Fecha**: 2026-03-24
-- **Tipo**: Cambio estructural (eliminar cursor FOR loop)
+- **Tipo**: Codigo (eliminar cursor FOR loop → set-based UPDATE) + Indice (IDX_DE08_NOCRED_CALIF_FECHA)
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 7 Actualiza_Precalificacion)
+- **Medido real**: No (OPT-014 midio solo impacto de indices; el rewrite set-based no se valido en tiempo real)
 
 ## Problema
 El cursor `Actualizar_Mto_Credito_Actual` seleccionaba todos los PR_REPRESTAMOS con ESTADO='RE'

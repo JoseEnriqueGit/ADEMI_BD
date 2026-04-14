@@ -6,6 +6,9 @@
 - **Seccion:** Loop final `FOR A IN CUR_REPRESTAMO` (~linea 8216)
 - **Entorno:** QA
 - **Git commit:** 821d2f1
+- **Orquestador(es):** Job1=P_Carga_Precalifica_Cancelado (paso 12 Loop Bitacora+Validaciones), Job3=P_Carga_Precalifica_Manual, Job4=P_Carga_Precalifica_Campana_Especial
+- **Tipo:** Codigo (cachear resultados de funciones F_Existe_* en variables booleanas)
+- **Medido real:** No (OPT-014 midio solo impacto de indices; cache no aplicado en DESA para la prueba real)
 
 ## Problema
 En el loop final de `P_Carga_Precalifica_Cancelado`, las funciones `F_Existe_Solicitudes`, `F_Existe_Canales` y `F_EXISTE_CREDITO` se invocaban directamente dentro de las condiciones IF/ELSIF. Dado que la logica de ramificacion las evalua multiples veces:

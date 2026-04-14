@@ -4,6 +4,9 @@
 - **Procedure**: Actualiza_XCORE_CUSTOM
 - **Entorno**: QA
 - **Fecha**: 2026-03-19
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 8 Actualiza_XCORE_CUSTOM)
+- **Tipo**: Codigo (loop doble N*M → 1 UPDATE set-based)
+- **Medido real**: No (OPT-014 midio solo impacto de indices; este rewrite no se aplico en DESA para la prueba real)
 
 ## Problema
 El procedure tenia un loop doble (FOR i IN 1..vCantidad_Procesar / FOR A IN CUR_UPDATE_XCORE) que:

@@ -4,8 +4,10 @@
 - **Procedure**: Actualiza_Precalificacion
 - **Entorno**: QA
 - **Fecha**: 2026-03-19
-- **Tipo**: Cambio estructural (redo log I/O, no cost SQL)
+- **Tipo**: Estructural (COMMIT fuera de loops — redo log I/O, no cost SQL)
 - **Git commit**: 837fa2b
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 7 Actualiza_Precalificacion)
+- **Medido real**: No (OPT-014 midio solo impacto de indices; el codigo de COMMITs no se valido en tiempo real)
 
 ## Problema
 Tres loops tenian COMMIT dentro de cada iteracion, causando un flush del redo log buffer por cada fila procesada. Con un lote de 200 registros, eran 800+ escrituras sincronas al disco.

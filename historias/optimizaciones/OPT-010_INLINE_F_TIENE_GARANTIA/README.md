@@ -5,6 +5,9 @@
 - **Entorno**: QA
 - **Fecha**: 2026-03-19
 - **SQL Quest**: SQL 399/400
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 2 Precalifica_Represtamo, paso 3 fiadores, paso 5 Precalifica_Repre_Cancelado)
+- **Tipo**: Codigo (F_TIENE_GARANTIA → NOT EXISTS inline) + Indice (IDX_GARANTIAS_TIPO_SB)
+- **Medido real**: Indice ✅ (OPT-014 pasos 2/3/5 mejoraron -65%/-72%/-41%) / Codigo ❌ no medido (rewrite no aplicado en DESA)
 
 ## Problema
 La funcion `F_TIENE_GARANTIA(a.no_credito) = 0` se usaba en el WHERE de 3 cursores.

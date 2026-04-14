@@ -6,6 +6,9 @@
 - **Fecha analisis**: 2026-04-07
 - **SQL Quest**: SQL 364 (cost original 8,332)
 - **Conclusion**: No optimizable sin cambiar estructura de tabla
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 9 via P_Registrar_Rechazo llamado desde P_Registrar_Solicitud)
+- **Tipo**: N/A (no optimizable — PK existente ya cubre el WHERE)
+- **Medido real**: N/A
 
 ## Query analizado
 

@@ -7,6 +7,9 @@
 - **Entorno**: QA
 - **Fecha**: 2026-04-07
 - **Cost**: 120,122 → 11 (reduccion 99.99%)
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 7 Actualiza_Precalificacion), Job3=P_Carga_Precalifica_Manual (Actualiza_Preca_Dirigida), Job4=P_Carga_Precalifica_Campana_Especial (Actualiza_Preca_Campana_Especiale)
+- **Tipo**: Indice (IDX_DE05_SIB_CASTIGO_CEDULA)
+- **Medido real**: ✅ (OPT-014 paso 7: 13.3→3.2s, -76%, LIO 742K→12K)
 
 ## Problema
 

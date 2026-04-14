@@ -6,6 +6,9 @@
 - **Entorno:** QA
 - **Linea aproximada:** ~3734 (body.sql)
 - **Git commit:** e13ee50
+- **Orquestador(es):** Job1=P_Carga_Precalifica_Cancelado (paso 11 PVALIDA_XCORE), Job3=P_Carga_Precalifica_Manual, Job4=P_Carga_Precalifica_Campana_Especial
+- **Tipo:** Estructural (COMMIT fuera de loop)
+- **Medido real:** No (OPT-014 midio solo impacto de indices)
 
 ## Problema
 El procedimiento `PVALIDA_XCORE` ejecuta un `COMMIT` dentro del `FOR cliente IN c_clientes LOOP` (linea 3734). Cada iteracion del cursor genera un flush de redo log al disco, lo cual:

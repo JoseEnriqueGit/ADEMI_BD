@@ -5,6 +5,9 @@
 - **Entorno**: QA
 - **Fecha**: 2026-04-06
 - **Git commit original**: 73849ac
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 9 P_REGISTRO_SOLICITUD), Job3=P_Carga_Precalifica_Manual (via P_Carga_Precalifica_Manual)
+- **Tipo**: Estructural (COMMIT fuera de loops)
+- **Medido real**: No (OPT-014 midio solo impacto de indices)
 
 ## Problema
 Ambos procedures tenian COMMIT dentro del FOR loop, lo que causaba:

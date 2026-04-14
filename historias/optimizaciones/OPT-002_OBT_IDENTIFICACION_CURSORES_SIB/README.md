@@ -8,6 +8,9 @@
 - **Fecha**: 2026-03-24
 - **SQL Quest**: SQL 303 y relacionados
 - **Cost**: 64,753 -> 39 (reduccion 99.9%)
+- **Orquestador(es)**: Job1=P_Carga_Precalifica_Cancelado (paso 7 Actualiza_Precalificacion; indice impacta paso 4 fiadores_hi), Job3=P_Carga_Precalifica_Manual, Job4=P_Carga_Precalifica_Campana_Especial
+- **Tipo**: Indice (IDX_DE08_SIB_FECHA_DEUDOR) + Codigo (JOIN a ID_PERSONAS)
+- **Medido real**: Indice ✅ (OPT-014 paso 4: 177.9→36.9s, -79%) / Codigo ❌ no medido
 
 ## Problema
 Los cursores CUR_DE08_SIB y CUR_DE05_SIB usaban `OBT_IDENTIFICACION_PERSONA(B.CODIGO_CLIENTE,'1')` en el WHERE.

@@ -6,6 +6,9 @@
 - **Seccion:** Rama ELSE (represtamo normal, no campana especial)
 - **Entorno:** QA
 - **Fecha:** 2026-03-25
+- **Orquestador(es):** Job1=P_Carga_Precalifica_Cancelado (pasos 2 Precalifica_Represtamo, 3 fiadores, 5 Cancelado — F_Obtener_Nuevo_Credito es llamada indirectamente), Job3, Job4
+- **Tipo:** Indice (IDX_CREDITOS_HI_NOCREDITO) + Codigo (eliminar scalar subqueries → JOINs directos)
+- **Medido real:** Indice ✅ (OPT-014 paso 2: 278.7→98.0s, -65%; paso 3: 190.8→53.8s, -72%) / Codigo ❌ no medido
 
 ## Estado
 **APLICADO.** Indice creado en QA + cambio en body.sql aplicado.
