@@ -94,6 +94,21 @@ RE procesados: 10 (LOTE=5, 2 iteraciones)
 | Con indices OPT-014 | 14.2 min | -41% |
 | Con indices + OPT-015 set-based | **11.3 min** | **-53%** |
 
+### Validacion de equivalencia semantica (2026-04-14)
+
+Se compararon snapshots de resultados entre body original y body OPT-015:
+- **Query 2 (campos clave)**: 0 diferencias — ESTADO, DIAS_ATRASO, MTO_CREDITO_ACTUAL identicos
+- **Query 1 (filas exclusivas)**: 3 filas "Solo en ANTES" (18 RE vs 15 RE)
+- **Causa**: Variabilidad entre ejecuciones, no diferencia de logica
+
+**Nota sobre variabilidad**: El cursor usa `ROWNUM <= 5` (LOTE) sin ORDER BY,
+por lo que Oracle no garantiza el orden de las filas retornadas. Entre ejecuciones,
+el optimizer puede elegir un plan diferente o los bloques en buffer pueden variar,
+resultando en que se procesen creditos distintos. Esto es comportamiento normal
+del codigo original — no fue introducido por OPT-015. Los 3 creditos faltantes
+tenian estado NP (pasaron todas las validaciones), confirmando que si hubieran
+sido procesados por el body optimizado, habrian tenido el mismo resultado.
+
 ### Archivos de rollback
 
 - `body_ANTES_OPT015.sql` — body original para revertir

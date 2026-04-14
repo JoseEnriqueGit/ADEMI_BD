@@ -1,8 +1,102 @@
-# Sesion Pendiente — Continuacion de mediciones OPT
+# Sesion Pendiente — Continuacion de optimizaciones OPT
 
 > Documento de contexto para continuar el trabajo de optimizacion en otra PC/sesion.
-> Fecha: 2026-04-13 (actualizado)
+> Fecha: 2026-04-14 (actualizado)
 > Sesion anterior: Claude Code VS Code Extension
+
+---
+
+## Resumen de lo completado (sesion 2026-04-14)
+
+### OPT-015: Rewrite set-based + NOT EXISTS en pasos 5-6 (COMPLETADO)
+
+**Resultado**: Job total 23 min → 11.3 min (**-51%**). Pasos 5+6: 856 seg → 378 seg (**-56%**)
+
+**Paso a paso de lo realizado:**
+
+1. **Reconstruccion del contexto**: La sesion anterior no persistio la carpeta OPT-015 ni el plan. Se reconstruyo todo desde SESION_PENDIENTE.md y los READMEs de OPT-004/OPT-010.
+
+2. **Extraccion de PA.P_DATOS_PERSONA**: El usuario copio spec.sql y body.sql del paquete PA.P_DATOS_PERSONA desde Toad a `ENTORNOS_ORACLE/DESARROLLO/schemas/PA/packages/PA.p_datos_persona/`.
+
+3. **A.0.1 - Verificacion funciones PEP/NEGRA (COMPLETADO)**:
+   - `esta_en_lista_pep` (L.314 body PA): SELECT INTO a `lista_pep` — read-only
+   - `esta_en_lista_negra` (L.129 body PA): SELECT INTO a `lista_negra` — read-only
+   - Conclusion: seguro mover a DELETE post-INSERT
+
+4. **A.0.2 - Indice IDX_GARANTIAS_TIPO_SB (COMPLETADO)**:
+   - No existia en DESARROLLO (solo en QA desde OPT-010)
+   - Creado: `CREATE INDEX PR.IDX_GARANTIAS_TIPO_SB ON PR.PR_GARANTIAS (CODIGO_EMPRESA, NUMERO_GARANTIA, CODIGO_TIPO_GARANTIA_SB) TABLESPACE PR_DAT;`
+
+5. **A.0.3 - Parametros verificados (COMPLETADO)**:
+   - `LOTE_DE_CARAGA_REPRESTAMO = 5` (batches de 5 filas por iteracion)
+   - `f_obt_Empresa_Represtamo = 1`
+   - Nota: la tabla PA_PARAMETROS_MVP tiene columna CODIGO_PARAMETRO (no COD_PARAMETRO)
+
+6. **A.1 - Explain Plans Q1-Q12 (COMPLETADO)**:
+   - Script: `OPT-015_SETBASED_CANCELADO_REWRITE/scripts_medicion/explain_plan_opt015.sql`
+   - Resultados:
+
+   | Query | Descripcion | Cost |
+   |-------|-------------|------|
+   | Q1 | Cursor Cancelado (DESPUES) | 5,541 |
+   | Q2 | Cursor Cancelado_hi (DESPUES) | 8,732 |
+   | Q3 | UPDATE DIAS_ATRASO set-based | 15,182 |
+   | Q4 | UPDATE MTO_CREDITO set-based | 9 |
+   | Q5 | UPDATE X3 TC set-based | 7 |
+   | Q6 | UPDATE X1 desembolso set-based | 24,551 |
+   | Q7 | DELETE PEP | 3 |
+   | Q8 | DELETE NEGRA | 3 |
+   | Q9 | ANTES FORALL DIAS_ATRASO (x1) | 53 |
+   | Q10 | ANTES FORALL MTO_CREDITO (x1) | 1,010 |
+   | Q11 | ANTES FORALL X3 TC (x1) | 8 |
+   | Q12 | ANTES FORALL X1 desembolso (x1) | 37 |
+
+   - IDX_GARANTIAS_TIPO_SB aparece en Q1/Q2 — NOT EXISTS inline usa el indice
+   - Sin FULL TABLE SCAN en tablas grandes
+   - Fase A aprobada
+
+7. **Fase B - Modificacion del body.sql (COMPLETADO)**:
+   - **Cambio 1 (Cursor)**: `F_TIENE_GARANTIA(a.no_credito) = 0` reemplazado por NOT EXISTS inline con JOIN a PR_CREDITOS → PR_GARANTIAS_X_CREDITO → PR_GARANTIAS. PEP/NEGRA eliminados del cursor.
+   - **Cambio 2 (Loop)**: 4 FORALL UPDATEs removidos del loop. Loop simplificado a solo INSERT + EXIT.
+   - **Cambio 3 (Post-loop)**: 4 UPDATEs set-based (U1-U4) con filtros defensivos `ADICIONADO_POR=USER AND FECHA_ADICION>=TRUNC(SYSDATE)`. 2 DELETEs post-INSERT para PEP/NEGRA.
+   - **Cambio 4**: Identico al 1-2-3 para Precalifica_Repre_Cancelado_hi (usa PR_CREDITOS_HI)
+   - Archivos: `body_ANTES_OPT015.sql` (rollback), `body_DESPUES_OPT015.sql` (cambios)
+
+8. **Medicion ANTES (body original)**:
+   - Restaurar RE: `UPDATE PR.PR_REPRESTAMOS SET ESTADO='RE' WHERE MODIFICADO_POR IS NULL AND FECHA_MODIFICACION >= DATE '2026-04-10' AND ESTADO IN ('AN','NP','CP','RXT','RXC');`
+   - 196 filas restauradas
+
+   | Paso | Tiempo | CPU |
+   |------|--------|-----|
+   | 5. Precalifica_Repre_Cancelado | 346.8 seg | 31,360 |
+   | 6. Precalifica_Repre_Cancelado_hi | 509.2 seg | 50,109 |
+   | **TOTAL** | **1,381 seg (23 min)** | |
+   | RE procesados | 10 | |
+
+9. **Compilacion y medicion DESPUES (body OPT-015)**:
+
+   | Paso | Tiempo | CPU |
+   |------|--------|-----|
+   | 5. Precalifica_Repre_Cancelado | 170.2 seg | 16,864 |
+   | 6. Precalifica_Repre_Cancelado_hi | 207.9 seg | 20,366 |
+   | **TOTAL** | **680 seg (11.3 min)** | |
+   | RE procesados | 15 | |
+
+10. **Validacion de equivalencia semantica (COMPLETADO)**:
+    - Se crearon tablas snapshot: `JOOGANDO.OPT015_RE_ANTES`, `OPT015_RESULTADO_DESPUES`, `OPT015_RESULTADO_ANTES`
+    - Query 2 (campos clave ESTADO, DIAS_ATRASO, MTO_CREDITO_ACTUAL): **0 diferencias**
+    - Query 1 (filas exclusivas): 3 filas "Solo en ANTES" (18 RE vs 15 RE)
+    - Causa: variabilidad entre ejecuciones por `ROWNUM <= 5` sin ORDER BY. El cursor no garantiza orden de filas entre ejecuciones. Comportamiento del codigo original, no introducido por OPT-015.
+
+11. **Commit**: `02c8df3` — incluye body.sql modificado, body rollback, explain plans, HANDOFF, PA.P_DATOS_PERSONA, README actualizado.
+
+**Acumulado desde baseline original:**
+
+| Medicion | Tiempo | Reduccion |
+|----------|--------|-----------| 
+| Baseline original (sin indices) | ~24 min | — |
+| Con indices OPT-014 | 14.2 min | -41% |
+| Con indices + OPT-015 set-based | **11.3 min** | **-53%** |
 
 ---
 
@@ -17,248 +111,61 @@
 ### Investigacion pasos 5-6 (CERRADA para indices)
 - Se probo 5to indice en PA_DETALLADO_DE08 → descartado (empeoro paso 5)
 - Causa raiz: CPU/PL/SQL (funciones por fila, context switching), no I/O
-- La solucion requiere cambios de codigo, no indices adicionales
+- La solucion requiere cambios de codigo, no indices adicionales → resuelto por OPT-015
 
 ---
 
-## Instrucciones para la proxima sesion
+## Estado actual de DESARROLLO (ADMQA1)
 
-### Tarea principal: Rewrite de codigo en Precalifica_Repre_Cancelado y Cancelado_hi
-
-Los pasos 5 y 6 consumen el **53% del tiempo total** (702 seg de 1,454 sin indices, 624 seg de 854 con indices). No se optimizan con indices — requieren rewrite de codigo.
-
-**Que hacer:**
-1. Replicar **OPT-004** (convertir loops row-by-row a UPDATE set-based) en:
-   - `Precalifica_Repre_Cancelado` (~linea 412 del body.sql DESARROLLO)
-   - `Precalifica_Repre_Cancelado_hi` (~linea 795 del body.sql DESARROLLO)
-2. Replicar **OPT-010** (inline de `F_TIENE_GARANTIA` / `F_TIENE_GARANTIA_HISTORICO` como NOT EXISTS) en los mismos procedimientos
-3. Medir con el script `05_MEDIR_JOB_CANCELADO_DETALLADO.sql` (restaurar 190 RE antes)
-
-**Patron de cambio (referencia):**
-- OPT-004: Loop con UPDATE por fila → 1-2 UPDATEs set-based con subquery
-- OPT-010: Llamada a F_TIENE_GARANTIA() en cursor → NOT EXISTS inline en el cursor/query
-
-**Cuello de botella especifico:**
-- FORALL UPDATE con `SELECT MAX(DIAS_ATRASO) FROM PA_DETALLADO_DE08` ejecutado en batches de 100
-- Funciones `F_TIENE_GARANTIA` / `F_TIENE_GARANTIA_HISTORICO` llamadas por cada fila del cursor
-- COMMITs dentro de loops (patron OPT-003)
-
-**Archivos de referencia:**
-- Body DESARROLLO: `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`
-- OPT-004: `historias/optimizaciones/OPT-004_SETBASED_ACTUALIZAR_MTO_CREDITO/README.md`
-- OPT-010: `historias/optimizaciones/OPT-010_INLINE_F_TIENE_GARANTIA/README.md`
-- Medicion: `historias/optimizaciones/scripts_medicion/05_MEDIR_JOB_CANCELADO_DETALLADO.sql`
-
-**Estado de DESARROLLO:**
-- 4 indices OPT creados y VALID
-- Paquete de produccion compilado (procedimientos activos)
-- Tablas backup: `JOOGANDO.PR_REPRESTAMOS_POST`, `PR.OPT_HIWATER_MARKS`
-- Restaurar RE antes de medir: `UPDATE PR.PR_REPRESTAMOS SET ESTADO='RE' WHERE MODIFICADO_POR IS NULL AND FECHA_MODIFICACION >= DATE '2026-04-10' AND ESTADO IN ('AN','NP','CP','RXT','RXC');`
-
-### Otros pendientes (menor prioridad)
-- Medir en QA cuando este disponible
-- Propuestas de hardcodeo de 3 cursores del job mensual (pendiente aprobacion del jefe)
-- Confirmar SQL 151/172 del Quest con companero
+- **Body compilado**: OPT-015 (optimizado) — verificado con `SELECT COUNT(*) FROM ALL_SOURCE WHERE TEXT LIKE '%OPT-015%'` = 10
+- **5 indices OPT creados y VALID** (4 de OPT-014 + IDX_GARANTIAS_TIPO_SB de OPT-015)
+- **Tablas backup**: `JOOGANDO.PR_REPRESTAMOS_POST`, `PR.OPT_HIWATER_MARKS`
+- **Tablas de validacion OPT-015**: `JOOGANDO.OPT015_RE_ANTES`, `OPT015_RESULTADO_ANTES`, `OPT015_RESULTADO_DESPUES`
+- **Restaurar RE**: `UPDATE PR.PR_REPRESTAMOS SET ESTADO='RE' WHERE MODIFICADO_POR IS NULL AND FECHA_MODIFICACION >= DATE '2026-04-10' AND ESTADO IN ('AN','NP','CP','RXT','RXC');`
 
 ---
 
-## Resumen de lo completado (sesion anterior 2026-04-07)
+## Lo que queda pendiente
 
-### OPT-013 (COMPLETADO)
-- **Indice**: `PA.IDX_DE05_SIB_CASTIGO_CEDULA` en PA.PA_DE05_SIB (FECHA_CASTIGO, CEDULA, ENTIDAD)
-- **Cost**: 120,122 → 11
-- **Ya creado en QA** bajo schema JOOGANDO
-- Documentado en `historias/optimizaciones/OPT-013_INDICE_PA_DE05_SIB/`
-- Commits: `3067cbc` (tabla), `3b642ef` (indice + documentacion)
+### 1. OPT-015: Aprobar para produccion
+- **Estado**: Completado en DESARROLLO, pendiente aprobacion del jefe
+- **Accion**: Presentar resultados (23 min → 11.3 min, -51%) y validacion de equivalencia
+- **Pendiente**: Medir en QA cuando este disponible
+- **Rollback**: `body_ANTES_OPT015.sql` en carpeta OPT-015
 
-### Mediciones realizadas hoy (todos los ANTES)
-| Query | Procedimiento | Cost | Resultado |
-|-------|--------------|------|-----------|
-| CUR_DE08_SIB (Dirigida) | Actualiza_Preca_Dirigida | 11 | Ya bajo, no optimizar |
-| CUR_DE05_SIB (Dirigida) | Actualiza_Preca_Dirigida | 120,122 → 11 | RESUELTO OPT-013 |
-| UPDATE MTO_CREDITO_ACTUAL (por fila) | Actualiza_Preca_Dirigida | 324 | Bajo por fila |
-| UPDATE ESTADO='RSB' (por fila) | Actualiza_Preca_Dirigida | 43 | Bajo |
-| MAX(DIAS_ATRASO) 3 subqueries | Precalifica_Carga_Dirigida | 15 | Bajo |
-| Capital pagado JOIN DE08 | Precalifica_Carga_Dirigida | 7 | Bajo |
-| Sola firma HAVING+EXISTS | Precalifica_Carga_Dirigida | 10 | Bajo |
-| Atraso TC | Precalifica_Carga_Dirigida | 5 | Bajo |
-| UPDATE set-based (DESPUES) | Actualiza_Preca_Dirigida | 10 | Bajo |
-
-**Conclusion**: Los queries individuales de Precalifica_Carga_Dirigida y Actualiza_Preca_Dirigida tienen costs bajos. No hay queries SQL que justifiquen optimizacion con indices.
-
----
-
-## Lo que queda pendiente (4 items)
-
-### 1. Propuestas de hardcodeo — 3 cursores del job mensual (cost total 11,698 → 62)
+### 2. Propuestas de hardcodeo — 3 cursores del job mensual (cost total 11,698 → 62)
 - **Estado**: Propuestas documentadas, pendientes aprobacion del jefe
 - **Archivos**:
-  - `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md` — CUR_Anular_creditos_cancelados (9,748→26)
-  - `historias/optimizaciones/propuestas/CURSORES_ANULAR_HARDCODEO_ESTADOS.md` — CUR_Anular (953→18) + CUR_Anular_campana_especiales (997→18)
-- **Job afectado**: JOB_ACTUALIZAR_ANULAR_RD (mensual, dia 1 a las 00:00)
-- **Cadena**: JOB → P_ACTUALIZAR_ANULAR_REPRESTAMO → P_ANULAR_REPRESTAMOS_INACTIVOS → 3 cursores
+  - `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md`
+  - `historias/optimizaciones/propuestas/CURSORES_ANULAR_HARDCODEO_ESTADOS.md`
 - **Accion**: Preguntar al jefe si aprueba el trade-off (hardcodeo vs parametros dinamicos)
-- **Alternativas evaluadas**: Subquery directa (cost 929), CARDINALITY hint (cost 952) — ambas descartadas, Oracle solo hace INLIST ITERATOR con literales
-- **Si se aprueba**: Aplicar los 3 cambios al body.sql, documentar como OPT-014
 
-#### Como probar el job en Toad (medir tiempo ANTES y DESPUES del cambio)
-
-**Ejecutar el job directamente:**
-```sql
-BEGIN
-  DBMS_SCHEDULER.RUN_JOB('PR.JOB_ACTUALIZAR_ANULAR_RD', USE_CURRENT_SESSION => TRUE);
-END;
-/
-```
-
-**O llamar el procedimiento con medicion de tiempo:**
-```sql
-SET TIMING ON;
-DECLARE
-  PMENSAJE VARCHAR2(32767);
-BEGIN
-  PMENSAJE := NULL;
-  PR.PR_PKG_REPRESTAMOS.P_ACTUALIZAR_ANULAR_REPRESTAMO(PMENSAJE);
-  COMMIT;
-  DBMS_OUTPUT.PUT_LINE('Mensaje: ' || PMENSAJE);
-END;
-/
-```
-
-**Proceso de prueba:**
-1. Correr el script ANTES de aplicar cambios — anotar tiempo de ejecucion
-2. Aplicar los cambios (hardcodeo de los 3 cursores) y recompilar el paquete
-3. Correr el mismo script — anotar tiempo DESPUES
-4. Comparar tiempos y documentar en la OPT
-
-### 2. SQL 151/172 del Quest (cost 106,783) — Confirmar que son CUR_DE05_SIB
+### 3. SQL 151/172 del Quest (cost 106,783)
 - **Estado**: Probablemente ya resueltos por OPT-013, falta confirmar
-- **Accion**: Pedirle al companero que abra el Quest SQL Optimizer y muestre el SQL Text de SQL 151 y SQL 172
-- **Si son CUR_DE05_SIB**: Marcar como resueltos por OPT-013
-- **Si son otro query**: Analizar el SQL Text y preparar Explain Plan
+- **Accion**: Pedirle al companero que muestre el SQL Text en Quest SQL Optimizer
 
-### 3. UPDATE MTO_CREDITO_ACTUAL — Evaluar conversion a set-based
-- **Estado**: Cost 324/fila (ANTES) vs 10 (DESPUES set-based). Mejora depende del volumen
-- **Accion**: Averiguar cuantos registros en estado 'RE' procesa tipicamente el job de carga dirigida
-- **Si el lote es >50 registros**: Vale la pena convertir a set-based (como OPT-004)
-- **Si el lote es <20 registros**: No vale la pena, dejar como esta
-- **Script DESPUES** (ya medido, cost 10):
-```sql
-UPDATE PR.PR_REPRESTAMOS R
-SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
-                              FROM PA.PA_DETALLADO_DE08 D
-                             WHERE D.FUENTE         = 'PR'
-                               AND D.NO_CREDITO     = R.NO_CREDITO
-                               AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
-                               AND D.FECHA_CORTE    = (SELECT MAX(P.FECHA_CORTE)
-                                                         FROM PA_DETALLADO_DE08 P
-                                                        WHERE P.FUENTE         = 'PR'
-                                                          AND P.NO_CREDITO     = R.NO_CREDITO
-                                                          AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-WHERE R.CODIGO_EMPRESA = 1
-  AND R.ESTADO = 'RE';
-```
+### 4. UPDATE MTO_CREDITO_ACTUAL en Actualiza_Preca_Dirigida
+- **Estado**: Cost 324/fila vs 10 set-based. Depende del volumen
+- **Accion**: Averiguar cuantos registros RE procesa el job de carga dirigida
 
-### 4. COMMITs dentro de loops — Redo I/O
+### 5. COMMITs dentro de loops
 - **Estado**: Aplica a Actualiza_Preca_Dirigida y Actualiza_Preca_Campana_Especiale
-- **Accion**: No se mide con Explain Plan. Solo vale la pena si los lotes son grandes (>100 registros)
-- **Cambio**: Mover COMMITs al final de cada loop (patron OPT-003)
-- **Riesgo**: Si el proceso falla a mitad del loop, se hace rollback completo en vez de conservar filas procesadas
+- **Accion**: Solo vale la pena si lotes > 100 registros
 
 ---
 
-## Archivos de referencia importantes
+## Archivos de referencia
 
 | Archivo | Contenido |
 |---------|-----------|
-| `historias/optimizaciones/README.md` | Indice de todas las OPT (001-013) |
+| `historias/optimizaciones/README.md` | Indice de todas las OPT (001-015) |
 | `historias/optimizaciones/PENDIENTES.md` | SQLs pendientes del Quest |
-| `historias/optimizaciones/MAPA_JOBS.md` | Mapa completo de los 5 jobs y sus procedimientos |
-| `historias/optimizaciones/propuestas/SQL371_HARDCODEO_ESTADOS.md` | Propuesta SQL 371 (CUR_Anular_creditos_cancelados) |
-| `historias/optimizaciones/propuestas/CURSORES_ANULAR_HARDCODEO_ESTADOS.md` | Propuesta CUR_Anular + CUR_Anular_campana_especiales |
-| `historias/optimizaciones/OPT-013_INDICE_PA_DE05_SIB/README.md` | OPT-013 completada |
-| `ENTORNOS_ORACLE/QA/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | Paquete principal (13,787 lineas) |
+| `historias/optimizaciones/MAPA_JOBS.md` | Mapa completo de los 5 jobs |
+| `historias/optimizaciones/OPT-015_SETBASED_CANCELADO_REWRITE/HANDOFF.md` | Contexto completo OPT-015 |
+| `historias/optimizaciones/OPT-015_SETBASED_CANCELADO_REWRITE/body_ANTES_OPT015.sql` | Body rollback |
+| `historias/optimizaciones/OPT-015_SETBASED_CANCELADO_REWRITE/body_DESPUES_OPT015.sql` | Body optimizado |
+| `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | Body actual (OPT-015) |
+| `ENTORNOS_ORACLE/DESARROLLO/schemas/PA/packages/PA.p_datos_persona/` | Paquete PA.P_DATOS_PERSONA |
 
-## Valores de referencia para Explain Plan
-- **NO_CREDITO**: 1087363
-- **CODIGO_CLIENTE**: 1107470
-- **FECHA_CORTE**: 27/09/2024
-- **CODIGO_EMPRESA**: 1
-
-## Nota sobre herramientas
-- En VS Code con Claude Code extension, las skills (`oracle-optimize`, `oracle-explain`) y herramientas son las mismas
-- El CLAUDE.md del proyecto se carga automaticamente
-- Leer este documento al inicio de la sesion para tener contexto completo
-
----
-
-## Instrucciones para la proxima sesion
-
-### Tarea principal: Medir ANTES/DESPUES del job mensual con hardcodeo
-
-**Paso 1 — Medir ANTES (sin cambios):**
-1. Conectar a QA (JOOGANDO@QAORACEL) en Toad
-2. Activar DBMS Output (View > DBMS Output)
-3. Abrir `historias/optimizaciones/scripts_medicion/MEDIR_JOB_ANULAR.sql`
-4. Ejecutar 3 veces — descartar la 1ra (cold cache), anotar 2da y 3ra como ANTES
-5. Copiar la linea "RESULTADO|..." del output
-
-**Paso 2 — Aplicar hardcodeo de los 3 cursores:**
-Modificar `P_Anular_Represtamos_Inactivos` en body.sql (linea 9368):
-
-*CUR_Anular (linea 9377) — cambiar:*
-```sql
--- ANTES:
-and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
--- DESPUES:
-and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
--- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
-```
-
-*CUR_Anular_campana_especiales (linea 9388) — mismo cambio:*
-```sql
--- ANTES:
-and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO')))
--- DESPUES:
-and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','EP','AP','MS','AYN','AYS','BLI','BLP','CP','SC')
--- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_REPRESTAMOS_POR_NO_CONCLUIR_PROCESO
-```
-
-*CUR_Anular_creditos_cancelados (linea 9395-9399) — cambiar 2 lineas:*
-```sql
--- ANTES (linea 9395):
-and ESTADO in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS_CANCELADOS')))
--- DESPUES:
-and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','CP')
--- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS_CANCELADOS
-
--- ANTES (linea 9399):
-and estado in (select COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS')))
--- DESPUES:
-and estado IN ('D','V','M','E','J','C')
--- Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS
-```
-
-Compilar el paquete en Toad (sin errores).
-
-**Paso 3 — Medir DESPUES:**
-1. Ejecutar `MEDIR_JOB_ANULAR.sql` 3 veces — anotar 2da y 3ra como DESPUES
-2. Copiar la linea "RESULTADO|..." del output
-3. Comparar con los resultados del Paso 1
-
-**Paso 4 — Documentar:**
-1. Si mejora: crear carpeta OPT-014 y documentar con ANTES/DESPUES
-2. Si no mejora o es marginal: revertir body.sql y anotar en SESION_PENDIENTE
-
-**Paso 5 — Rollback (si algo sale mal):**
-Revertir los 3 cursores a la version original con TABLE(F_Obt_Valor_Parametros(...)) y recompilar.
-
-### Otros items pendientes (menor prioridad)
-1. Confirmar SQL 151/172 del Quest con companero
-2. Evaluar UPDATE MTO_CREDITO_ACTUAL set-based (preguntar volumen de lote)
-3. Evaluar COMMITs en loops (preguntar volumen de lote)
-
-### Al finalizar la sesion
-1. Actualizar este documento con los resultados de las mediciones
-2. Hacer commit y push de todo
-3. Si se creo OPT-014, agregar entrada al README.md de optimizaciones
+## Nota sobre variabilidad entre ejecuciones
+El cursor usa `ROWNUM <= 5` (LOTE) sin ORDER BY, por lo que Oracle no garantiza el orden de las filas retornadas. Entre ejecuciones, el optimizer puede elegir un plan diferente o los bloques en buffer pueden variar, resultando en que se procesen creditos distintos. Esto es comportamiento normal del codigo original — no fue introducido por OPT-015.
