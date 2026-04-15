@@ -1,8 +1,39 @@
 # Sesion Pendiente — Continuacion de optimizaciones OPT
 
 > Documento de contexto para continuar el trabajo de optimizacion en otra PC/sesion.
-> Fecha: 2026-04-14 (actualizado)
+> Fecha: 2026-04-15 (actualizado)
 > Sesion anterior: Claude Code VS Code Extension
+
+---
+
+## Resumen de lo completado (sesion 2026-04-15)
+
+### OPT-015: Pruebas formales ANTES/DESPUES en DESARROLLO (COMPLETADO)
+
+**Objetivo**: Documentar con evidencia las pruebas de rendimiento para presentar a riesgos/seguridad.
+
+**Resultado medicion formal**:
+
+| Metrica | ANTES | DESPUES | Mejora |
+|---------|-------|---------|--------|
+| Paso 5 (seg) | 312.8 | 265.4 | -15% |
+| Paso 6 (seg) | 427.3 | 208.2 | -51% |
+| Total job (min) | 15.3 | 10.4 | **-32%** |
+| RE procesados | 20 | 21 | |
+
+**Entorno**: DESARROLLO (JOOGANDO@ADMQA1_19C) — QA estaba bloqueado por un job activo (ORA-04021).
+
+**Pasos realizados**:
+1. Verificacion prerequisitos (indice VALID, 202 RE disponibles)
+2. Restaurar RE, compilar body ANTES, ejecutar medicion (917.3 seg / 15.3 min)
+3. Restaurar RE, compilar body DESPUES, ejecutar medicion (625.4 seg / 10.4 min)
+4. Body OPT-015 dejado activo en DESARROLLO
+
+**Paquete para riesgos/seguridad creado**:
+- Carpeta: `OPT-015_SETBASED_CANCELADO_REWRITE/PAQUETE_PRUEBAS_RIESGOS/`
+- Contenido: body ANTES, body DESPUES, script medicion, script indice, guia de pruebas, explicacion de cambios, historia Jira
+
+**Historia Jira**: IRD-519 — "Optimizacion de rendimiento del job de precalificacion de cancelados"
 
 ---
 
@@ -97,6 +128,8 @@
 | Baseline original (sin indices) | ~24 min | — |
 | Con indices OPT-014 | 14.2 min | -41% |
 | Con indices + OPT-015 set-based | **11.3 min** | **-53%** |
+| Medicion formal 15/04 (ANTES) | 15.3 min | -36% |
+| Medicion formal 15/04 (DESPUES) | **10.4 min** | **-57%** |
 
 ---
 
@@ -128,10 +161,12 @@
 ## Lo que queda pendiente
 
 ### 1. OPT-015: Aprobar para produccion
-- **Estado**: Completado en DESARROLLO, pendiente aprobacion del jefe
-- **Accion**: Presentar resultados (23 min → 11.3 min, -51%) y validacion de equivalencia
-- **Pendiente**: Medir en QA cuando este disponible
-- **Rollback**: `body_ANTES_OPT015.sql` en carpeta OPT-015
+- **Estado**: Pruebas formales completadas, paquete enviado a riesgos/seguridad
+- **Historia Jira**: IRD-519
+- **Resultados**: 15.3 min → 10.4 min (-32%)
+- **Paquete**: `OPT-015_SETBASED_CANCELADO_REWRITE/PAQUETE_PRUEBAS_RIESGOS/`
+- **Pendiente**: Aprobacion de riesgos/seguridad, luego deploy a produccion
+- **Rollback**: `body_ANTES_OPT015.sql`
 
 ### 2. Propuestas de hardcodeo — 3 cursores del job mensual (cost total 11,698 → 62)
 - **Estado**: Propuestas documentadas, pendientes aprobacion del jefe
