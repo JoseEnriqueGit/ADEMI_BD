@@ -1,5 +1,84 @@
 # OPT-015 - Rewrite Set-Based + Inline NOT EXISTS en Pasos 5-6
 
+## Actualizacion 2026-04-16 | Handoff para otra PC / sesion Codex
+
+- **Estado actual**: se dejo preparado un paquete de pruebas mas riguroso en `PAQUETE_PRUEBAS_RIESGOS` para validar equivalencia funcional en `DESARROLLO` desde una PC con acceso a Oracle.
+- **Importante**: en esta sesion **no** se ejecutaron scripts contra la BD. Solo se preparo documentacion, scripts SQL y metodologia.
+- **Objetivo de la siguiente sesion**: correr la validacion rigurosa de equivalencia para OPT-015 y luego, si pasa, cerrar evidencia con tiempos ANTES/DESPUES.
+
+### Archivos nuevos preparados
+
+- `PAQUETE_PRUEBAS_RIESGOS/02_SETUP_EQUIVALENCIA_OPT015.sql`
+- `PAQUETE_PRUEBAS_RIESGOS/03_EJECUTAR_CADENA_CANCELADOS_OPT015.sql`
+- `PAQUETE_PRUEBAS_RIESGOS/04_LIMPIAR_RUN_EQUIVALENCIA_OPT015.sql`
+- `PAQUETE_PRUEBAS_RIESGOS/06_COMPARAR_EQUIVALENCIA_CANCELADOS_OPT015.sql`
+- `PAQUETE_PRUEBAS_RIESGOS/07_RESTAURAR_PARAMETRO_LOTE_OPT015.sql`
+- `PAQUETE_PRUEBAS_RIESGOS/PRUEBAS_OPT015_RIGUROSA.md`
+
+### Que cambia respecto a la guia anterior
+
+- La equivalencia ya no se basa solo en `PR_REPRESTAMOS`.
+- Se compara tambien:
+  - `PR_SOLICITUD_REPRESTAMO`
+  - `PR_CANALES_REPRESTAMO`
+  - `PR_OPCIONES_REPRESTAMO`
+  - `PR_BITACORA_REPRESTAMO`
+- La comparacion se hace por **llave de negocio**:
+  - `CODIGO_EMPRESA`
+  - `CODIGO_CLIENTE`
+  - `NO_CREDITO`
+  - `FECHA_CORTE`
+- No se usa `ID_REPRESTAMO` como clave de comparacion entre corridas porque la secuencia cambia.
+- Se sube temporalmente `LOTE_DE_CARAGA_REPRESTAMO` a `500` para reducir la variabilidad por `ROWNUM` sin `ORDER BY`.
+- Se excluyen `PVALIDA_WORLD_COMPLIANCE` y `PVALIDA_XCORE` como criterio de equivalencia porque meten dependencias externas y ruido ajeno a OPT-015.
+
+### Flujo recomendado para la siguiente sesion
+
+1. Confirmar acceso a `DESARROLLO`.
+2. Ejecutar `01_CREAR_INDICE_IDX_GARANTIAS_TIPO_SB.sql` solo si el indice no existe.
+3. Ejecutar `02_SETUP_EQUIVALENCIA_OPT015.sql`.
+4. Compilar `body_ANTES_OPT015.sql`.
+5. Ejecutar `03_EJECUTAR_CADENA_CANCELADOS_OPT015.sql` con `RUN_LABEL = ANTES`.
+6. Ejecutar `05_MEDIR_JOB_CANCELADO_DETALLADO.sql` para tiempos ANTES.
+7. Ejecutar `04_LIMPIAR_RUN_EQUIVALENCIA_OPT015.sql` con `RUN_LABEL = ANTES`.
+8. Compilar `body_DESPUES_OPT015.sql`.
+9. Ejecutar `03_EJECUTAR_CADENA_CANCELADOS_OPT015.sql` con `RUN_LABEL = DESPUES`.
+10. Ejecutar `05_MEDIR_JOB_CANCELADO_DETALLADO.sql` para tiempos DESPUES.
+11. Ejecutar `06_COMPARAR_EQUIVALENCIA_CANCELADOS_OPT015.sql`.
+12. Ejecutar `07_RESTAURAR_PARAMETRO_LOTE_OPT015.sql`.
+13. Si se desea limpiar los datos funcionales del segundo run, ejecutar `04_LIMPIAR_RUN_EQUIVALENCIA_OPT015.sql` con `RUN_LABEL = DESPUES`.
+
+### Resultado esperado para aprobar equivalencia
+
+- `0` filas exclusivas y `0` diferencias en:
+  - `PR_REPRESTAMOS`
+  - `PR_SOLICITUD_REPRESTAMO`
+  - `PR_CANALES_REPRESTAMO`
+  - `PR_OPCIONES_REPRESTAMO`
+  - `PR_BITACORA_REPRESTAMO`
+- Mejora de tiempo en `Paso 5`, `Paso 6` y total del job.
+
+### Permisos / objetos que deben existir en la otra PC
+
+- Conexion al entorno `DESARROLLO`.
+- Capacidad de compilar `PR.PR_PKG_REPRESTAMOS`.
+- Capacidad de ejecutar `UPDATE` sobre `PA.PA_PARAMETROS_MVP`.
+- Capacidad de crear tablas auxiliares en el usuario desde el cual se ejecutaran los scripts.
+- Indice `PR.IDX_GARANTIAS_TIPO_SB` valido.
+
+### Si algo falla, lo primero que hay que capturar
+
+- Error exacto de compilacion del package.
+- Error exacto al crear tablas auxiliares.
+- Error exacto al actualizar `PA.PA_PARAMETROS_MVP`.
+- Salida final de `03_EJECUTAR_CADENA_CANCELADOS_OPT015.sql` y de `06_COMPARAR_EQUIVALENCIA_CANCELADOS_OPT015.sql`.
+
+### Nota metodologica para la siguiente sesion
+
+- Esta validacion es deliberadamente mas estrecha que el job completo.
+- Cubre la cadena local impactada por OPT-015 y deja fuera pasos externos.
+- Si esta validacion pasa, ya se puede afirmar equivalencia funcional local con mucha mas fuerza que con la guia anterior.
+
 - **Paquete**: PR_PKG_REPRESTAMOS
 - **Procedures**: Precalifica_Repre_Cancelado (L.382), Precalifica_Repre_Cancelado_hi (L.766)
 - **Entorno**: DESARROLLO (ADMQA1 / bmadev0004)
