@@ -1,0 +1,86 @@
+/* 
+  Historia: Pagina 135 APEX - filtro de productos digitales
+  Objetivo: validar si existen certificados para alguno de los productos digitales
+            usados por la pagina 135.
+
+  Nota:
+  - En Toad/APEX SQL Workshop, :P_COD_EMPRESA puede dejarse como bind.
+  - Si se desea forzar una empresa, reemplazar NVL(:P_COD_EMPRESA, '1') por el codigo fijo.
+*/
+
+/* 1. Validacion general: existe al menos un certificado digital */
+WITH certificados_digitales AS (
+    SELECT
+        cd.COD_PRODUCTO,
+        cd.NUM_CERTIFICADO,
+        cd.CLIENTE,
+        cd.ESTADO,
+        cd.FEC_EMISION,
+        cd.FEC_VENCIMIENTO
+    FROM CD.CD_CERTIFICADO cd
+    WHERE cd.COD_EMPRESA = NVL(:P_COD_EMPRESA, '1')
+      AND cd.COD_PRODUCTO IN (310, 311, 313, 314, 315, 316, 317, 318)
+)
+SELECT
+    CASE
+        WHEN COUNT(*) > 0 THEN 'SI'
+        ELSE 'NO'
+    END AS EXISTE_AL_MENOS_UN_CERTIFICADO,
+    COUNT(*) AS TOTAL_CERTIFICADOS_DIGITALES,
+    MIN(FEC_EMISION) AS PRIMERA_FECHA_EMISION,
+    MAX(FEC_EMISION) AS ULTIMA_FECHA_EMISION
+FROM certificados_digitales;
+
+/* 2. Validacion por producto: muestra cuales productos tienen certificados */
+WITH productos_digitales AS (
+    SELECT 310 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 311 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 313 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 314 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 315 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 316 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 317 AS COD_PRODUCTO FROM DUAL UNION ALL
+    SELECT 318 AS COD_PRODUCTO FROM DUAL
+),
+conteo AS (
+    SELECT
+        cd.COD_PRODUCTO,
+        COUNT(*) AS TOTAL_CERTIFICADOS,
+        MIN(cd.FEC_EMISION) AS PRIMERA_FECHA_EMISION,
+        MAX(cd.FEC_EMISION) AS ULTIMA_FECHA_EMISION
+    FROM CD.CD_CERTIFICADO cd
+    WHERE cd.COD_EMPRESA = NVL(:P_COD_EMPRESA, '1')
+      AND cd.COD_PRODUCTO IN (310, 311, 313, 314, 315, 316, 317, 318)
+    GROUP BY cd.COD_PRODUCTO
+)
+SELECT
+    p.COD_PRODUCTO,
+    CASE
+        WHEN NVL(c.TOTAL_CERTIFICADOS, 0) > 0 THEN 'SI'
+        ELSE 'NO'
+    END AS EXISTE_CERTIFICADO,
+    NVL(c.TOTAL_CERTIFICADOS, 0) AS TOTAL_CERTIFICADOS,
+    c.PRIMERA_FECHA_EMISION,
+    c.ULTIMA_FECHA_EMISION
+FROM productos_digitales p
+LEFT JOIN conteo c
+    ON c.COD_PRODUCTO = p.COD_PRODUCTO
+ORDER BY p.COD_PRODUCTO;
+
+/* 3. Resumen de certificados encontrados agrupados por producto */
+SELECT
+    cd.COD_PRODUCTO,
+    COUNT(*) AS TOTAL_CERTIFICADOS,
+    COUNT(DISTINCT cd.CLIENTE) AS TOTAL_CLIENTES,
+    SUM(cd.MONTO) AS MONTO_TOTAL,
+    MIN(cd.FEC_EMISION) AS PRIMERA_FECHA_EMISION,
+    MAX(cd.FEC_EMISION) AS ULTIMA_FECHA_EMISION,
+    MIN(cd.FEC_VENCIMIENTO) AS PRIMERA_FECHA_VENCIMIENTO,
+    MAX(cd.FEC_VENCIMIENTO) AS ULTIMA_FECHA_VENCIMIENTO
+FROM CD.CD_CERTIFICADO cd
+WHERE cd.COD_EMPRESA = NVL(:P_COD_EMPRESA, '1')
+  AND cd.COD_PRODUCTO IN (310, 311, 313, 314, 315, 316, 317, 318)
+GROUP BY
+    cd.COD_PRODUCTO
+ORDER BY
+    cd.COD_PRODUCTO;
