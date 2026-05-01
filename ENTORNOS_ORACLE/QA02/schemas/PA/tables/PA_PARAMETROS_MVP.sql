@@ -1,0 +1,60 @@
+DROP TABLE PA.PA_PARAMETROS_MVP CASCADE CONSTRAINTS;
+
+CREATE TABLE PA.PA_PARAMETROS_MVP
+(
+  CODIGO_EMPRESA      NUMBER(4)                 NOT NULL,
+  CODIGO_MVP          VARCHAR2(30 BYTE)         NOT NULL,
+  CODIGO_PARAMETRO    VARCHAR2(50 BYTE)         NOT NULL,
+  DES_PARAMETRO       VARCHAR2(500 BYTE)        NOT NULL,
+  VALOR               VARCHAR2(4000 BYTE),
+  ADICIONADO_POR      VARCHAR2(30 BYTE)         NOT NULL,
+  FECHA_ADICION       DATE                      NOT NULL,
+  MODIFICADO_POR      VARCHAR2(30 BYTE),
+  FECHA_MODIFICACION  DATE,
+  VALOR_RAW           RAW(2000)
+)
+TABLESPACE PA_DAT
+PCTFREE    10
+INITRANS   1
+MAXTRANS   255
+STORAGE    (
+            INITIAL          64K
+            NEXT             1M
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            BUFFER_POOL      DEFAULT
+           )
+LOGGING 
+NOCOMPRESS 
+NOCACHE;
+
+
+CREATE OR REPLACE TRIGGER PR.TRG_BUI_PA_PARAMETROS_MVP
+BEFORE INSERT OR UPDATE
+ON pa.pa_parametros_MVP REFERENCING NEW AS New OLD AS Old
+FOR EACH ROW
+BEGIN
+  IF INSERTING THEN
+     :new.fecha_adicion := sysdate;
+     if :new.adicionado_por is null THEN
+        :new.adicionado_por := user;
+     end if;
+  ELSE 
+     :new.fecha_modificacion := sysdate;
+     if :new.modificado_por is null THEN
+        :new.modificado_por := user;
+     end if;
+  END IF;
+END;
+/
+
+
+CREATE OR REPLACE PUBLIC SYNONYM PA_PARAMETROS_MVP FOR PA.PA_PARAMETROS_MVP;
+
+
+GRANT SELECT ON PA.PA_PARAMETROS_MVP TO BPR;
+
+GRANT DELETE, INSERT, SELECT, UPDATE ON PA.PA_PARAMETROS_MVP TO PR WITH GRANT OPTION;
+
+GRANT SELECT ON PA.PA_PARAMETROS_MVP TO USR_REMESAS;
