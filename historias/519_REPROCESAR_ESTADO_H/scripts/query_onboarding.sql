@@ -10,7 +10,7 @@
 --   - Tipos de documento (fuente: JSON DocumentService Onboarding):
 --     P: 618/429 (FCSCPF), 424 (SolicitudTarjeta), 809 (MRAVPF/MatrizRiesgo)
 --     R: 810/527 (SIB), 621/511 (LEXISNEXIS), 762/428 (BURO)
---   - Mapeo estado H: 618,429,424,809 -> P | 810,527,621,511,762,428 -> R
+--   - Mapeo Reprocesar (todos los estados): 618,429,424,809 -> P | 810,527,621,511,762,428 -> R
 -- =============================================================================
 WITH
   CONFIG AS (
@@ -35,21 +35,15 @@ FROM (
     -- =============================================================================
     SELECT
         CASE
-            WHEN R.ESTADO_REPORTE = 'H' THEN
-                 '<a href="' || APEX_PAGE.GET_URL(
-                        p_page   => 66,
-                        p_items  => 'P66_CODIGO_REPORTE,P66_ESTADO_REPORTE',
-                        p_values => R.CODIGO_REPORTE || ',' ||
-                                    CASE
-                                        WHEN R.ID_TIPO_DOCUMENTO IN ('618', '429', '424', '809') THEN 'P'
-                                        ELSE 'R'
-                                    END
-                    ) || '">Reprocesar</a>'
-            WHEN R.ESTADO_REPORTE IN ('E', 'D', 'S') THEN
+            WHEN R.ESTADO_REPORTE IN ('E', 'D', 'S', 'H') THEN
                 '<a href="' || APEX_PAGE.GET_URL(
                     p_page   => 66,
                     p_items  => 'P66_CODIGO_REPORTE,P66_ESTADO_REPORTE',
-                    p_values => R.CODIGO_REPORTE || ',' || CASE WHEN R.ESTADO_REPORTE = 'S' THEN 'P' ELSE 'R' END
+                    p_values => R.CODIGO_REPORTE || ',' ||
+                                CASE
+                                    WHEN R.ID_TIPO_DOCUMENTO IN ('618', '429', '424', '809') THEN 'P'
+                                    ELSE 'R'
+                                END
                 ) || '">Reprocesar</a>'
             ELSE NULL
         END AS REIMPRIMIR,
@@ -91,21 +85,15 @@ FROM (
     -- =============================================================================
     SELECT
         CASE
-            WHEN R.ESTADO_REPORTE = 'H' THEN
-                 '<a href="' || APEX_PAGE.GET_URL(
-                        p_page   => 66,
-                        p_items  => 'P66_CODIGO_REPORTE,P66_ESTADO_REPORTE',
-                        p_values => R.CODIGO_REPORTE || ',' ||
-                                    CASE
-                                        WHEN R.ID_TIPO_DOCUMENTO IN ('618', '429', '424', '809') THEN 'P'
-                                        ELSE 'R'
-                                    END
-                    ) || '">Reprocesar</a>'
-            WHEN R.ESTADO_REPORTE IN ('E', 'D', 'S') THEN
+            WHEN R.ESTADO_REPORTE IN ('E', 'D', 'S', 'H') THEN
                 '<a href="' || APEX_PAGE.GET_URL(
                     p_page   => 66,
                     p_items  => 'P66_CODIGO_REPORTE,P66_ESTADO_REPORTE',
-                    p_values => R.CODIGO_REPORTE || ',' || CASE WHEN R.ESTADO_REPORTE = 'S' THEN 'P' ELSE 'R' END
+                    p_values => R.CODIGO_REPORTE || ',' ||
+                                CASE
+                                    WHEN R.ID_TIPO_DOCUMENTO IN ('618', '429', '424', '809') THEN 'P'
+                                    ELSE 'R'
+                                END
                 ) || '">Reprocesar</a>'
             ELSE NULL
         END AS REIMPRIMIR,

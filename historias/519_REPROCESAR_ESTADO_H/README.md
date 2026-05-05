@@ -77,7 +77,11 @@ END AS REIMPRIMIR
 | Columna Représtamo | `SR.ID_REPRESTAMO` | Se elimina (no aplica) |
 | Columna No. Crédito | `F_NUM_PRESTAMO` | `F_NUM_CUENTA` (número de cuenta) |
 
-### Mapeo de transición Onboarding (estado H)
+### Mapeo de transición Onboarding (todos los estados E, D, S, H)
+
+Según los criterios de aceptación de la IRD-519, la transición al reprocesar se determina
+**siempre por tipo de documento**, sin importar el estado actual. Esto difiere de la página 63
+(Represtamos) donde E/D/S usan lógica basada en estado.
 
 | Servicio | ID Tipo Documento | Estado destino | Fuente |
 |---|---|---|---|
