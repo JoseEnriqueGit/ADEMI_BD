@@ -1,0 +1,62 @@
+-- =====================================================================
+-- ACUMULADO: Crear indices de soporte de OPT-002, 004, 009, 010, 011, 013, 016
+-- Ejecutar solo si faltan en DESARROLLO o si se desea preparar el paquete
+-- para validacion / pase posterior a Riesgos y Produccion.
+-- NOTA: En QA algunos indices se crearon bajo JOOGANDO; aqui se crean bajo el schema correcto
+-- =====================================================================
+
+-- OPT-002: Indice covering CUR_DE08_SIB
+CREATE INDEX PA.IDX_DE08_SIB_FECHA_DEUDOR
+ON PA.PA_DE08_SIB (FECHA_CORTE, ID_DEUDOR, CLASIFICACION)
+TABLESPACE PA_DAT;
+
+-- OPT-004: Indice de soporte para UPDATE set-based de clasificacion SIB
+CREATE INDEX PA.IDX_DE08_NOCRED_CALIF_FECHA
+ON PA.PA_DETALLADO_DE08 (NO_CREDITO, FECHA_CORTE, CALIFICA_CLIENTE)
+TABLESPACE PA_DAT;
+
+-- OPT-009: Indice para F_Obtener_Nuevo_Credito
+CREATE INDEX PR.IDX_CREDITOS_HI_NOCREDITO
+ON PR.PR_CREDITOS_HI (NO_CREDITO);
+
+-- OPT-010 / OPT-015: Indice de soporte para validacion inline de garantias
+CREATE INDEX PR.IDX_GARANTIAS_TIPO_SB
+ON PR.PR_GARANTIAS (CODIGO_EMPRESA, NUMERO_GARANTIA, CODIGO_TIPO_GARANTIA_SB)
+TABLESPACE PR_DAT;
+
+-- OPT-011: Indice covering CUR_Anular_creditos_cancelados
+CREATE INDEX PR.IDX_REPRESTAMOS_EMP_EST_NOCRED
+ON PR.PR_REPRESTAMOS (CODIGO_EMPRESA, ESTADO, NO_CREDITO, ID_REPRESTAMO)
+TABLESPACE PR_DAT;
+
+-- OPT-013: Indice covering CUR_DE05_SIB
+CREATE INDEX PA.IDX_DE05_SIB_CASTIGO_CEDULA
+ON PA.PA_DE05_SIB (FECHA_CASTIGO, CEDULA, ENTIDAD)
+TABLESPACE PA_DAT;
+
+-- OPT-016: Indice covering para cursor de P_REGISTRO_SOLICITUD (WHERE ESTADO = 'RE')
+-- Mejora medida en DESARROLLO: Buffers 126 -> 3 (-97.6%)
+CREATE INDEX PR.IDX_REPRESTAMOS_ESTADO_COV
+ON PR.PR_REPRESTAMOS (ESTADO, ID_REPRESTAMO, XCORE_GLOBAL)
+TABLESPACE PR_DAT;
+
+-- OPT-016: Indice covering para subquery de F_Obtener_Nuevo_Credito (WHERE ID_REPRESTAMO = X)
+-- Mejora medida en DESARROLLO: Buffers ~5 -> 2 (-60%), ejecutada por cada fila del cursor
+CREATE INDEX PR.IDX_SOLREPRE_IDREPRE_TIPCRED
+ON PR.PR_SOLICITUD_REPRESTAMO (ID_REPRESTAMO, TIPO_CREDITO)
+TABLESPACE PR_DAT;
+
+-- Verificar que se crearon:
+SELECT INDEX_NAME, TABLE_NAME, TABLE_OWNER, STATUS
+FROM ALL_INDEXES
+WHERE INDEX_NAME IN (
+    'IDX_DE08_SIB_FECHA_DEUDOR',
+    'IDX_DE08_NOCRED_CALIF_FECHA',
+    'IDX_CREDITOS_HI_NOCREDITO',
+    'IDX_GARANTIAS_TIPO_SB',
+    'IDX_REPRESTAMOS_EMP_EST_NOCRED',
+    'IDX_DE05_SIB_CASTIGO_CEDULA',
+    'IDX_REPRESTAMOS_ESTADO_COV',
+    'IDX_SOLREPRE_IDREPRE_TIPCRED'
+);
+-- Debe retornar 8 filas con STATUS = VALID
