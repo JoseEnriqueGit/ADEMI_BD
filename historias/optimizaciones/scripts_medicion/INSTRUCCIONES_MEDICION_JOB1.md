@@ -33,7 +33,7 @@ Ambos archivos estan en `historias/optimizaciones/scripts_medicion/`
 ## IMPORTANTE: Ejecutar DESPUES de la medicion de indices
 
 Estas instrucciones asumen que ya completaste la medicion de indices
-(INSTRUCCIONES_MEDICION.md) y los 4 indices estan restaurados.
+(INSTRUCCIONES_MEDICION.md) y los 6 indices estan restaurados.
 
 ---
 

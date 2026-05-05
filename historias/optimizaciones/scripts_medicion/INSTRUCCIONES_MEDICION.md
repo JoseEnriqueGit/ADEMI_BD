@@ -4,14 +4,14 @@
 > Job: JOB_PRECALIFICA_REPRESTAMO (mensual, dia 1 a las 7am)
 > Procedimiento: PR.PR_PKG_REPRESTAMOS.P_CARGA_PRECALIFICA_REPRESTAMO
 > Entorno: QA (JOOGANDO@QAORACEL)
-> Optimizaciones a medir: 4 indices (OPT-002, 009, 011, 013)
+> Optimizaciones a medir: 6 indices (OPT-002, 004, 009, 010, 011, 013)
 
 ---
 
 ## Contexto
 
 Este job reutiliza procedimientos del Job 1 (P_Carga_Precalifica_Cancelado) que se
-benefician de 4 indices creados en optimizaciones anteriores. Los indices ya estan
+benefician de 6 indices creados en optimizaciones anteriores. Los indices ya estan
 en la BD de QA. Queremos medir cuanto impactan eliminandolos y restaurandolos.
 
 **No hay cambios de codigo** — solo indices.
@@ -21,7 +21,9 @@ en la BD de QA. Queremos medir cuanto impactan eliminandolos y restaurandolos.
 | OPT | Indice | Tabla | Mejora en Explain Plan |
 |-----|--------|-------|----------------------|
 | OPT-002 | IDX_DE08_SIB_FECHA_DEUDOR | PA.PA_DE08_SIB | 64,753 -> 39 |
+| OPT-004 | IDX_DE08_NOCRED_CALIF_FECHA | PA.PA_DETALLADO_DE08 | soporte al UPDATE set-based |
 | OPT-009 | IDX_CREDITOS_HI_NOCREDITO | PR.PR_CREDITOS_HI | 17,232 -> 909 |
+| OPT-010 | IDX_GARANTIAS_TIPO_SB | PR.PR_GARANTIAS | soporte al NOT EXISTS inline |
 | OPT-011 | IDX_REPRESTAMOS_EMP_EST_NOCRED | PR.PR_REPRESTAMOS | 10,656 -> 9,748 |
 | OPT-013 | IDX_DE05_SIB_CASTIGO_CEDULA | PA.PA_DE05_SIB | 120,122 -> 11 |
 
@@ -36,15 +38,17 @@ SELECT INDEX_NAME, TABLE_NAME, TABLE_OWNER, STATUS
 FROM ALL_INDEXES
 WHERE INDEX_NAME IN (
     'IDX_DE08_SIB_FECHA_DEUDOR',
+    'IDX_DE08_NOCRED_CALIF_FECHA',
     'IDX_CREDITOS_HI_NOCREDITO',
+    'IDX_GARANTIAS_TIPO_SB',
     'IDX_REPRESTAMOS_EMP_EST_NOCRED',
     'IDX_DE05_SIB_CASTIGO_CEDULA'
 );
 ```
-Debe retornar 4 filas. Si falta alguno, no se puede medir esa OPT.
+Debe retornar 6 filas. Si falta alguno, no se puede medir esa OPT.
 **Anotar los resultados.**
 
-### Paso 2 — Eliminar los 4 indices
+### Paso 2 — Eliminar los 6 indices
 Abrir y ejecutar: `scripts_medicion/01_DROP_INDICES_ROLLBACK.sql`
 
 Verificar que el SELECT final retorna 0 filas (indices eliminados).
@@ -66,10 +70,10 @@ ANTES Ejecucion 2:             elapsed=___ms cpu=___ lio=___
 ANTES Ejecucion 3:             elapsed=___ms cpu=___ lio=___
 ```
 
-### Paso 4 — Restaurar los 4 indices
+### Paso 4 — Restaurar los 6 indices
 Abrir y ejecutar: `scripts_medicion/03_CREATE_INDICES_RESTAURAR.sql`
 
-Verificar que el SELECT final retorna 4 filas con STATUS = VALID.
+Verificar que el SELECT final retorna 6 filas con STATUS = VALID.
 
 **NOTA**: La creacion de indices puede tardar unos minutos dependiendo del tamano
 de las tablas. Esperar a que termine antes de continuar.
@@ -133,9 +137,9 @@ SELECT STATUS FROM ALL_OBJECTS WHERE OBJECT_NAME = 'PR_PKG_REPRESTAMOS' AND OBJE
 
 | Archivo | Que hace |
 |---------|----------|
-| 01_DROP_INDICES_ROLLBACK.sql | Elimina los 4 indices para medir baseline |
+| 01_DROP_INDICES_ROLLBACK.sql | Elimina los 6 indices para medir baseline |
 | 02_MEDIR_JOB_PRECALIFICA.sql | Script de medicion con V$MYSTAT |
-| 03_CREATE_INDICES_RESTAURAR.sql | Restaura los 4 indices |
+| 03_CREATE_INDICES_RESTAURAR.sql | Restaura los 6 indices |
 | MEDIR_JOB_ANULAR.sql | Script de medicion para el otro job (JOB_ACTUALIZAR_ANULAR_RD) |
 | README.md | Explicacion de metricas |
 | INSTRUCCIONES_MEDICION.md | Este archivo |

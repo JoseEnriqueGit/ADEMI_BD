@@ -78,8 +78,21 @@ Los 4 indices redujeron el tiempo en ~600 segundos. El mayor impacto fue en:
 - **Requiere investigacion adicional** — ver seccion "Pendientes"
 
 ### Pasos 8 y 9 subieron ligeramente
-No es regresion de los indices. Se procesaron mas RE (v_conteo=8 vs 5) porque con indices
-la precalificacion rechaza menos registros, dejando mas trabajo para XCORE y REGISTRO_SOLICITUD.
+No es regresion de los indices. El conjunto de represtamos sobrevivientes a precalificacion
+cambio entre runs: ANTES quedaron 5 en estado RE; DESPUES quedaron 8. Como pasos 8-9 solo
+procesan los que siguen en RE, procesaron mas registros y por eso subieron en tiempo absoluto.
+
+**Aclaracion tecnica**: los indices NO cambian que registros rechaza una query — solo
+cambian como Oracle accede a la data. La diferencia 5 vs 8 se debe a drift en datos
+auxiliares entre corridas (PA_DE05_SIB, PA_DE08_SIB, PR_CREDITOS_HI pudieron actualizarse;
+o validaciones con SYSDATE corrieron a horas distintas). Solo se restauraron los 190 RE
+de PR_REPRESTAMOS, no las tablas dependientes.
+
+**Normalizado por registro**: P_REGISTRO_SOLICITUD paso de 18.6s/5 reg = ~3.7s/reg ANTES
+a 23.9s/8 reg = ~3.0s/reg DESPUES. Por registro mejoro ~19%, no empeoro.
+
+Para una medicion futura rigurosa: congelar todas las tablas dependientes entre corridas
+o normalizar metricas por cantidad de RE procesados.
 
 ## Volumenes de datos
 

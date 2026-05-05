@@ -1,7 +1,7 @@
 -- =====================================================================
--- RESTAURAR: Crear indices de OPT-002, 009, 011, 013
+-- RESTAURAR: Crear indices de OPT-002, 004, 009, 010, 011, 013
 -- Ejecutar DESPUES de medir el baseline para restaurar las optimizaciones
--- NOTA: En QA los indices se crearon bajo JOOGANDO, aqui se crean bajo el schema correcto
+-- NOTA: En QA algunos indices se crearon bajo JOOGANDO; aqui se crean bajo el schema correcto
 -- =====================================================================
 
 -- OPT-002: Indice covering CUR_DE08_SIB
@@ -9,9 +9,19 @@ CREATE INDEX PA.IDX_DE08_SIB_FECHA_DEUDOR
 ON PA.PA_DE08_SIB (FECHA_CORTE, ID_DEUDOR, CLASIFICACION)
 TABLESPACE PA_DAT;
 
+-- OPT-004: Indice de soporte para UPDATE set-based de clasificacion SIB
+CREATE INDEX PA.IDX_DE08_NOCRED_CALIF_FECHA
+ON PA.PA_DETALLADO_DE08 (NO_CREDITO, FECHA_CORTE, CALIFICA_CLIENTE)
+TABLESPACE PA_DAT;
+
 -- OPT-009: Indice para F_Obtener_Nuevo_Credito
 CREATE INDEX PR.IDX_CREDITOS_HI_NOCREDITO
 ON PR.PR_CREDITOS_HI (NO_CREDITO);
+
+-- OPT-010 / OPT-015: Indice de soporte para validacion inline de garantias
+CREATE INDEX PR.IDX_GARANTIAS_TIPO_SB
+ON PR.PR_GARANTIAS (CODIGO_EMPRESA, NUMERO_GARANTIA, CODIGO_TIPO_GARANTIA_SB)
+TABLESPACE PR_DAT;
 
 -- OPT-011: Indice covering CUR_Anular_creditos_cancelados
 CREATE INDEX PR.IDX_REPRESTAMOS_EMP_EST_NOCRED
@@ -28,8 +38,10 @@ SELECT INDEX_NAME, TABLE_NAME, TABLE_OWNER, STATUS
 FROM ALL_INDEXES
 WHERE INDEX_NAME IN (
     'IDX_DE08_SIB_FECHA_DEUDOR',
+    'IDX_DE08_NOCRED_CALIF_FECHA',
     'IDX_CREDITOS_HI_NOCREDITO',
+    'IDX_GARANTIAS_TIPO_SB',
     'IDX_REPRESTAMOS_EMP_EST_NOCRED',
     'IDX_DE05_SIB_CASTIGO_CEDULA'
 );
--- Debe retornar 4 filas con STATUS = VALID
+-- Debe retornar 6 filas con STATUS = VALID
