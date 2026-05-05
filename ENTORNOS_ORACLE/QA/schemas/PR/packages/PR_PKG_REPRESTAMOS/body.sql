@@ -120,18 +120,10 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
-       AND NOT EXISTS (
-            SELECT 1
-            FROM PR_GARANTIAS_X_CREDITO gxc
-            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
-                                AND g.numero_garantia = gxc.numero_garantia
-            WHERE gxc.codigo_empresa = a.codigo_empresa
-              AND gxc.no_credito = a.no_credito
-              AND g.codigo_tipo_garantia_sb != 'NA'
-       )
+        -- Se valida que los clientes no tengan no garantes 
+       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
         ;
@@ -483,20 +475,12 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
-        AND NOT EXISTS (
-            SELECT 1
-            FROM PR_GARANTIAS_X_CREDITO gxc
-            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
-                                AND g.numero_garantia = gxc.numero_garantia
-            WHERE gxc.codigo_empresa = a.codigo_empresa
-              AND gxc.no_credito = a.no_credito
-              AND g.codigo_tipo_garantia_sb != 'NA'
-        )
+        -- Se valida que los clientes no tengan no garantes 
+        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0 
         ;
         
                          
@@ -1251,18 +1235,10 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.codigo_empresa = a1.codigo_empresa
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente)
-        -- OPT-010: Se valida que los clientes no tengan garantes (inline NOT EXISTS reemplaza F_TIENE_GARANTIA)
-       AND NOT EXISTS (
-            SELECT 1
-            FROM PR_GARANTIAS_X_CREDITO gxc
-            JOIN PR_GARANTIAS g ON g.codigo_empresa = gxc.codigo_empresa
-                                AND g.numero_garantia = gxc.numero_garantia
-            WHERE gxc.codigo_empresa = a.codigo_empresa
-              AND gxc.no_credito = a.no_credito
-              AND g.codigo_tipo_garantia_sb != 'NA'
-       )
+        -- Se valida que los clientes no tengan no garantes 
+       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
         -- Se valida que los clientes no esten en lista PEP
-        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0
+        AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
         AND EXISTS (
@@ -2725,34 +2701,34 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                      
    --ACTUALIZA EL MONTO CREDITO ACTUAL
           
-          -- OPT-004: Reemplazado loop row-by-row con UPDATEs set-based
-          -- UPDATE 1: Actualizar MTO_CREDITO_ACTUAL con ultimo monto desembolsado
-          UPDATE PR.PR_REPRESTAMOS R
-          SET R.MTO_CREDITO_ACTUAL = (SELECT D.monto_desembolsado
-                                        FROM PA.PA_DETALLADO_DE08 D
-                                       WHERE D.FUENTE         = 'PR'
-                                         AND D.NO_CREDITO     = R.NO_CREDITO
-                                         AND D.CODIGO_CLIENTE = R.CODIGO_CLIENTE
-                                         AND D.FECHA_CORTE    = (SELECT MAX(P.FECHA_CORTE)
-                                                                   FROM PA_DETALLADO_DE08 P
-                                                                  WHERE P.FUENTE         = 'PR'
-                                                                    AND P.NO_CREDITO     = R.NO_CREDITO
-                                                                    AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-          WHERE R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-            AND R.ESTADO = 'RE';
-
-          -- UPDATE 2: Marcar como RSB los que no cumplen clasificacion SIB
-          UPDATE PR_REPRESTAMOS R
-          SET R.ESTADO = 'RSB'
-          WHERE R.ESTADO = 'RE'
-            AND EXISTS (SELECT 1
-                          FROM PA_DETALLADO_DE08 D
-                         WHERE D.NO_CREDITO = R.NO_CREDITO
-                           AND D.CALIFICA_CLIENTE NOT IN (SELECT COLUMN_VALUE
-                                                            FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('CLASIFICACION_SIB')))
-                           AND D.FECHA_CORTE = v_fecha_corte);
-
-          COMMIT;
+          FOR y in Actualizar_Mto_Credito_Actual LOOP
+             UPDATE PR.PR_REPRESTAMOS R SET  R.MTO_CREDITO_ACTUAL = (SELECT monto_desembolsado
+                                               FROM  PA.PA_DETALLADO_DE08 D
+                                              WHERE  D.FUENTE           = 'PR'
+                                                 AND D.NO_CREDITO       = y.NO_CREDITO 
+                                                 AND D.CODIGO_CLIENTE   = y.CODIGO_CLIENTE
+                                                 AND D.FECHA_CORTE   = ( SELECT MAX(P.FECHA_CORTE)   
+                                                                                                FROM PA_DETALLADO_DE08 P
+                                                                                                WHERE P.FUENTE       = 'PR' 
+                                                                                                AND P.NO_CREDITO     = y.NO_CREDITO 
+                                                                                                AND P.CODIGO_CLIENTE = y.CODIGO_CLIENTE))
+                                                                                                
+               WHERE R.CODIGO_EMPRESA = PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+               AND R.CODIGO_CLIENTE =   y.CODIGO_CLIENTE
+               AND R.NO_CREDITO     =   y.NO_CREDITO 
+               AND R.ESTADO         = 'RE';
+               --Actualizo el estado del detalle de la bitacora
+        --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
+       
+         COMMIT;     
+         
+        UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB' WHERE NO_CREDITO = ( SELECT NO_CREDITO 
+                FROM PA_DETALLADO_DE08 
+                WHERE NO_CREDITO = y.NO_CREDITO 
+                AND CALIFICA_CLIENTE  NOT IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'CLASIFICACION_SIB')))
+                AND  fecha_corte = v_fecha_corte);
+           COMMIT;         
+      END LOOP;
     
     
       --Cambio el estado del detalle de la bitacora
@@ -9394,13 +9370,11 @@ END P_Registra_Solicitud_Campana;
              SELECT id_represtamo, no_credito
             FROM PR_REPRESTAMOS a
             WHERE codigo_empresa =PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
-            -- OPT-014: Hardcodeo de estados (cost 9,748 -> 26). Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS_CANCELADOS
-            and ESTADO IN ('RE','NP','VR','MS','NR','LA','AEP','AYR','CP')
+            and ESTADO in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS_CANCELADOS')))
             and not exists (select 1
                             from pr_creditos
                             where no_credito = a.no_credito
-                            -- OPT-014: Valores de PA_PARAMETROS_MVP.ESTADOS_ANULAR_CREDITOS
-                            and estado IN ('D','V','M','E','J','C'))
+                            and estado in (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_ANULAR_CREDITOS'))))
             and not exists(
                             select 1
                             from pr_creditos_hi h
@@ -9755,24 +9729,36 @@ END P_Registra_Solicitud_Campana;
                 LEFT JOIN PR.PR_CREDITOS_HI H ON H.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR.PR_TIPO_CREDITO T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
                 WHERE R.ID_REPRESTAMO = pIdReprestamo ;*/
-                -- OPT-009: Reemplazado scalar subquery con JOINs directos (cost 17,232 -> 909)
-                SELECT MIN(NT.TIPO_CREDITO) INTO NUEVO_TIPO
+                SELECT (
+                    SELECT MIN(NT.TIPO_CREDITO)
+                    FROM   PR_TIPO_CREDITO                NT
+                    JOIN   PR_PLAZO_CREDITO_REPRESTAMO    P 
+                         ON  P.TIPO_CREDITO = NT.TIPO_CREDITO
+                    WHERE R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
+                      AND NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
+                      AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
+                      --AND T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC
+                      /*  Regla de FACILIDAD: Si el ORIGEN (T) es FMO se ignora
+                                              Si no es FMO debe coincidir           */
+                      AND ( T.TIPO_CREDITO IN (SELECT TIPO_CREDITO
+                                               FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                               WHERE  CREDITO_FMO = 'S')
+                            OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC )
+                      -- Excluir tipos de crédito FMO
+                      AND NT.TIPO_CREDITO NOT IN (SELECT TIPO_CREDITO
+                                                  FROM   PR_TIPO_CREDITO_REPRESTAMO
+                                                  WHERE  CREDITO_FMO = 'S')
+                      -- Vigente y sin campaña especial
+                      AND EXISTS ( SELECT 1
+                            FROM   PR_TIPO_CREDITO_REPRESTAMO R
+                            WHERE  R.TIPO_CREDITO = NT.TIPO_CREDITO AND  R.OBSOLETO = 0 AND  NVL(R.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
+                      )
+                ) INTO NUEVO_TIPO
                 FROM PR_REPRESTAMOS   R
                 LEFT JOIN PR_CREDITOS      C ON C.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR_CREDITOS_HI   H ON H.NO_CREDITO = R.NO_CREDITO
-                LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = COALESCE(C.TIPO_CREDITO, H.TIPO_CREDITO)
-                JOIN PR_TIPO_CREDITO             NT ON NT.CODIGO_SUB_APLICACION = T.CODIGO_SUB_APLICACION
-                                                    AND NT.GRUPO_TIPO_CREDITO    = T.GRUPO_TIPO_CREDITO
-                JOIN PR_PLAZO_CREDITO_REPRESTAMO P  ON P.TIPO_CREDITO = NT.TIPO_CREDITO
-                JOIN PR_TIPO_CREDITO_REPRESTAMO  RV ON RV.TIPO_CREDITO = NT.TIPO_CREDITO
-                                                    AND RV.OBSOLETO = 0
-                                                    AND NVL(RV.CREDITO_CAMPANA_ESPECIAL,'N') <> 'S'
-                                                    AND NVL(RV.CREDITO_FMO,'N') <> 'S'
-                LEFT JOIN PR_TIPO_CREDITO_REPRESTAMO FMO ON FMO.TIPO_CREDITO = T.TIPO_CREDITO
-                                                         AND FMO.CREDITO_FMO = 'S'
-                WHERE R.ID_REPRESTAMO = pIdReprestamo
-                  AND R.MTO_PREAPROBADO BETWEEN P.MONTO_MIN AND P.MONTO_MAX
-                  AND (FMO.TIPO_CREDITO IS NOT NULL OR T.FACILIDAD_CREDITIC = NT.FACILIDAD_CREDITIC);
+                LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
+                WHERE R.ID_REPRESTAMO = pIdReprestamo;
                 RETURN NUEVO_TIPO;
                 DBMS_OUTPUT.PUT_LINE ( 'NUEVO CREDITO '|| NUEVO_TIPO || 'REPRESTAMOS' || pIdReprestamo);
             EXCEPTION

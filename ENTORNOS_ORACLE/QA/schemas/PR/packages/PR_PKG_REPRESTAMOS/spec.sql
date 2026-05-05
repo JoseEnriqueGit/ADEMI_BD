@@ -264,11 +264,12 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                                     pTipo             IN VARCHAR2 DEFAULT 'A')  -- A = Actual, O = Original
      RETURN VARCHAR2;
    
-   FUNCTION F_Obt_Subject_Email(pIdReprestamo     IN VARCHAR2) RETURN VARCHAR2;    
+    FUNCTION F_Obt_Subject_Email(pIdReprestamo     IN VARCHAR2) RETURN VARCHAR2;    
      
-  FUNCTION F_Obt_Body_Mensaje(pIdReprestamo IN VARCHAR2, pCanal IN VARCHAR2) RETURN VARCHAR2;
-  
-  FUNCTION F_Obt_Body_Mensaje(pNombres IN VARCHAR2, pFecha IN DATE, pCanal IN VARCHAR2) RETURN VARCHAR2;                            
+    FUNCTION F_Obt_Body_Mensaje(pIdReprestamo     IN VARCHAR2,
+                            pCanal           IN VARCHAR2)
+     RETURN VARCHAR2;
+    FUNCTION F_Obt_Body_Mensaje(pNombres IN VARCHAR2, pFecha IN DATE, pCanal IN VARCHAR2) RETURN VARCHAR2;                                  
    
    PROCEDURE P_Registrar_Solicitud(pIdReprestamo     IN     VARCHAR2,
                                    pUsuario          IN     VARCHAR2,
@@ -760,10 +761,12 @@ PROCEDURE P_ACTUALIZA_COMENTARIO_CAMPANA(pComentario in VARCHAR2);
 PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
                                      pTotalRegistros  IN NUMBER);    
 PROCEDURE P_ACTUALIZAR_CAMPO_APPADEMI(pIdReprestamo IN VARCHAR2, pOrigen IN VARCHAR2);
-PROCEDURE  ProcesarSolicitudAPI( pCodigo_Empresa IN NUMBER, 
-                                 pNo_Credito     IN NUMBER,
-                                 pArchivos       IN PA.PKG_API_PKM.tDescargaList,
-                                 pResultado      OUT VARCHAR2);
+PROCEDURE ProcesarSolicitudAPI(
+  pCodigo_Empresa IN NUMBER,
+  pNo_Credito     IN NUMBER,
+  pArchivos       IN PA.PKG_API_PKM.tDescargaList,
+  pResultado      OUT VARCHAR2
+);
 END PR_PKG_REPRESTAMOS;
 /
 
