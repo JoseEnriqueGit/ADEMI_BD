@@ -488,7 +488,10 @@ PROCEDURE Precalifica_Repre_Cancelado IS
               AND cr.ESTADO IN ('D','V','M','E','J')
               AND g.CODIGO_TIPO_GARANTIA_SB != 'NA'
         )
-        -- OPT-015: PEP y NEGRA movidos a DELETE post-INSERT (D1/D2)
+        -- Se valida que los clientes no esten en lista PEP
+        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, a.codigo_cliente) = 0
+        -- Se valida que los clientes no esten en lista NEGRA
+        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
         ;
 
 
@@ -499,6 +502,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
        v_fecha_proceso           DATE;
        v_atraso_30               NUMBER(10);
        v_conteo                  NUMBER(10);
+       v_ids_represtamo          SYS.ODCINUMBERLIST := SYS.ODCINUMBERLIST();
        --agregue esta variable
        pMensaje      VARCHAR2(100);
        --Defino la variable para capturar si existe un detalle
@@ -613,6 +617,11 @@ PROCEDURE Precalifica_Repre_Cancelado IS
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
 
+          FOR i IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
+             v_ids_represtamo.EXTEND;
+             v_ids_represtamo(v_ids_represtamo.COUNT) := VCREDITOS_PROCESAR(i).ID_REPRESTAMO;
+          END LOOP;
+
           EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
 
        END LOOP;
@@ -621,7 +630,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
 
      -- =================================================================
      -- OPT-015: UPDATEs set-based (reemplazan 4 FORALL row-by-row)
-     -- Filtros defensivos: ADICIONADO_POR=USER + FECHA_ADICION>=TRUNC(SYSDATE)
+     -- Mantiene el alcance original por llave de negocio del cursor.
      -- =================================================================
 
      -- U1: Actualizar DIAS_ATRASO con maximo de ultimos 6 meses
@@ -632,9 +641,14 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                                AND D.FECHA_CORTE >= ADD_MONTHS(y.FECHA_CORTE, -6)
                                AND D.NO_CREDITO = y.NO_CREDITO
                                AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE)
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE);
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE);
 
      -- U2: Actualizar MTO_CREDITO_ACTUAL con monto desembolsado de ultima fecha corte
      UPDATE PR.PR_REPRESTAMOS R
@@ -648,21 +662,31 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                                                            WHERE P.FUENTE = 'PR'
                                                              AND P.NO_CREDITO = R.NO_CREDITO
                                                              AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-      WHERE R.ESTADO = 'RE'
-        AND R.ADICIONADO_POR = USER
-        AND R.FECHA_ADICION >= TRUNC(SYSDATE);
+       WHERE R.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = R.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = R.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = R.NO_CREDITO
+                        AND z.FECHA_CORTE = R.FECHA_CORTE);
 
      -- U3: Excluir cliente con TC con atraso mayor a v_atraso_30 dias
      UPDATE PR.PR_REPRESTAMOS y
         SET y.ESTADO = 'X3',
             Y.OBSERVACIONES = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PA_DETALLADO_DE08 D
-                    WHERE D.FUENTE = 'TC'
-                      AND D.FECHA_CORTE = y.FECHA_CORTE
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE)
+         AND EXISTS (SELECT 1
+                     FROM PA_DETALLADO_DE08 D
+                     WHERE D.FUENTE = 'TC'
+                       AND D.FECHA_CORTE = y.FECHA_CORTE
                       AND D.NO_CREDITO != y.NO_CREDITO
                       AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE
                       AND D.CODIGO_EMPRESA = y.CODIGO_EMPRESA
@@ -672,34 +696,21 @@ PROCEDURE Precalifica_Repre_Cancelado IS
      UPDATE PR.PR_REPRESTAMOS y
         SET y.ESTADO = 'X1',
             Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PR_CREDITOS C
-                    WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND C.NO_CREDITO != y.NO_CREDITO
-                      AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
-                      AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
-
-     -- =================================================================
-     -- OPT-015: DELETEs post-INSERT (PEP/NEGRA movidos del cursor)
-     -- =================================================================
-
-     -- D1: Eliminar clientes en lista PEP
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, CODIGO_CLIENTE) = 1;
-
-     -- D2: Eliminar clientes en lista NEGRA
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, CODIGO_CLIENTE) = 1;
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE)
+         AND EXISTS (SELECT 1
+                     FROM PR_CREDITOS C
+                     WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                       AND C.NO_CREDITO != y.NO_CREDITO
+                       AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                       AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
+                       AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
 
   -- Se actualiza el ESTADO con valor 'X2' y el campo OBSERVACIONES con 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
        -- en la tabla PR_REPRESTAMOS para todos los Créditos precalificados con Estodo ='P'
@@ -866,7 +877,10 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
               AND cr.ESTADO IN ('D','V','M','E','J')
               AND g.CODIGO_TIPO_GARANTIA_SB != 'NA'
         )
-        -- OPT-015: PEP y NEGRA movidos a DELETE post-INSERT (D1/D2)
+        -- Se valida que los clientes no esten en lista PEP
+        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, a.codigo_cliente) = 0
+        -- Se valida que los clientes no esten en lista NEGRA
+        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, a.codigo_cliente) = 0
         ;
 
        TYPE tCREDITOS_PROCESAR IS TABLE OF CREDITOS_PROCESAR%ROWTYPE;
@@ -876,6 +890,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        v_fecha_proceso           DATE;
        v_atraso_30               NUMBER(10);
        v_conteo                  NUMBER(10);
+       v_ids_represtamo          SYS.ODCINUMBERLIST := SYS.ODCINUMBERLIST();
        --agregue esta variable
        pMensaje      VARCHAR2(100);
        --Defino la variable para capturar si existe un detalle
@@ -973,6 +988,11 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
 
+          FOR i IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
+             v_ids_represtamo.EXTEND;
+             v_ids_represtamo(v_ids_represtamo.COUNT) := VCREDITOS_PROCESAR(i).ID_REPRESTAMO;
+          END LOOP;
+
           EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
 
        END LOOP;
@@ -981,7 +1001,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
 
      -- =================================================================
      -- OPT-015: UPDATEs set-based (reemplazan 4 FORALL row-by-row)
-     -- Filtros defensivos: ADICIONADO_POR=USER + FECHA_ADICION>=TRUNC(SYSDATE)
+     -- Mantiene el alcance original por llave de negocio del cursor.
      -- =================================================================
 
      -- U1: Actualizar DIAS_ATRASO con maximo de ultimos 6 meses
@@ -992,9 +1012,14 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                                AND D.FECHA_CORTE >= ADD_MONTHS(y.FECHA_CORTE, -6)
                                AND D.NO_CREDITO = y.NO_CREDITO
                                AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE)
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE);
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE);
 
      -- U2: Actualizar MTO_CREDITO_ACTUAL con monto desembolsado de ultima fecha corte
      UPDATE PR.PR_REPRESTAMOS R
@@ -1008,21 +1033,31 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                                                            WHERE P.FUENTE = 'PR'
                                                              AND P.NO_CREDITO = R.NO_CREDITO
                                                              AND P.CODIGO_CLIENTE = R.CODIGO_CLIENTE))
-      WHERE R.ESTADO = 'RE'
-        AND R.ADICIONADO_POR = USER
-        AND R.FECHA_ADICION >= TRUNC(SYSDATE);
+       WHERE R.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = R.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = R.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = R.NO_CREDITO
+                        AND z.FECHA_CORTE = R.FECHA_CORTE);
 
      -- U3: Excluir cliente con TC con atraso mayor a v_atraso_30 dias
      UPDATE PR.PR_REPRESTAMOS y
         SET y.ESTADO = 'X3',
             Y.OBSERVACIONES = 'EL CLIENTE POSEE TARJETA DE CREDITO CON ATRASO MAYOR A '||v_atraso_30||' DIAS'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PA_DETALLADO_DE08 D
-                    WHERE D.FUENTE = 'TC'
-                      AND D.FECHA_CORTE = y.FECHA_CORTE
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE)
+         AND EXISTS (SELECT 1
+                     FROM PA_DETALLADO_DE08 D
+                     WHERE D.FUENTE = 'TC'
+                       AND D.FECHA_CORTE = y.FECHA_CORTE
                       AND D.NO_CREDITO != y.NO_CREDITO
                       AND D.CODIGO_CLIENTE = y.CODIGO_CLIENTE
                       AND D.CODIGO_EMPRESA = y.CODIGO_EMPRESA
@@ -1032,34 +1067,21 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
      UPDATE PR.PR_REPRESTAMOS y
         SET y.ESTADO = 'X1',
             Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ULTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
-      WHERE y.ESTADO = 'RE'
-        AND y.ADICIONADO_POR = USER
-        AND y.FECHA_ADICION >= TRUNC(SYSDATE)
-        AND EXISTS (SELECT 1
-                    FROM PR_CREDITOS C
-                    WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
-                      AND C.NO_CREDITO != y.NO_CREDITO
-                      AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
-                      AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
-                      AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
-
-     -- =================================================================
-     -- OPT-015: DELETEs post-INSERT (PEP/NEGRA movidos del cursor)
-     -- =================================================================
-
-     -- D1: Eliminar clientes en lista PEP
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP(1, CODIGO_CLIENTE) = 1;
-
-     -- D2: Eliminar clientes en lista NEGRA
-     DELETE FROM PR_REPRESTAMOS
-      WHERE ESTADO = 'RE'
-        AND ADICIONADO_POR = USER
-        AND FECHA_ADICION >= TRUNC(SYSDATE)
-        AND PR.PR_PKG_REPRESTAMOS.F_Validar_Lista_NEGRA(1, CODIGO_CLIENTE) = 1;
+       WHERE y.ESTADO = 'RE'
+         AND EXISTS (SELECT 1
+                       FROM PR.PR_REPRESTAMOS z
+                      WHERE z.ID_REPRESTAMO IN (SELECT COLUMN_VALUE FROM TABLE(v_ids_represtamo))
+                        AND z.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                        AND z.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                        AND z.NO_CREDITO = y.NO_CREDITO
+                        AND z.FECHA_CORTE = y.FECHA_CORTE)
+         AND EXISTS (SELECT 1
+                     FROM PR_CREDITOS C
+                     WHERE C.CODIGO_EMPRESA = y.CODIGO_EMPRESA
+                       AND C.NO_CREDITO != y.NO_CREDITO
+                       AND C.CODIGO_CLIENTE = y.CODIGO_CLIENTE
+                       AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, -OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR'))
+                       AND C.ESTADO IN (SELECT COLUMN_VALUE FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('ESTADOS_CREDITOS'))));
 
   -- Se actualiza el ESTADO con valor 'X2'
         UPDATE PR.PR_REPRESTAMOS P
