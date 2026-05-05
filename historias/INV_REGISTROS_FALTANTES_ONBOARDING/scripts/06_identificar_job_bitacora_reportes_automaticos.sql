@@ -1,0 +1,387 @@
+-- =============================================================================
+-- Historia: INV_REGISTROS_FALTANTES_ONBOARDING
+-- Script: Identificar job/proceso que alimenta BITACORA_REP_AUTOMATICOS
+--
+-- Proposito:
+--   Documentar que objeto llena PA.BITACORA_REP_AUTOMATICOS y que job/proceso
+--   cambia los estados de PA.PA_REPORTES_AUTOMATICOS.
+--
+-- Nota tecnica:
+--   La bitacora puede no ser llenada directamente por un job. En QA02 se observa
+--   que PA.TRG_REP_AUTOMATICOS llama PA.Bitacora_Reportes_Automaticos en cada
+--   INSERT/UPDATE de PA.PA_REPORTES_AUTOMATICOS. El job normalmente seria el que
+--   actualiza ESTADO_REPORTE/IDPROCESO en la tabla principal.
+--
+-- Uso en Toad:
+--   1. Ejecutar en el ambiente que se quiere documentar.
+--   2. Ejecutar bloque por bloque.
+--   3. Si un bloque con DBA_* falla por privilegios, usar el bloque ALL_*/USER_*.
+--   4. No modifica datos.
+-- =============================================================================
+
+-- BLOQUE 1: Ver triggers de PA_REPORTES_AUTOMATICOS y BITACORA_REP_AUTOMATICOS.
+SELECT
+    T.OWNER,
+    T.TRIGGER_NAME,
+    T.TABLE_OWNER,
+    T.TABLE_NAME,
+    T.TRIGGERING_EVENT,
+    T.STATUS,
+    T.DESCRIPTION
+FROM ALL_TRIGGERS T
+WHERE T.TABLE_OWNER = 'PA'
+  AND T.TABLE_NAME IN ('PA_REPORTES_AUTOMATICOS', 'BITACORA_REP_AUTOMATICOS')
+ORDER BY
+    T.TABLE_NAME,
+    T.TRIGGER_NAME;
+
+-- BLOQUE 2: Ver el codigo de triggers relacionados.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE,
+    S.TEXT
+FROM ALL_SOURCE S
+WHERE S.OWNER = 'PA'
+  AND S.TYPE = 'TRIGGER'
+  AND S.NAME IN (
+        SELECT T.TRIGGER_NAME
+        FROM ALL_TRIGGERS T
+        WHERE T.TABLE_OWNER = 'PA'
+          AND T.TABLE_NAME IN ('PA_REPORTES_AUTOMATICOS', 'BITACORA_REP_AUTOMATICOS')
+  )
+ORDER BY
+    S.NAME,
+    S.LINE;
+
+-- BLOQUE 3: Buscar objetos que insertan en BITACORA o llaman el procedimiento
+-- de bitacora.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    MIN(S.LINE) AS PRIMERA_LINEA,
+    COUNT(*) AS COINCIDENCIAS
+FROM ALL_SOURCE S
+WHERE S.OWNER IN ('PA', 'PR', 'CD', 'CC', 'IA', 'TC')
+  AND (
+        UPPER(S.TEXT) LIKE '%BITACORA_REP_AUTOMATICOS%'
+     OR UPPER(S.TEXT) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+  )
+GROUP BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE
+ORDER BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE;
+
+-- BLOQUE 4: Lineas exactas de los objetos del bloque 3.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE,
+    S.TEXT
+FROM ALL_SOURCE S
+WHERE S.OWNER IN ('PA', 'PR', 'CD', 'CC', 'IA', 'TC')
+  AND (
+        UPPER(S.TEXT) LIKE '%BITACORA_REP_AUTOMATICOS%'
+     OR UPPER(S.TEXT) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+  )
+ORDER BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE;
+
+-- BLOQUE 5: Buscar jobs scheduler que mencionen reportes automaticos,
+-- bitacora o paquetes PKM. Este es el primer bloque para identificar el job.
+SELECT
+    J.OWNER,
+    J.JOB_NAME,
+    J.ENABLED,
+    J.STATE,
+    J.JOB_TYPE,
+    J.JOB_ACTION,
+    J.PROGRAM_OWNER,
+    J.PROGRAM_NAME,
+    J.SCHEDULE_OWNER,
+    J.SCHEDULE_NAME,
+    J.REPEAT_INTERVAL,
+    J.START_DATE,
+    J.LAST_START_DATE,
+    J.NEXT_RUN_DATE,
+    J.RUN_COUNT,
+    J.FAILURE_COUNT
+FROM ALL_SCHEDULER_JOBS J
+WHERE UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%PA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%BITACORA_REP_AUTOMATICOS%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%PKG_API_PKM%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%PKG_TIPO_DOCUMENTO_PKM%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%PKM%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%REPORTE%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%REPORT%'
+ORDER BY
+    J.OWNER,
+    J.JOB_NAME;
+
+-- BLOQUE 6: Si el scheduler job llama un PROGRAM, buscar el detalle del PROGRAM.
+SELECT
+    P.OWNER,
+    P.PROGRAM_NAME,
+    P.PROGRAM_TYPE,
+    P.PROGRAM_ACTION,
+    P.NUMBER_OF_ARGUMENTS,
+    P.ENABLED
+FROM ALL_SCHEDULER_PROGRAMS P
+WHERE UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%PA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%BITACORA_REP_AUTOMATICOS%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%PKG_API_PKM%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%PKG_TIPO_DOCUMENTO_PKM%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%PKM%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%REPORTE%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%REPORT%'
+ORDER BY
+    P.OWNER,
+    P.PROGRAM_NAME;
+
+-- BLOQUE 7: Buscar objetos que actualizan PA_REPORTES_AUTOMATICOS.
+-- Si aqui aparece un package/procedure, puede ser el que ejecuta el job.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    MIN(S.LINE) AS PRIMERA_LINEA,
+    COUNT(*) AS COINCIDENCIAS
+FROM ALL_SOURCE S
+WHERE S.OWNER IN ('PA', 'PR', 'CD', 'CC', 'IA', 'TC')
+  AND (
+        UPPER(S.TEXT) LIKE '%UPDATE%PA_REPORTES_AUTOMATICOS%'
+     OR UPPER(S.TEXT) LIKE '%PA_REPORTES_AUTOMATICOS%SET%'
+     OR UPPER(S.TEXT) LIKE '%ESTADO_REPORTE%'
+     OR UPPER(S.TEXT) LIKE '%IDPROCESO%'
+  )
+  AND (
+        UPPER(S.TEXT) LIKE '%PA_REPORTES_AUTOMATICOS%'
+     OR UPPER(S.TEXT) LIKE '%PKG_API_PKM%'
+     OR UPPER(S.TEXT) LIKE '%PKG_TIPO_DOCUMENTO_PKM%'
+  )
+GROUP BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE
+ORDER BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE;
+
+-- BLOQUE 8: Ver lineas exactas de actualizacion de PA_REPORTES_AUTOMATICOS.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE,
+    S.TEXT
+FROM ALL_SOURCE S
+WHERE S.OWNER IN ('PA', 'PR', 'CD', 'CC', 'IA', 'TC')
+  AND (
+        UPPER(S.TEXT) LIKE '%PA_REPORTES_AUTOMATICOS%'
+     OR UPPER(S.TEXT) LIKE '%PKG_API_PKM%'
+     OR UPPER(S.TEXT) LIKE '%PKG_TIPO_DOCUMENTO_PKM%'
+  )
+ORDER BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE;
+
+-- BLOQUE 9: Dependencias hacia la tabla y hacia el procedimiento de bitacora.
+SELECT
+    D.OWNER,
+    D.NAME,
+    D.TYPE,
+    D.REFERENCED_OWNER,
+    D.REFERENCED_NAME,
+    D.REFERENCED_TYPE,
+    D.DEPENDENCY_TYPE
+FROM ALL_DEPENDENCIES D
+WHERE D.REFERENCED_OWNER = 'PA'
+  AND D.REFERENCED_NAME IN (
+        'PA_REPORTES_AUTOMATICOS',
+        'BITACORA_REP_AUTOMATICOS',
+        'BITACORA_REPORTES_AUTOMATICOS'
+  )
+ORDER BY
+    D.REFERENCED_NAME,
+    D.OWNER,
+    D.NAME,
+    D.TYPE;
+
+-- BLOQUE 10: Historial real de un reporte en bitacora.
+-- Reemplazar :P_CODIGO_REPORTE por un CODIGO_REPORTE real.
+SELECT
+    R.CODIGO_REPORTE,
+    R.ORIGEN_PKM,
+    R.ID_TIPO_DOCUMENTO,
+    R.ESTADO_REPORTE AS ESTADO_ACTUAL,
+    R.IDPROCESO AS IDPROCESO_ACTUAL,
+    R.NOMBRE_ARCHIVO,
+    R.FECHA_REPORTE,
+    B.CODIGO_BITACORA,
+    B.FECHA_BITACORA,
+    B.ESTADO_REPORTE AS ESTADO_BITACORA,
+    B.IDPROCESO AS IDPROCESO_BITACORA,
+    B.MENSAJE,
+    B.ADICIONADO_POR,
+    B.FECHA_ADICION
+FROM PA.PA_REPORTES_AUTOMATICOS R
+LEFT JOIN PA.BITACORA_REP_AUTOMATICOS B
+    ON B.CODIGO_REPORTE = R.CODIGO_REPORTE
+WHERE R.CODIGO_REPORTE = :P_CODIGO_REPORTE
+ORDER BY
+    B.FECHA_BITACORA,
+    B.CODIGO_BITACORA;
+
+-- BLOQUE 11: Ultimos registros de bitacora para inferir usuario/proceso que la llena.
+SELECT
+    B.CODIGO_BITACORA,
+    B.CODIGO_REPORTE,
+    B.NOMBRE_ARCHIVO,
+    B.FECHA_BITACORA,
+    B.ESTADO_REPORTE,
+    B.IDPROCESO,
+    B.MENSAJE,
+    B.ADICIONADO_POR,
+    B.FECHA_ADICION
+FROM PA.BITACORA_REP_AUTOMATICOS B
+WHERE B.FECHA_BITACORA >= SYSDATE - 2
+ORDER BY
+    B.FECHA_BITACORA DESC,
+    B.CODIGO_BITACORA DESC;
+
+-- BLOQUE 12 OPCIONAL: Detalle de ejecuciones recientes del scheduler.
+-- Cambiar el filtro por el JOB_NAME candidato encontrado en el bloque 5.
+SELECT
+    R.OWNER,
+    R.JOB_NAME,
+    R.STATUS,
+    R.ACTUAL_START_DATE,
+    R.RUN_DURATION,
+    R.ERROR#,
+    R.ADDITIONAL_INFO
+FROM ALL_SCHEDULER_JOB_RUN_DETAILS R
+WHERE R.ACTUAL_START_DATE >= SYSTIMESTAMP - INTERVAL '7' DAY
+  AND (
+        UPPER(R.JOB_NAME) LIKE '%PKM%'
+     OR UPPER(R.JOB_NAME) LIKE '%REPORTE%'
+     OR UPPER(R.JOB_NAME) LIKE '%REPORT%'
+  )
+ORDER BY
+    R.ACTUAL_START_DATE DESC;
+
+-- BLOQUE 13: Extraer codigo de objetos candidatos encontrados.
+-- Estos objetos aparecieron como consumidores de BITACORA_REP_AUTOMATICOS.
+SELECT
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE,
+    S.TEXT
+FROM ALL_SOURCE S
+WHERE S.OWNER IN ('PA', 'IA')
+  AND S.NAME IN (
+        'PKG_MANT_TBL_HELADO',
+        'BITACORA_REPORTES_AUTOMATICOS',
+        'CAMBIAR_MULTIESTADO_REP_AUTO',
+        'MARK_ERROR_STATUS_AUTOMATICO',
+        'CHECK_ESTADO_REPORTE',
+        'CHECK_ESTADO_REPORTE_TEST',
+        'CHECK_ESTADO_REPORTE_V1'
+  )
+ORDER BY
+    S.OWNER,
+    S.NAME,
+    S.TYPE,
+    S.LINE;
+
+-- BLOQUE 14: Buscar jobs que llamen especificamente los objetos candidatos.
+-- Este bloque debe revelar el scheduler que ejecuta el mantenimiento/archivo.
+SELECT
+    J.OWNER,
+    J.JOB_NAME,
+    J.ENABLED,
+    J.STATE,
+    J.JOB_TYPE,
+    J.JOB_ACTION,
+    J.PROGRAM_OWNER,
+    J.PROGRAM_NAME,
+    J.SCHEDULE_OWNER,
+    J.SCHEDULE_NAME,
+    J.REPEAT_INTERVAL,
+    J.START_DATE,
+    J.LAST_START_DATE,
+    J.NEXT_RUN_DATE,
+    J.RUN_COUNT,
+    J.FAILURE_COUNT
+FROM ALL_SCHEDULER_JOBS J
+WHERE UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%PKG_MANT_TBL_HELADO%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%MANT_TBL_HELADO%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%CAMBIAR_MULTIESTADO_REP_AUTO%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%MARK_ERROR_STATUS_AUTOMATICO%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%CHECK_ESTADO_REPORTE%'
+   OR UPPER(NVL(J.JOB_ACTION, ' ')) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%HELADO%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%BITACORA%'
+   OR UPPER(NVL(J.JOB_NAME, ' ')) LIKE '%REPORTE%'
+ORDER BY
+    J.OWNER,
+    J.JOB_NAME;
+
+-- BLOQUE 15: Si el job usa PROGRAM, ubicar el programa scheduler que llama
+-- los objetos candidatos.
+SELECT
+    P.OWNER,
+    P.PROGRAM_NAME,
+    P.PROGRAM_TYPE,
+    P.PROGRAM_ACTION,
+    P.NUMBER_OF_ARGUMENTS,
+    P.ENABLED
+FROM ALL_SCHEDULER_PROGRAMS P
+WHERE UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%PKG_MANT_TBL_HELADO%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%MANT_TBL_HELADO%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%CAMBIAR_MULTIESTADO_REP_AUTO%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%MARK_ERROR_STATUS_AUTOMATICO%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%CHECK_ESTADO_REPORTE%'
+   OR UPPER(NVL(P.PROGRAM_ACTION, ' ')) LIKE '%BITACORA_REPORTES_AUTOMATICOS%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%HELADO%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%BITACORA%'
+   OR UPPER(NVL(P.PROGRAM_NAME, ' ')) LIKE '%REPORTE%'
+ORDER BY
+    P.OWNER,
+    P.PROGRAM_NAME;
+
+-- BLOQUE 16: Historial reciente de ejecuciones para los jobs candidatos.
+-- Ajustar nombres segun lo que devuelva el bloque 14.
+SELECT
+    R.OWNER,
+    R.JOB_NAME,
+    R.STATUS,
+    R.ACTUAL_START_DATE,
+    R.RUN_DURATION,
+    R.ERROR#,
+    R.ADDITIONAL_INFO
+FROM ALL_SCHEDULER_JOB_RUN_DETAILS R
+WHERE R.ACTUAL_START_DATE >= SYSTIMESTAMP - INTERVAL '30' DAY
+  AND (
+        UPPER(R.JOB_NAME) LIKE '%HELADO%'
+     OR UPPER(R.JOB_NAME) LIKE '%BITACORA%'
+     OR UPPER(R.JOB_NAME) LIKE '%REPORTE%'
+     OR UPPER(R.JOB_NAME) LIKE '%REPORT%'
+  )
+ORDER BY
+    R.ACTUAL_START_DATE DESC;

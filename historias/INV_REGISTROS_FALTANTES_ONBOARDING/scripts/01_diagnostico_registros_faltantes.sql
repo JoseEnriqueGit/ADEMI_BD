@@ -1,0 +1,129 @@
+-- =============================================================================
+-- Historia: INV_REGISTROS_FALTANTES_ONBOARDING
+-- Diagnostico inicial de registros faltantes en Pagina 136 Onboarding
+--
+-- Instrucciones:
+--   1. Ejecutar en Toad en el entorno confirmado por el usuario.
+--   2. No hacer cambios de datos.
+--   3. Guardar resultados relevantes como evidencia de la investigacion.
+-- =============================================================================
+
+-- BLOQUE 1: Universo completo por ORIGEN_PKM real.
+-- Objetivo: detectar variantes de origen que la pagina actual no toma.
+SELECT
+    NVL(R.ORIGEN_PKM, '<NULL>') AS ORIGEN_PKM,
+    TRIM(R.ORIGEN_PKM) AS ORIGEN_TRIM,
+    UPPER(TRIM(R.ORIGEN_PKM)) AS ORIGEN_NORMALIZADO,
+    COUNT(*) AS CANTIDAD,
+    MIN(R.FECHA_REPORTE) AS PRIMERA_FECHA,
+    MAX(R.FECHA_REPORTE) AS ULTIMA_FECHA
+FROM PA.PA_REPORTES_AUTOMATICOS R
+GROUP BY
+    NVL(R.ORIGEN_PKM, '<NULL>'),
+    TRIM(R.ORIGEN_PKM),
+    UPPER(TRIM(R.ORIGEN_PKM))
+ORDER BY CANTIDAD DESC;
+
+-- BLOQUE 2: Total que debe devolver la query de referencia de la pagina 136.
+-- La division CON_URL/SIN_URL es equivalente a URL_REPORTE IS NOT NULL UNION ALL URL_REPORTE IS NULL.
+WITH PAGINA_136 AS (
+    SELECT R.CODIGO_REPORTE, R.FECHA_REPORTE
+    FROM PA.PA_REPORTES_AUTOMATICOS R
+    WHERE R.URL_REPORTE IS NOT NULL
+      AND R.ORIGEN_PKM = 'Onboarding'
+
+    UNION ALL
+
+    SELECT R.CODIGO_REPORTE, R.FECHA_REPORTE
+    FROM PA.PA_REPORTES_AUTOMATICOS R
+    WHERE R.URL_REPORTE IS NULL
+      AND R.ORIGEN_PKM = 'Onboarding'
+)
+SELECT
+    COUNT(*) AS TOTAL_QUERY_PAGINA_136,
+    MIN(FECHA_REPORTE) AS PRIMERA_FECHA,
+    MAX(FECHA_REPORTE) AS ULTIMA_FECHA
+FROM PAGINA_136;
+
+-- BLOQUE 3: Registros del flujo que parecen relacionados, pero quedan fuera
+-- porque ORIGEN_PKM no es exactamente 'Onboarding'.
+SELECT
+    R.CODIGO_REPORTE,
+    R.ORIGEN_PKM,
+    R.ID_TIPO_DOCUMENTO,
+    R.ESTADO_REPORTE,
+    CASE WHEN R.URL_REPORTE IS NULL THEN 'SIN_URL' ELSE 'CON_URL' END AS TIPO_URL,
+    R.CODIGO_REFERENCIA,
+    R.NOMBRE_ARCHIVO,
+    R.FECHA_REPORTE
+FROM PA.PA_REPORTES_AUTOMATICOS R
+WHERE UPPER(TRIM(R.ORIGEN_PKM)) IN ('ONBOARDING', 'TARJETA', 'TARJETAPC')
+  AND NVL(R.ORIGEN_PKM, '<NULL>') <> 'Onboarding'
+ORDER BY R.FECHA_REPORTE DESC, R.CODIGO_REPORTE DESC;
+
+-- BLOQUE 4: Distribucion de los registros que si entran a la pagina.
+SELECT
+    R.ESTADO_REPORTE,
+    R.ID_TIPO_DOCUMENTO,
+    CASE WHEN R.URL_REPORTE IS NULL THEN 'SIN_URL' ELSE 'CON_URL' END AS TIPO_URL,
+    COUNT(*) AS CANTIDAD,
+    MIN(R.FECHA_REPORTE) AS PRIMERA_FECHA,
+    MAX(R.FECHA_REPORTE) AS ULTIMA_FECHA
+FROM PA.PA_REPORTES_AUTOMATICOS R
+WHERE R.ORIGEN_PKM = 'Onboarding'
+GROUP BY
+    R.ESTADO_REPORTE,
+    R.ID_TIPO_DOCUMENTO,
+    CASE WHEN R.URL_REPORTE IS NULL THEN 'SIN_URL' ELSE 'CON_URL' END
+ORDER BY R.ESTADO_REPORTE, R.ID_TIPO_DOCUMENTO, TIPO_URL;
+
+-- BLOQUE 5: Tipos de documento Onboarding fuera del mapeo conocido.
+-- No excluye filas por si solo, pero puede explicar ausencia de accion Reprocesar esperada.
+SELECT
+    R.ID_TIPO_DOCUMENTO,
+    COUNT(*) AS CANTIDAD,
+    MIN(R.FECHA_REPORTE) AS PRIMERA_FECHA,
+    MAX(R.FECHA_REPORTE) AS ULTIMA_FECHA
+FROM PA.PA_REPORTES_AUTOMATICOS R
+WHERE R.ORIGEN_PKM = 'Onboarding'
+  AND R.ID_TIPO_DOCUMENTO NOT IN ('618', '429', '424', '809', '810', '527', '621', '511', '762', '428')
+GROUP BY R.ID_TIPO_DOCUMENTO
+ORDER BY R.ID_TIPO_DOCUMENTO;
+
+-- BLOQUE 6: Muestra completa y ordenada de lo que entra por la query actual.
+-- Comparar este resultado contra lo visible en APEX.
+SELECT
+    R.CODIGO_REPORTE,
+    R.ORIGEN_PKM,
+    R.ID_TIPO_DOCUMENTO,
+    R.ESTADO_REPORTE,
+    CASE WHEN R.URL_REPORTE IS NULL THEN 'SIN_URL' ELSE 'CON_URL' END AS TIPO_URL,
+    CASE
+        WHEN INSTR(R.CODIGO_REFERENCIA, ':') = 0 THEN R.CODIGO_REFERENCIA
+        ELSE IA.PKG_API_PKM.ObtieneParteReferencia(R.CODIGO_REFERENCIA, ':', 3)
+    END AS F_NUM_CUENTA,
+    R.CODIGO_REFERENCIA,
+    R.NOMBRE_ARCHIVO,
+    R.FECHA_REPORTE
+FROM PA.PA_REPORTES_AUTOMATICOS R
+WHERE R.ORIGEN_PKM = 'Onboarding'
+ORDER BY R.FECHA_REPORTE DESC, R.CODIGO_REPORTE DESC;
+
+-- BLOQUE 7: Validacion puntual por registro esperado.
+-- Reemplazar :P_CODIGO_REPORTE con un codigo reportado como faltante.
+SELECT
+    R.CODIGO_REPORTE,
+    R.ORIGEN_PKM,
+    R.ID_TIPO_DOCUMENTO,
+    R.ESTADO_REPORTE,
+    CASE WHEN R.URL_REPORTE IS NULL THEN 'SIN_URL' ELSE 'CON_URL' END AS TIPO_URL,
+    R.CODIGO_REFERENCIA,
+    R.NOMBRE_ARCHIVO,
+    R.FECHA_REPORTE,
+    CASE
+        WHEN R.ORIGEN_PKM = 'Onboarding' THEN 'ENTRA_POR_ORIGEN'
+        WHEN UPPER(TRIM(R.ORIGEN_PKM)) IN ('ONBOARDING', 'TARJETA', 'TARJETAPC') THEN 'FUERA_POR_ORIGEN_EXACTO'
+        ELSE 'FUERA_DEL_FLUJO_ESPERADO'
+    END AS DIAGNOSTICO_ORIGEN
+FROM PA.PA_REPORTES_AUTOMATICOS R
+WHERE R.CODIGO_REPORTE = :P_CODIGO_REPORTE;
