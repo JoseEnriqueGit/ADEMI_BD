@@ -7,6 +7,12 @@
 
 <!-- Agregar nuevas entradas al inicio -->
 
+## 2026-05-06 | OPT-018 Bulk collect final en P_Carga_Precalifica_Cancelado
+- **Cambio**: `P_Carga_Precalifica_Cancelado` deja de clasificar `RE` con cursor `FOR` abierto; ahora carga los candidatos finales con `BULK COLLECT`, cierra el cursor y luego ejecuta la clasificacion `NP/RXT/CP/AN`.
+- **Procedimientos afectados**: `P_Carga_Precalifica_Cancelado`
+- **Motivo**: reducir el riesgo restante de `ORA-01555` por cursor abierto mientras `P_Generar_Bitacora` y `P_Validar_Cambio_Estado` ejecutan transacciones autonomas y commits internos.
+- **Referencia**: `historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/README.md`
+
 ## 2026-05-05 | OPT-017 Bulk collect en P_REGISTRO_SOLICITUD
 - **Cambio**: `P_REGISTRO_SOLICITUD` deja de procesar con cursor `FOR` abierto sobre `PR_REPRESTAMOS`; ahora carga los `ID_REPRESTAMO` en memoria con `BULK COLLECT`, cierra el cursor y luego itera la coleccion.
 - **Procedimientos afectados**: `P_REGISTRO_SOLICITUD`

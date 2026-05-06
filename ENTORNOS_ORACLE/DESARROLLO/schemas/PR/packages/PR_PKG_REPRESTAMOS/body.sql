@@ -7982,7 +7982,7 @@ END P_Registra_Solicitud_Campana;
         DECLARE
         
         CURSOR CUR_REPRESTAMO IS 
-            SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
+            SELECT ID_REPRESTAMO
             FROM PR_REPRESTAMOS
             WHERE ESTADO = 'RE';
                          
@@ -7998,6 +7998,8 @@ END P_Registra_Solicitud_Campana;
          v_fin DATE;
          v_seg NUMBER(10);
          VALOR VARCHAR(400);
+         TYPE T_IDS_REPRESTAMO_FINAL IS TABLE OF PR_REPRESTAMOS.ID_REPRESTAMO%TYPE;
+         V_IDS_REPRESTAMO_FINAL T_IDS_REPRESTAMO_FINAL := T_IDS_REPRESTAMO_FINAL();
          /*pIDAPLICACION1 NUMBER;
          pIDAPLICACION2 NUMBER;
          pIDAPLICACION3 NUMBER;
@@ -8082,22 +8084,27 @@ END P_Registra_Solicitud_Campana;
 
                     
                       
-                      FOR A IN CUR_REPRESTAMO LOOP
-                      DBMS_OUTPUT.PUT_LINE ( 'Entra AL CURSOR CUR_REPRESTAMO = '|| A.ID_REPRESTAMO  );
+                      OPEN CUR_REPRESTAMO;
+                      FETCH CUR_REPRESTAMO BULK COLLECT INTO V_IDS_REPRESTAMO_FINAL;
+                      CLOSE CUR_REPRESTAMO;
+
+                      IF V_IDS_REPRESTAMO_FINAL.COUNT > 0 THEN
+                      FOR I IN 1 .. V_IDS_REPRESTAMO_FINAL.COUNT LOOP
+                      DBMS_OUTPUT.PUT_LINE ( 'Entra AL CURSOR CUR_REPRESTAMO = '|| V_IDS_REPRESTAMO_FINAL(I)  );
 
                         -- validar que tenga solicitud, que tenga canales
-                        IF  PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(A.ID_REPRESTAMO) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(A.ID_REPRESTAMO)AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN 
-                         PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'NP', NULL, 'Notificaci¿n Pendiente', USER);
+                        IF  PR.PR_PKG_REPRESTAMOS.F_Existe_Solicitudes(V_IDS_REPRESTAMO_FINAL(I)) AND PR.PR_PKG_REPRESTAMOS.F_Existe_Canales(V_IDS_REPRESTAMO_FINAL(I))AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( V_IDS_REPRESTAMO_FINAL(I) ) THEN
+                         PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(V_IDS_REPRESTAMO_FINAL(I), NULL, 'NP', NULL, 'Notificaci¿n Pendiente', USER);
                          
                          ELSE
                          
-                            IF  PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) = FALSE THEN
-                             PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
+                            IF  PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( V_IDS_REPRESTAMO_FINAL(I) ) = FALSE THEN
+                             PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(V_IDS_REPRESTAMO_FINAL(I), NULL, 'RXT', NULL, 'No cumple con los criterios: Tipo de Credito ', USER);
                             ELSE
-                                IF F_Existe_Solicitudes(A.ID_REPRESTAMO) AND F_Existe_Canales(A.ID_REPRESTAMO) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( A.ID_REPRESTAMO ) THEN
-                                    PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
+                                IF F_Existe_Solicitudes(V_IDS_REPRESTAMO_FINAL(I)) AND F_Existe_Canales(V_IDS_REPRESTAMO_FINAL(I)) = FALSE AND PR.PR_PKG_REPRESTAMOS.F_EXISTE_CREDITO ( V_IDS_REPRESTAMO_FINAL(I) ) THEN
+                                    PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(V_IDS_REPRESTAMO_FINAL(I), NULL, 'CP', NULL, 'Solicitud Pendiente de Canal', USER);
                                 ELSE
-                                PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(A.ID_REPRESTAMO, NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
+                                PR.PR_PKG_REPRESTAMOS.P_Generar_Bitacora(V_IDS_REPRESTAMO_FINAL(I), NULL, 'AN', NULL, 'No cumple con los criterios: Solicitudes,Opciones', USER);
                                 END IF;
                 
                         END IF; 
@@ -8105,6 +8112,7 @@ END P_Registra_Solicitud_Campana;
                        END IF;
                       
                       END LOOP;
+                      END IF;
                 UPDATE PA.PA_PARAMETROS_MVP SET VALOR=VALOR||(CASE WHEN NVL(REGEXP_COUNT(VALOR, '}'),0)>0 THEN ',' ELSE '' END)||'{"F":"'||TO_CHAR(SYSDATE,'dd/mm/yyyy hh:mi:ss')||'","R":'||v_conteo||',"E":'||NVL(REGEXP_COUNT(VALOR, '}')+1,1)||'}'
                 WHERE CODIGO_MVP = 'REPRESTAMOS' AND CODIGO_PARAMETRO='EJECUCIONES';
                 COMMIT;
@@ -8122,6 +8130,11 @@ END P_Registra_Solicitud_Campana;
         END;
         */
        COMMIT;
+      EXCEPTION WHEN OTHERS THEN
+          IF CUR_REPRESTAMO%ISOPEN THEN
+             CLOSE CUR_REPRESTAMO;
+          END IF;
+          RAISE;
       END;
                 
            

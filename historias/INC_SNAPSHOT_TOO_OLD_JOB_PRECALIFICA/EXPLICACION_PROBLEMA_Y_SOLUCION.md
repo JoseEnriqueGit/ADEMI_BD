@@ -3,6 +3,10 @@
 > Documento actualizado al 2026-05-05. Reemplaza el plan anterior que proponia
 > reproducir el error en QA/DEV. Esa reproduccion queda descartada por decision
 > del equipo.
+>
+> Nota 2026-05-06: OPT-017 ya fue complementada con OPT-018 en `DESARROLLO`.
+> El estado operativo vigente esta en `README.md`, `bitacora_resolucion.md` y
+> `historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/README.md`.
 
 ---
 

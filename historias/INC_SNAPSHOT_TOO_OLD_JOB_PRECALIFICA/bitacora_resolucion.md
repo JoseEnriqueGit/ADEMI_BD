@@ -12,10 +12,12 @@
 | 2026-05-05 | Se implementa OPT-017 en `DESARROLLO` con variante minima: `BULK COLLECT` solo de `ID_REPRESTAMO`, cierre del cursor y loop posterior sobre coleccion | Desarrollo | Implementado en repo y colocado en Toad |
 | 2026-05-05 | Se documenta OPT-017 con procedimiento completo antes, despues y rollback | Desarrollo | Documentado en `historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/` |
 | 2026-05-05 | Se evalua warning de Toad por `BULK COLLECT` sin `LIMIT` | Desarrollo | Aceptado para volumen actual de 5,000 a 10,000 IDs; si escala mucho, evaluar staging/GTT |
+| 2026-05-06 | Se implementa OPT-018 en `DESARROLLO`: el cursor final de `P_Carga_Precalifica_Cancelado` carga candidatos con `BULK COLLECT`, cierra cursor y luego clasifica `NP/RXT/CP/AN` | Desarrollo | Implementado en repo; pendiente compilacion/regresion en Toad |
+| 2026-05-06 | Se cierra sesion de OPT-018: se simplifica la variante final para usar directamente la coleccion de IDs, se regeneran `AFTER.sql` y `DESPUES.sql`, y se valida el diff local | Desarrollo | Documentado; pendiente compilacion/regresion en Toad |
 | Pendiente | Validar en PROD `UNDO_RETENTION`, presion/tamano de UNDO y volumen real de `ESTADO='RE'` | DBA | Pendiente |
 | Pendiente | Confirmar `IND_CAMBIA_ESTADO_REPRE='S'` para `CODIGO_ESTADO='RE'` | DBA / Desarrollo | Pendiente |
 | Pendiente | Compilar y validar en QA como regresion basica, no como reproduccion del `ORA-01555` | Desarrollo / DBA | Pendiente |
-| Pendiente | Analizar `P_Generar_Bitacora` y `P_Validar_Cambio_Estado` en una sesion separada para evaluar refactorizacion adicional | Desarrollo | Pendiente |
+| Pendiente | Evaluar en fase separada cualquier refactor directo de `P_Generar_Bitacora` y `P_Validar_Cambio_Estado` | Desarrollo | Pendiente |
 | Pendiente | Coordinar pase a PROD y monitorear la corrida del 2026-06-01 | Desarrollo / DBA | Pendiente |
 
 ## Notas
@@ -25,5 +27,7 @@
 - La reproduccion en QA/DEV queda fuera del alcance por decision operativa.
 - OPT-004/010/015 pueden seguir siendo mejoras generales del job, pero no son la
   correccion directa para este `ORA-01555`.
-- La propuesta directa del incidente es OPT-017: `BULK COLLECT` de IDs, cierre
-  inmediato del cursor y loop posterior sobre la coleccion.
+- La propuesta directa inicial del incidente fue OPT-017: `BULK COLLECT` de IDs,
+  cierre inmediato del cursor y loop posterior sobre la coleccion.
+- OPT-018 complementa esa correccion en el cursor final de clasificacion dentro
+  de `P_Carga_Precalifica_Cancelado`.

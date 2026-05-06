@@ -1,11 +1,11 @@
 # INC SNAPSHOT TOO OLD - JOB_PRECALIFICA_REPRESTAMO
 
 **Fecha apertura**: 2026-05-01
-**Actualizado**: 2026-05-05
+**Actualizado**: 2026-05-06
 **Reportado por**: equipo de Base de Datos
 **Job afectado**: `PR.JOB_PRECALIFICA_REPRESTAMO`
 **Procedimiento orquestador**: `PR.PR_PKG_REPRESTAMOS.P_CARGA_PRECALIFICA_CANCELADO`
-**Estado**: OPT-017 implementada en `DESARROLLO`; pendiente compilacion/regresion en Toad/QA y analisis posterior de `P_Generar_Bitacora`.
+**Estado**: OPT-017 y OPT-018 implementadas en `DESARROLLO`; pendiente compilacion/regresion en Toad/QA.
 
 ## Resumen
 
@@ -89,6 +89,26 @@ La implementacion final quedo en:
 | Loop posterior sobre la coleccion | `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | 7927-7935 |
 | Documentacion OPT-017 | `historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/README.md` | 1-60 |
 
+## Optimizacion adicional implementada en DESARROLLO
+
+Se creo OPT-018 para reducir el riesgo restante detectado despues de OPT-017:
+el cursor final de `P_Carga_Precalifica_Cancelado` volvia a leer
+`PR_REPRESTAMOS WHERE ESTADO='RE'` y dentro del loop ejecutaba
+`P_Generar_Bitacora`, que puede actualizar `PR_REPRESTAMOS` por medio de
+`P_Validar_Cambio_Estado`.
+
+La solucion aplicada mantiene la logica de clasificacion `NP/RXT/CP/AN`, pero
+carga los candidatos finales con `BULK COLLECT`, cierra el cursor y luego procesa
+la coleccion.
+
+| Punto | Archivo | Lineas |
+|-------|---------|--------|
+| Procedimiento `P_Carga_Precalifica_Cancelado` con OPT-018 | `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | 7960-8159 |
+| `OPEN/FETCH BULK COLLECT/CLOSE` final | `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | 8087-8089 |
+| Loop posterior sobre la coleccion final | `ENTORNOS_ORACLE/DESARROLLO/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql` | 8091-8115 |
+| Documentacion OPT-018 | `historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/README.md` | 1-67 |
+| Antes/despues OPT-018 | `historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/ANTES.sql`, `DESPUES.sql` | Procedimiento completo |
+
 ## Aclaracion importante
 
 Los archivos `body_ANTES.sql` y `body_DESPUES.sql` de esta carpeta son snapshots
@@ -117,6 +137,8 @@ transacciones autonomas y siguen haciendo commits internos.
   `CODIGO_ESTADO='RE'`.
 - Coordinar validacion en QA como compilacion/regresion basica, no como
   reproduccion del `ORA-01555`.
-- Analizar en una sesion separada `P_Generar_Bitacora` y
-  `P_Validar_Cambio_Estado`, porque siguen usando transacciones autonomas y
-  commits internos.
+- Monitorear que OPT-017 y OPT-018 reduzcan el riesgo observado sin reproducir
+  `ORA-01555`.
+- Dejar para una fase separada cualquier refactor directo de
+  `P_Generar_Bitacora` y `P_Validar_Cambio_Estado`, porque siguen usando
+  transacciones autonomas y commits internos.
