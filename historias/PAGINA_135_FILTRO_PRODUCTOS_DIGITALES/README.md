@@ -23,6 +23,18 @@ La pantalla debe cumplir con los siguientes criterios:
 2. **Aplicar el mismo universo de datos en cards y tabla**
    Las cards informativas y el reporte/tabla deben usar el mismo filtro de productos digitales para que conteos, montos y detalle sean consistentes.
 
+3. **Evaluar la vigencia solo por `ESTADO`** (cambio 2026-05-08)
+   La vigencia del certificado se determina exclusivamente por el campo `ESTADO`: `ESTADO IN ('A','R')` -> vigente, `ESTADO IN ('C','P','N','I')` -> vencido / cancelado. La columna `FEC_VENCIMIENTO` no participa en la clasificacion de vigencia. Detalle: `historias/PAGINA_135_CARDS_VIGENCIA_POR_ESTADO/README.md`.
+
+4. **Card "Total Certificados Abiertos" clickeable** (cambio 2026-05-08)
+   Al hacer click sobre la card debe filtrar la tabla mostrando todo el universo de certificados del WHERE base, sin restriccion adicional. Detalle: `historias/PAGINA_135_CARDS_VIGENCIA_POR_ESTADO/README.md`.
+
+5. **Cards de monto reactivas al filtro por card** (cambio 2026-05-08)
+   Las cards `Monto en Pesos`, `Monto en Dólares`, `Monto Cancelados (Pesos)` y `Monto Cancelados (Dólares)` recalculan sus sumas sobre el subconjunto seleccionado al hacer click en `Certificados Vigentes`, `Certificados Vencidos`, `Clientes Externos` o `Empleados`. Las cards de conteo siempre representan totales del universo base. Detalle: `historias/PAGINA_135_CARDS_VIGENCIA_POR_ESTADO/README.md`.
+
+6. **Columna `NOMBRE_PRODUCTO` en el reporte/tabla** (cambio 2026-05-08)
+   La tabla debe mostrar el nombre del producto despues de `Número Certificado`, tomado de `PA.PRODUCTOS.DESCRIPCION` joineada por `COD_PRODUCTO` y `COD_EMPRESA`. Se remueve el prefijo redundante `"Certificados financieros Digital "` con `REGEXP_REPLACE` para mejor legibilidad. Si el producto no existe en `PA.PRODUCTOS`, mostrar `'PRODUCTO ' || cd.COD_PRODUCTO` como fallback. Detalle: `historias/PAGINA_135_AGREGAR_NOMBRE_PRODUCTO/README.md`.
+
 ## Cambio funcional realizado
 
 Se agrego el filtro de productos digitales en las dos consultas principales de la pagina:
