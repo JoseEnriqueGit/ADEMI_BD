@@ -5,6 +5,7 @@ Cambios incluidos en este release:
 1. Vigencia de certificados evaluada **solo por `ESTADO`** (sin la condicion `FEC_VENCIMIENTO < SYSDATE`).
 2. Card **"Total Certificados Abiertos"** ahora es clickeable y filtra la tabla mostrando todos los certificados del universo base.
 3. **Cards de monto reactivas al filtro por card**: las cards `Monto en Pesos`, `Monto en Dólares`, `Monto Cancelados (Pesos)` y `Monto Cancelados (Dólares)` recalculan sus sumas cuando se hace click en `Certificados Vigentes`, `Certificados Vencidos`, `Clientes Externos` o `Empleados`.
+4. **Columna `NOMBRE_PRODUCTO` agregada** en el reporte/tabla, equivalente al campo que tiene la pagina 134. JOIN a `PA.PRODUCTOS` por `COD_PRODUCTO` y `COD_EMPRESA`.
 
 ## Motivo
 
@@ -19,6 +20,14 @@ Antes del cambio, el Bloque 1 tenia `VALOR_FILTRO = NULL`, lo que hacia que la c
 ### 3. Cards de monto reactivas al filtro por card
 
 Antes, las cards de monto siempre sumaban sobre todo el universo (`CertificadosBase`). Negocio requirio que la suma reflejara el subconjunto seleccionado al hacer click en una card de conteo (Vigentes, Vencidos, Externos, Empleados). Se introdujo la CTE `CertificadosFiltrados` que aplica el filtro de `:P135_FILTRO_CARD` y las cards de monto pasan a leer de esa CTE. Las cards de conteo siguen leyendo de `CertificadosBase` para que sus numeros representen siempre el universo total.
+
+### 4. Columna `NOMBRE_PRODUCTO` en el reporte/tabla
+
+Negocio requiere ver el nombre legible del producto en la tabla de la pagina 135, igual que la pagina 134. Se agrego la columna `NOMBRE_PRODUCTO` al SELECT del reporte, posicionada despues de `Número Certificado`, y un `LEFT JOIN PA.PRODUCTOS` por `COD_PRODUCTO` y `COD_EMPRESA`. Si el producto no existe en `PA.PRODUCTOS`, se muestra `'PRODUCTO ' || cd.COD_PRODUCTO` como fallback.
+
+Las cards no requieren este cambio.
+
+Detalle: ver `historias/PAGINA_135_AGREGAR_NOMBRE_PRODUCTO/README.md`.
 
 ## Archivos
 
