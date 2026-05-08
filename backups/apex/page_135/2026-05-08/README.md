@@ -5,7 +5,7 @@ Cambios incluidos en este release:
 1. Vigencia de certificados evaluada **solo por `ESTADO`** (sin la condicion `FEC_VENCIMIENTO < SYSDATE`).
 2. Card **"Total Certificados Abiertos"** ahora es clickeable y filtra la tabla mostrando todos los certificados del universo base.
 3. **Cards de monto reactivas al filtro por card**: las cards `Monto en Pesos`, `Monto en Dólares`, `Monto Cancelados (Pesos)` y `Monto Cancelados (Dólares)` recalculan sus sumas cuando se hace click en `Certificados Vigentes`, `Certificados Vencidos`, `Clientes Externos` o `Empleados`.
-4. **Columna `NOMBRE_PRODUCTO` agregada** en el reporte/tabla, equivalente al campo que tiene la pagina 134. JOIN a `PA.PRODUCTOS` por `COD_PRODUCTO` y `COD_EMPRESA`.
+4. **Columna `NOMBRE_PRODUCTO` agregada** en el reporte/tabla, equivalente al campo que tiene la pagina 134. JOIN a `PA.PRODUCTOS` por `COD_PRODUCTO` y `COD_EMPRESA`. Se aplica `REGEXP_REPLACE` para remover el prefijo redundante `"Certificados financieros Digital "` del valor mostrado, y dejar solo la parte distintiva (ejemplo: `Capitalizable Pesos` en vez de `Certificados financieros Digital Capitalizable Pesos`).
 
 ## Motivo
 
@@ -24,6 +24,8 @@ Antes, las cards de monto siempre sumaban sobre todo el universo (`CertificadosB
 ### 4. Columna `NOMBRE_PRODUCTO` en el reporte/tabla
 
 Negocio requiere ver el nombre legible del producto en la tabla de la pagina 135, igual que la pagina 134. Se agrego la columna `NOMBRE_PRODUCTO` al SELECT del reporte, posicionada despues de `Número Certificado`, y un `LEFT JOIN PA.PRODUCTOS` por `COD_PRODUCTO` y `COD_EMPRESA`. Si el producto no existe en `PA.PRODUCTOS`, se muestra `'PRODUCTO ' || cd.COD_PRODUCTO` como fallback.
+
+Refinamiento posterior: como todas las descripciones en `PA.PRODUCTOS` para los productos digitales empiezan con el prefijo `"Certificados financieros Digital "`, ese prefijo ocupa la mitad del ancho de la columna y dificulta diferenciar productos en el filtro del reporte (queda truncado igual para todas las opciones). Se envuelve la descripcion en `REGEXP_REPLACE` con anclaje `^` y flag `'i'` (case-insensitive) para remover ese prefijo solo cuando aparece al inicio. Si en el futuro algun producto no respeta esa convencion, `REGEXP_REPLACE` lo deja intacto y no rompe nada.
 
 Las cards no requieren este cambio.
 

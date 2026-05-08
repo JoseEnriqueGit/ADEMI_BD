@@ -27,7 +27,10 @@ SELECT
     END AS GENERO,
     TRUNC(MONTHS_BETWEEN(SYSDATE, pf.FEC_NACIMIENTO) / 12) AS EDAD,
     cd.NUM_CERTIFICADO AS "Número Certificado",
-    NVL(prod.DESCRIPCION, 'PRODUCTO ' || cd.COD_PRODUCTO) AS NOMBRE_PRODUCTO,
+    NVL(
+        REGEXP_REPLACE(prod.DESCRIPCION, '^Certificados financieros Digital\s*', '', 1, 1, 'i'),
+        'PRODUCTO ' || cd.COD_PRODUCTO
+    ) AS NOMBRE_PRODUCTO,
     CASE cd.TIP_CERTIFICADO
         WHEN 'CU' THEN 'Crédito a Cuenta'
         WHEN 'CV' THEN 'Capitalizable'

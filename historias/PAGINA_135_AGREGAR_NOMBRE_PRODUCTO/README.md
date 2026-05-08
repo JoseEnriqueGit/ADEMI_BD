@@ -18,9 +18,10 @@ Yo como negocio requiero que la tabla de la pagina 135 muestre el nombre del pro
 
 1. **Columna `NOMBRE_PRODUCTO`** agregada al reporte/tabla, posicionada inmediatamente despues de `Número Certificado` y antes de `MODALIDAD_PAGO`.
 2. **Fuente del nombre**: `PA.PRODUCTOS.DESCRIPCION` joinada por `COD_PRODUCTO` y `COD_EMPRESA` desde `CD.CD_CERTIFICADO`.
-3. **Fallback**: si el producto no existe en `PA.PRODUCTOS` o el JOIN no retorna fila, mostrar `'PRODUCTO ' || cd.COD_PRODUCTO` para que la celda nunca aparezca en blanco.
-4. **No alterar** filtros, otras columnas, ni cards. Solo agrega un campo y un JOIN al reporte.
-5. **Cardinalidad preservada**: el JOIN es `LEFT JOIN`, por lo que ningun certificado debe perderse aunque su producto no exista en `PA.PRODUCTOS`.
+3. **Prefijo redundante removido**: como todas las descripciones de productos digitales empiezan con `"Certificados financieros Digital "`, se aplica `REGEXP_REPLACE` para mostrar solo la parte distintiva (ejemplo: `Capitalizable Pesos`, `Pagadero Dólares (P.Fisica)`).
+4. **Fallback**: si el producto no existe en `PA.PRODUCTOS` o el JOIN no retorna fila, mostrar `'PRODUCTO ' || cd.COD_PRODUCTO` para que la celda nunca aparezca en blanco.
+5. **No alterar** filtros, otras columnas, ni cards. Solo agrega un campo y un JOIN al reporte.
+6. **Cardinalidad preservada**: el JOIN es `LEFT JOIN`, por lo que ningun certificado debe perderse aunque su producto no exista en `PA.PRODUCTOS`.
 
 ## Cambio funcional realizado
 
@@ -31,10 +32,20 @@ Dos cambios puntuales en el SQL:
 #### 1. Columna agregada en el SELECT
 
 ```sql
-NVL(prod.DESCRIPCION, 'PRODUCTO ' || cd.COD_PRODUCTO) AS NOMBRE_PRODUCTO,
+NVL(
+    REGEXP_REPLACE(prod.DESCRIPCION, '^Certificados financieros Digital\s*', '', 1, 1, 'i'),
+    'PRODUCTO ' || cd.COD_PRODUCTO
+) AS NOMBRE_PRODUCTO,
 ```
 
 Posicion: justo despues de `cd.NUM_CERTIFICADO AS "Número Certificado"`.
+
+**Nota sobre el `REGEXP_REPLACE`**: las descripciones de los productos digitales en `PA.PRODUCTOS` siguen el patron `"Certificados financieros Digital <variante>"` (ejemplo: `Certificados financieros Digital Capitalizable Pesos`). Como ese prefijo aparece en TODAS las filas, ocupa ancho de columna sin diferenciar nada y trunca el filtro del reporte para todas las opciones por igual. El regex tiene:
+
+- `^` -> ancla al inicio: solo strip si aparece como prefijo, no en medio.
+- `\s*` -> consume el espacio que sigue al prefijo.
+- Flags `1, 1, 'i'` -> primera ocurrencia, primera coincidencia, case-insensitive (por si en algun momento el catalogo tiene variantes de mayusculas/minusculas).
+- Si la descripcion **no** empieza con el prefijo, `REGEXP_REPLACE` la deja intacta. No rompe nada.
 
 #### 2. JOIN agregado al FROM
 
