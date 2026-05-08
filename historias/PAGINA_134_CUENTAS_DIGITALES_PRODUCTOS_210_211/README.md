@@ -27,6 +27,15 @@ Yo como negocio requiero que la vista de cuentas digitales incluya los productos
 4. **Evitar errores de logica en el filtro de productos**
    El filtro de productos debe implementarse de forma que ambos productos, `210` y `211`, respeten las mismas condiciones de fecha y filtros de la pantalla.
 
+5. **Mostrar saldos separados por moneda**
+   Adicional a las cards existentes, la pantalla debe mostrar el saldo total de cuentas digitales activas separado por moneda: una card para pesos dominicanos (producto `210`) y otra para dolares estadounidenses (producto `211`).
+
+6. **Reflejar el filtro activo en las cards de saldo por moneda**
+   Al aplicar filtro por tipo de cliente desde las cards (activas, empleados o cliente externo), las cards de saldo por moneda deben recalcular sus montos para reflejar solo el subconjunto seleccionado.
+
+7. **Refresh consistente al cambiar la logica de fecha**
+   Al cambiar entre `AND` y `OR` en la logica de fecha, tanto las cards como la tabla deben refrescar siempre con el valor recien seleccionado.
+
 ## Cambio funcional realizado
 
 Se agrego el producto `211` al universo de cuentas digitales de la pagina 134.
