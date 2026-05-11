@@ -71,7 +71,7 @@ Tarjetas AS (
     SELECT
         'Total Certificados Abiertos' AS CARD_TITLE,
         TO_CHAR(COUNT(*), 'FM999,999,999,990') AS CARD_TEXT,
-        'Histórico Periodo' AS CARD_SUBTEXT,
+        'Histórico Período' AS CARD_SUBTEXT,
         'fa-file-text-o' AS CARD_ICON,
         'u-color-1' AS CARD_COLOR,
         1 AS ORDER_COL,

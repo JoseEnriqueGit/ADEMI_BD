@@ -24,7 +24,7 @@ SELECT
         WHEN pf.SEXO = 'M' THEN 'MASCULINO'
         WHEN pf.SEXO = 'F' THEN 'FEMENINO'
         ELSE NVL(pf.SEXO, 'NO DEFINIDO')
-    END AS GENERO,
+    END AS "Género",
     TRUNC(MONTHS_BETWEEN(SYSDATE, pf.FEC_NACIMIENTO) / 12) AS EDAD,
     cd.NUM_CERTIFICADO AS "Número Certificado",
     NVL(
@@ -43,7 +43,7 @@ SELECT
         ELSE 'Moneda ' || cd.COD_MONEDA
     END AS MONEDA,
     cd.MONTO AS MONTO_CERTIFICADO,
-    cd.PLA_DIAS AS PLAZO_DIAS,
+    cd.PLA_DIAS AS "Plazo Días",
     cd.TAS_BRUTA AS "Tasa de Interés",
     cd.FEC_EMISION AS FECHA_APERTURA,
     cd.FEC_VENCIMIENTO AS "Fecha Vencimiento",
