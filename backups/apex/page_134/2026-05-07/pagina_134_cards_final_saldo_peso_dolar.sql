@@ -126,7 +126,7 @@ WHERE FEC_CANCELAC IS NULL
 UNION ALL
 
 SELECT
-    'Saldo Total en Dolares',
+    'Saldo Total en Dólares',
     'US$ ' || TO_CHAR(NVL(SUM(SAL_TOTAL_CTA), 0), 'FM999,999,999,990.00'),
     'Cuentas activas en USD',
     'fa-usd',
@@ -141,7 +141,7 @@ UNION ALL
 SELECT
     'Total Cuentas Canceladas',
     TO_CHAR(COUNT(*), 'FM999,999,999,990'),
-    'Canceladas segun filtros',
+    'Canceladas según filtros',
     'fa-ban',
     'u-color-21',
     8 AS ORDER_COL
