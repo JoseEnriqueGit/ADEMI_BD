@@ -7908,7 +7908,7 @@ END P_Registra_Solicitud_Campana;
         
        VMSG  VARCHAR2(4000);
        pMensaje      VARCHAR2(100);  
-       idCabeceraDet NUMBER; 
+       vUsuario      VARCHAR2(30) := NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'), USER);
             
        CURSOR CUR_REPRESTAMO IS 
        SELECT ID_REPRESTAMO
@@ -7926,9 +7926,9 @@ END P_Registra_Solicitud_Campana;
 
         IF V_IDS_REPRESTAMO.COUNT > 0 THEN
             FOR I IN 1 .. V_IDS_REPRESTAMO.COUNT LOOP
-                PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(V_IDS_REPRESTAMO(I),NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER),VMSG);
+                PR.PR_PKG_REPRESTAMOS.P_Registrar_Solicitud(V_IDS_REPRESTAMO(I), vUsuario, VMSG);
 
-                PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(V_IDS_REPRESTAMO(I), NULL, 'RE', NULL, '',  NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER));
+                PR.PR_PKG_REPRESTAMOS.P_GENERAR_BITACORA(V_IDS_REPRESTAMO(I), NULL, 'RE', NULL, '', vUsuario);
 
                 COMMIT;
             END LOOP ;

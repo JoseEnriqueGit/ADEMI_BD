@@ -27,10 +27,6 @@
             FROM PR_REPRESTAMOS
             WHERE ESTADO = 'RE';
 
-        CURSOR CUR_REPRESTAMO_XCORE IS
-         SELECT ID_REPRESTAMO,ESTADO,XCORE_GLOBAL
-         FROM PR_REPRESTAMOS
-         WHERE ESTADO = 'RE';
 
          VMSG  VARCHAR2(4000);
          v_Id_Represtamo  VARCHAR2(400);
