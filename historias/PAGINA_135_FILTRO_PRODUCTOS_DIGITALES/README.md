@@ -23,17 +23,10 @@ La pantalla debe cumplir con los siguientes criterios:
 2. **Aplicar el mismo universo de datos en cards y tabla**
    Las cards informativas y el reporte/tabla deben usar el mismo filtro de productos digitales para que conteos, montos y detalle sean consistentes.
 
-3. **Evaluar la vigencia solo por estado del certificado**
-   La vigencia se determina por `ESTADO IN ('A','R')` para vigentes y `ESTADO IN ('C','P','N','I')` para vencidos. La fecha de vencimiento no participa.
+3. **Mostrar nombre del producto en el reporte/tabla**
 
-4. **Card "Total Certificados Abiertos" debe ser clickeable**
-   Al hacer click la tabla muestra todo el universo de certificados.
-
-5. **Cards de monto reactivas al filtro por card**
+4. **Cards de monto reactivas al filtro por card**
    Las cards de monto recalculan sus sumas al hacer click en `Certificados Vigentes`, `Certificados Vencidos`, `Clientes Externos` o `Empleados`.
-
-6. **Mostrar nombre del producto en el reporte/tabla**
-   La tabla muestra la descripcion legible del producto al lado del numero de certificado.
 
 ## Cambio funcional realizado
 
