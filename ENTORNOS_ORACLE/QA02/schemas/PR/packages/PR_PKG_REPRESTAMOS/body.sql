@@ -5638,6 +5638,66 @@ PRAGMA AUTONOMOUS_TRANSACTION;
         END;   
   END P_Datos_Primarios;
 
+  FUNCTION F_Obt_Telefono_Persona_Local(pCodPersona     IN VARCHAR2,
+                                        pTipoTelefono   IN VARCHAR2)
+    RETURN VARCHAR2 IS
+    vLabTel VARCHAR2(30);
+  BEGIN
+    -- QA02 TEMP: replica PA.obt_telefono_persona evitando conversion implicita sobre columnas VARCHAR2.
+    IF pTipoTelefono IN ('X','O') THEN
+      BEGIN
+        SELECT DECODE(l.cod_area, NULL, l.num_telefono,
+                                 DECODE(l.extension_tel, NULL, '(' || l.cod_area || ')' || l.num_telefono,
+                                                             '(' || l.cod_area || ')' || l.num_telefono || ' ' || l.extension_tel)) telefono
+          INTO vLabTel
+          FROM PA.info_laboral l
+         WHERE l.cod_per_fisica = pCodPersona
+           AND l.cod_laboral = (SELECT MAX(x.cod_laboral)
+                                  FROM PA.info_laboral x
+                                 WHERE x.cod_per_fisica = pCodPersona);
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          vLabTel := NULL;
+        WHEN OTHERS THEN
+          vLabTel := NULL;
+      END;
+    ELSE
+      BEGIN
+        SELECT DECODE(cod_area, NULL, num_telefono,
+                                DECODE(extension, NULL, '(' || cod_area || ')' || num_telefono,
+                                                       '(' || cod_area || ')' || num_telefono || ' ' || extension)) telefono
+          INTO vLabTel
+          FROM PA.tel_personas
+         WHERE cod_persona = pCodPersona
+           AND tip_telefono = pTipoTelefono
+           AND es_default = 'S'
+           AND ROWNUM = 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          vLabTel := NULL;
+      END;
+
+      IF vLabTel IS NULL THEN
+        BEGIN
+          SELECT DECODE(cod_area, NULL, num_telefono,
+                                  DECODE(extension, NULL, '(' || cod_area || ')' || num_telefono,
+                                                         '(' || cod_area || ')' || num_telefono || ' ' || extension)) telefono
+            INTO vLabTel
+            FROM PA.tel_personas
+           WHERE cod_persona = pCodPersona
+             AND tip_telefono = pTipoTelefono
+             AND es_default = 'N'
+             AND ROWNUM = 1;
+        EXCEPTION
+          WHEN OTHERS THEN
+            vLabTel := NULL;
+        END;
+      END IF;
+    END IF;
+
+    RETURN vLabTel;
+  END F_Obt_Telefono_Persona_Local;
+
   PROCEDURE P_Datos_Secundarios(pCodCliente         IN     VARCHAR2,
                                 pTelefonoCelular    IN OUT VARCHAR2,
                                 pTelefonoResidencia IN OUT VARCHAR2,
@@ -5649,9 +5709,9 @@ PRAGMA AUTONOMOUS_TRANSACTION;
                                 pMensaje            IN OUT VARCHAR2) IS                                   
   CURSOR CUR_email IS
       SELECT C.EMAIL_USUARIO, 
-                 NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
-                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'D'), NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'R'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
-                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'O'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
+                 NVL(F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
+                 NVL(NVL(F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'D'), NVL(F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'R'), F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
+                 NVL(NVL(F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'O'), F_Obt_Telefono_Persona_Local(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
                  obt_direccion_actualizada(C.COD_PER_FISICA) detalle--D.DETALLE DIRECCION-- D.COD_DIRECCION, D.TIP_DIRECCION
             FROM PERSONAS_FISICAS c
            WHERE C.COD_PER_FISICA = pCodCliente;
