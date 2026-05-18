@@ -1,0 +1,64 @@
+-- =====================================================================
+-- OPT-020 - Tracking persistente aplicado a PR.PR_PKG_REPRESTAMOS
+-- Entorno objetivo: QA02
+--
+-- Estado:
+--   El patch fue aplicado sobre:
+--     body_actual_QA02_tracking/body_actual_QA02.sql
+--
+-- Respaldo antes del tracking:
+--     body_actual_QA02_tracking/body_actual_QA02_BEFORE_TRACKING.sql
+--
+-- Importante:
+--   - No cambia la spec.
+--   - No cambia reglas de negocio.
+--   - No reactiva PVALIDA_XCORE; en el body actual ese llamado esta comentado.
+--   - El tracking escribe en PR.PR_JOB_PRECALIFICA_TRACK usando transacciones
+--     autonomas, para conservar evidencia aunque el job falle despues.
+-- =====================================================================
+
+-- =====================================================================
+-- Cambios aplicados
+-- =====================================================================
+
+-- 1. En el DECLARE local de P_Carga_Precalifica_Cancelado se agregaron:
+--    - v_id_ejecucion_track
+--    - v_paso_actual_track
+--    - v_proceso_track
+--    - track_inicio / track_fin / track_error
+--
+-- 2. Cada proceso del orquestador fue envuelto asi:
+--
+--    track_inicio(<id_paso>, '<proceso>');
+--    <llamada original>;
+--    track_fin(<id_paso>);
+--
+-- 3. La exception interna registra:
+--
+--    track_error(v_paso_actual_track, v_proceso_track, SQLCODE, ...);
+--    track_error(0, 'TOTAL_JOB', SQLCODE, ...);
+--
+-- 4. Los resultados se consultan con:
+--
+--    08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql
+
+-- =====================================================================
+-- Mapa de pasos instrumentados
+-- =====================================================================
+
+--  0 TOTAL_JOB
+--  1 P_Actualizar_Anular_Represtamo
+--  2 Precalifica_Represtamo
+--  3 Precalifica_Represtamo_fiadores
+--  4 Precalifica_Represtamo_fiadores_hi
+--  5 Precalifica_Repre_Cancelado
+--  6 Precalifica_Repre_Cancelado_hi
+--  7 COUNT_RE
+--  8 Actualiza_Precalificacion
+--  9 Actualiza_XCORE_CUSTOM
+-- 10 P_REGISTRO_SOLICITUD
+-- 11 PVALIDA_WORLD_COMPLIANCE
+-- 12 LOOP_FINAL_VALIDACIONES_BITACORA
+-- 13 ACTUALIZA_PARAMETRO_EJECUCIONES
+
+PROMPT Tracking persistente aplicado en body_actual_QA02_tracking/body_actual_QA02.sql.
