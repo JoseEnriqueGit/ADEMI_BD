@@ -85,7 +85,7 @@ SELECT log_id,
        additional_info
   FROM dba_scheduler_job_run_details
  WHERE owner    = 'PR'
-   AND job_name = 'P_CARGA_PRECALIFICA_CANCELADO'
+   AND job_name = 'JOB_CARGA_PRECALIFICA_RD'
  ORDER BY log_id DESC;
 ```
 
@@ -116,7 +116,7 @@ SELECT r.runid,
     ON j.actual_start_date BETWEEN r.run_date - INTERVAL '5' MINUTE
                                AND r.run_date + INTERVAL '30' MINUTE
  WHERE r.run_comment LIKE '%P_Carga_Precalifica_Cancelado%'
-   AND j.job_name = 'P_CARGA_PRECALIFICA_CANCELADO'
+   AND j.job_name = 'JOB_CARGA_PRECALIFICA_RD'
  ORDER BY r.runid DESC;
 ```
 
