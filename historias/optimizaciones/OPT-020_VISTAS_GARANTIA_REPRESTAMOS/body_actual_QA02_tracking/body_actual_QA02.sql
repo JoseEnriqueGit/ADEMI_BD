@@ -7113,13 +7113,17 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
         vDireccion          PA.DIR_PERSONAS.DETALLE%TYPE;
         vCodArea            VARCHAR2(3);
         vNumTel             VARCHAR2(50);           
+        vCodigoEmpresa      PR.PR_REPRESTAMOS.CODIGO_EMPRESA%TYPE;
+        vTelefonoValidado   VARCHAR2(50);
 
     BEGIN
+        vCodigoEmpresa := PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo;
+
         BEGIN
             SELECT R.CODIGO_CLIENTE
               INTO vCodCliente
               FROM PR.PR_REPRESTAMOS r
-             WHERE r.CODIGO_EMPRESA = PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+             WHERE r.CODIGO_EMPRESA = vCodigoEmpresa
                AND r.ID_REPRESTAMO = pIdReprestamo;
 
         EXCEPTION WHEN NO_DATA_FOUND THEN
@@ -7131,7 +7135,7 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
             SELECT R.ID_REPRESTAMO
               INTO vIdreprestamoSolicitud
               FROM PR.PR_SOLICITUD_REPRESTAMO r
-             WHERE r.CODIGO_EMPRESA = PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
+             WHERE r.CODIGO_EMPRESA = vCodigoEmpresa
                AND r.ID_REPRESTAMO = pIdReprestamo;
 
         EXCEPTION WHEN NO_DATA_FOUND THEN
@@ -7173,7 +7177,7 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
                           TIPO_CREDITO
                       ) 
                     VALUES
-                    (PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo,
+                    (vCodigoEmpresa,
                      pIdReprestamo,
                      vNombres,
                      vApellidos,
@@ -7207,10 +7211,12 @@ DBMS_OUTPUT.PUT_LINE ( 'v_response = ' || v_response );
              
         END IF; 
         
-        IF pIdReprestamo IS NOT NULL AND F_Validar_Telefono(vTelefonoCelular) IS NOT NULL THEN
+        vTelefonoValidado := F_Validar_Telefono(vTelefonoCelular);
+
+        IF pIdReprestamo IS NOT NULL AND vTelefonoValidado IS NOT NULL THEN
         
         INSERT INTO PR.PR_CANALES_REPRESTAMO ( CODIGO_EMPRESA, ID_REPRESTAMO, CANAL, VALOR, ADICIONADO_POR, FECHA_ADICION )
-               VALUES ( PR.PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo, pIdReprestamo,1/*Obtener el valor de la tabla parametro*/, F_Validar_Telefono(vTelefonoCelular), pUsuario, SYSDATE);
+               VALUES ( vCodigoEmpresa, pIdReprestamo,1/*Obtener el valor de la tabla parametro*/, vTelefonoValidado, pUsuario, SYSDATE);
                COMMIT;
         END IF;
            -- UPDATE PR.PR_SOLICITUD_REPRESTAMO S SET S.TIPO_CREDITO = PR.PR_PKG_REPRESTAMOS.F_OBTENER_NUEVO_CREDITO (pIdReprestamo) WHERE S.ID_REPRESTAMO = pIdReprestamo;
@@ -8010,18 +8016,22 @@ END P_Registra_Solicitud_Campana;
        VMSG  VARCHAR2(4000);
        pMensaje      VARCHAR2(100);
        vUsuario      VARCHAR2(30) := NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'), USER);
+       vCodigoEmpresa PR.PR_REPRESTAMOS.CODIGO_EMPRESA%TYPE;
 
-       CURSOR CUR_REPRESTAMO IS
+       CURSOR CUR_REPRESTAMO(P_CODIGO_EMPRESA PR.PR_REPRESTAMOS.CODIGO_EMPRESA%TYPE) IS
        SELECT ID_REPRESTAMO
        FROM PR_REPRESTAMOS
-       WHERE ESTADO = 'RE';
+       WHERE CODIGO_EMPRESA = P_CODIGO_EMPRESA
+         AND ESTADO = 'RE';
 
        TYPE T_IDS_REPRESTAMO IS TABLE OF PR_REPRESTAMOS.ID_REPRESTAMO%TYPE;
        V_IDS_REPRESTAMO T_IDS_REPRESTAMO := T_IDS_REPRESTAMO();
 
       BEGIN
 
-        OPEN CUR_REPRESTAMO;
+        vCodigoEmpresa := PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO;
+
+        OPEN CUR_REPRESTAMO(vCodigoEmpresa);
         FETCH CUR_REPRESTAMO BULK COLLECT INTO V_IDS_REPRESTAMO;
         CLOSE CUR_REPRESTAMO;
 
@@ -9596,7 +9606,8 @@ END P_Registra_Solicitud_Campana;
      BEGIN
      SELECT COUNT(1) INTO vExiste
        FROM PR.PR_REPRESTAMOS R
-       WHERE R.ID_REPRE_CAMPANA_ESPECIALES IS NOT NULL
+       WHERE R.CODIGO_EMPRESA = F_Obt_Empresa_Represtamo
+       AND R.ID_REPRE_CAMPANA_ESPECIALES IS NOT NULL
        AND R.ID_REPRESTAMO = pIdReprestamo;
       
       
@@ -9609,7 +9620,8 @@ END P_Registra_Solicitud_Campana;
      BEGIN
      SELECT COUNT(1) INTO vExiste
        FROM PR.PR_REPRESTAMOS R
-       WHERE R.ID_CARGA_DIRIGIDA IS NOT NULL
+       WHERE R.CODIGO_EMPRESA = F_Obt_Empresa_Represtamo
+       AND R.ID_CARGA_DIRIGIDA IS NOT NULL
        AND R.ID_REPRESTAMO = pIdReprestamo;
        
        RETURN (vExiste > 0);
@@ -9763,11 +9775,17 @@ END P_Registra_Solicitud_Campana;
  FUNCTION F_Obtener_Nuevo_Credito(pIdReprestamo IN NUMBER)
     RETURN NUMBER IS
         NUEVO_TIPO NUMBER;
+        vCodigoEmpresa PR.PR_REPRESTAMOS.CODIGO_EMPRESA%TYPE;
         CURSOR CREDITO IS 
             SELECT TIPO_CREDITO_DESTINO 
             FROM PR.PR_REPRESTAMO_CAMPANA_DET 
-            WHERE TIPO_CREDITO_ORIGEN = (SELECT TIPO_CREDITO FROM PR.PR_SOLICITUD_REPRESTAMO WHERE ID_REPRESTAMO = pIdReprestamo);
+            WHERE TIPO_CREDITO_ORIGEN = (SELECT TIPO_CREDITO
+                                            FROM PR.PR_SOLICITUD_REPRESTAMO
+                                           WHERE CODIGO_EMPRESA = vCodigoEmpresa
+                                             AND ID_REPRESTAMO = pIdReprestamo);
     BEGIN
+        vCodigoEmpresa := F_Obt_Empresa_Represtamo;
+
         IF PR.PR_PKG_REPRESTAMOS.F_Validar_Tipo_Represtamo(pIdReprestamo) THEN
         DBMS_OUTPUT.PUT_LINE('EL REPRESTAMO ES DE CAMPAÑA ESPECIAL');
             FOR A IN CREDITO LOOP
@@ -9779,6 +9797,7 @@ END P_Registra_Solicitud_Campana;
                       AND R.MTO_PREAPROBADO >= (SELECT MIN(MONTO_MIN) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO) 
                       AND R.MTO_PREAPROBADO <= (SELECT MAX(MONTO_MAX) FROM PR.PR_PLAZO_CREDITO_REPRESTAMO WHERE TIPO_CREDITO = T.TIPO_CREDITO)
                       AND ROWNUM <= 1
+                      AND R.CODIGO_EMPRESA = vCodigoEmpresa
                       AND R.ID_REPRESTAMO = pIdReprestamo;
                     DBMS_OUTPUT.PUT_LINE('CREDITO DE CAMPAÑA ESPECIAL');
                     DBMS_OUTPUT.PUT_LINE('Nuevo Tipo de Crédito: ' || NUEVO_TIPO);
@@ -9827,10 +9846,11 @@ END P_Registra_Solicitud_Campana;
                       )
                 ) INTO NUEVO_TIPO
                 FROM PR_REPRESTAMOS   R
-                LEFT JOIN PR_CREDITOS      C ON C.NO_CREDITO = R.NO_CREDITO
-                LEFT JOIN PR_CREDITOS_HI   H ON H.NO_CREDITO = R.NO_CREDITO
+                LEFT JOIN PR_CREDITOS      C ON C.CODIGO_EMPRESA = R.CODIGO_EMPRESA AND C.NO_CREDITO = R.NO_CREDITO
+                LEFT JOIN PR_CREDITOS_HI   H ON H.CODIGO_EMPRESA = R.CODIGO_EMPRESA AND H.NO_CREDITO = R.NO_CREDITO
                 LEFT JOIN PR_TIPO_CREDITO  T ON T.TIPO_CREDITO = C.TIPO_CREDITO OR T.TIPO_CREDITO = H.TIPO_CREDITO
-                WHERE R.ID_REPRESTAMO = pIdReprestamo;
+                WHERE R.CODIGO_EMPRESA = vCodigoEmpresa
+                  AND R.ID_REPRESTAMO = pIdReprestamo;
                 RETURN NUEVO_TIPO;
                 DBMS_OUTPUT.PUT_LINE ( 'NUEVO CREDITO '|| NUEVO_TIPO || 'REPRESTAMOS' || pIdReprestamo);
             EXCEPTION
