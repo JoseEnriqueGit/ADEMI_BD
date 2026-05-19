@@ -121,7 +121,12 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
         -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+       AND NOT EXISTS (
+             SELECT 1
+               FROM PR.V_REPRE_CREDITOS_GAR vg
+              WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+                AND vg.no_credito = a.no_credito
+           )
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -380,7 +385,16 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
         
     END Precalifica_Represtamo;
 PROCEDURE Precalifica_Repre_Cancelado IS 
-    CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS
+    CURSOR CREDITOS_PROCESAR (
+        P_FECHA_CORTE            DATE,
+        P_LOTE_CARGA             NUMBER,
+        P_MAX_INTENTOS_PIN       PR.PR_REPRESTAMOS.INTENTOS_PIN%TYPE,
+        P_MAX_INTENTOS_IDENT     PR.PR_REPRESTAMOS.INTENTOS_IDENTIFICACION%TYPE,
+        P_DIAS_CANCELACION       NUMBER,
+        P_MESES_MAX_DESEMBOLSO   NUMBER,
+        P_PERSONA_FISICA         VARCHAR2,
+        P_CLIENTES_SOLA_FIRMA    VARCHAR2
+    )  IS
          select a.codigo_empresa
          CODIGO_EMPRESA, 
          pr_pkg_represtamos.f_genera_secuencia ID_REPRESTAMO,
@@ -392,8 +406,8 @@ PROCEDURE Precalifica_Repre_Cancelado IS
          0 DIAS_ATRASO, 
          sysdate FECHA_PROCESO, 
          0 PIN,--lpad(PA.PKG_NOTIFICACIONES.GENERAR_PIN_RANDOM(100,999999),6, '0') PIN,
-         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN') INTENTOS_PIN,
-         PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION') INTENTOS_IDENTIFICACION,    --   TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'INTENTOS_IDENT')) INTENTOS_IDENTIFICACION,    ---DEBE INSERTAR ESTE PARAMETRO 
+         P_MAX_INTENTOS_PIN INTENTOS_PIN,
+         P_MAX_INTENTOS_IDENT INTENTOS_IDENTIFICACION,    --   TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'INTENTOS_IDENT')) INTENTOS_IDENTIFICACION,    ---DEBE INSERTAR ESTE PARAMETRO
          'N' IND_SOLICITA_AYUDA,
          0 mto_aprobado,
          --b.monto_desembolsado mto_aprobado,
@@ -412,14 +426,14 @@ PROCEDURE Precalifica_Repre_Cancelado IS
          FROM PR_CREDITOS a,
          --pa_detallado_De08 b,
               PR_tipo_credito_REPRESTAMO c 
-         WHERE ROWNUM <= TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO')) and  a.tipo_credito= c.tipo_credito  
+         WHERE ROWNUM <= P_LOTE_CARGA and  a.tipo_credito= c.tipo_credito
          AND (EXISTS (SELECT 1
             FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq
             WHERE a.CODIGO_PERIODO_CUOTA = subq.COLUMN_VALUE)OR NOT EXISTS ( SELECT 1 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('PERIODOS_CUOTA')) subq ) )
          and A.TIPO_CREDITO = C.TIPO_CREDITO
          and  A.F_CANCELACION= ( SELECT  d.F_CANCELACION
                         FROM PR_CREDITOS d
-                        WHERE d.F_CANCELACION >= SYSDATE - TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'))
+                        WHERE d.F_CANCELACION >= SYSDATE - P_DIAS_CANCELACION
                         AND d.F_CANCELACION <= SYSDATE
                         AND d.NO_CREDITO =   a.NO_CREDITO
                         AND d.ESTADO = 'C'
@@ -431,7 +445,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                                  WHERE C.CODIGO_EMPRESA      =  a.CODIGO_EMPRESA
                                    AND C.NO_CREDITO          != a.NO_CREDITO                       
                                    AND C.CODIGO_CLIENTE      = a.CODIGO_CLIENTE                        
-                                   AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+                                   AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - P_MESES_MAX_DESEMBOLSO) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
                                    AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))))
           AND not exists (SELECT 1
                                   FROM PR_CREDITOS C 
@@ -443,7 +457,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
           AND exists (SELECT 1 
                       FROM PERSONAS a
                       WHERE COD_PERSONA = cast(a.codigo_cliente as varchar2(15))
-                      AND ES_FISICA = PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'PERSONA_FISICA' ))
+                      AND ES_FISICA = P_PERSONA_FISICA)
          -- validación la nacionalidad              
          AND EXISTS ( SELECT 1
                       FROM ID_PERSONAS a
@@ -474,9 +488,14 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                         and b.codigo_empresa = a1.codigo_empresa
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
-                        AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
+                        AND P_CLIENTES_SOLA_FIRMA = 'S')
         -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+        AND NOT EXISTS (
+              SELECT 1
+                FROM PR.V_REPRE_CREDITOS_GAR vg
+               WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+                 AND vg.no_credito = a.no_credito
+            )
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -491,6 +510,15 @@ PROCEDURE Precalifica_Repre_Cancelado IS
        v_fecha_proceso           DATE;
        v_atraso_30               NUMBER(10); 
        v_conteo                  NUMBER(10); 
+       v_lote_carga              NUMBER;
+       v_max_intentos_pin        PR.PR_REPRESTAMOS.INTENTOS_PIN%TYPE;
+       v_max_intentos_ident      PR.PR_REPRESTAMOS.INTENTOS_IDENTIFICACION%TYPE;
+       v_dias_cancelacion        NUMBER;
+       v_meses_max_desembolso    NUMBER;
+       v_persona_fisica          VARCHAR2(4000);
+       v_clientes_sola_firma     VARCHAR2(4000);
+       v_precal_desembolso_pr    NUMBER;
+       v_precal_mora_mayor_pr    NUMBER;
        --agregue esta variable
        pMensaje      VARCHAR2(100);
        --Defino la variable para capturar si existe un detalle
@@ -552,6 +580,15 @@ PROCEDURE Precalifica_Repre_Cancelado IS
             PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 10, 'EN PROCESO', pMensaje );
         END IF;*/
         DBMS_OUTPUT.PUT_LINE ( 'entra en el begin' );    
+       v_lote_carga           := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('LOTE_DE_CARAGA_REPRESTAMO'));
+       v_max_intentos_pin     := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_PIN');
+       v_max_intentos_ident   := PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MAX_INTENTOS_IDENTIFICACION');
+       v_dias_cancelacion     := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('DIAS_CANCELACION'));
+       v_meses_max_desembolso := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('MESES_MAX_X_DESEMBOLSO'));
+       v_persona_fisica       := PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO('PERSONA_FISICA');
+       v_clientes_sola_firma  := PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO('CLIENTES_A_SOLA_FIRMA');
+       v_precal_desembolso_pr := TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR'));
+       v_precal_mora_mayor_pr := TO_NUMBER(OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR'));
        -- Asigna el valor del Parámetro a la variable correspondioente 
        v_atraso_30 := TO_NUMBER(PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('PRECAL_DIA_ATRASO_TC'));
       -- Ejecuto un SELECT INTO de la FECHA_PROCESO en la tabla PR_REPRESTAMOS    
@@ -595,7 +632,16 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                     
        
        
-       OPEN CREDITOS_PROCESAR(v_fecha_corte); 
+       OPEN CREDITOS_PROCESAR(
+            v_fecha_corte,
+            v_lote_carga,
+            v_max_intentos_pin,
+            v_max_intentos_ident,
+            v_dias_cancelacion,
+            v_meses_max_desembolso,
+            v_persona_fisica,
+            v_clientes_sola_firma
+       );
         --Cambio el estado del detalle de la bitacora
       --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 40, 'EN PROCESO', pMensaje );
        LOOP
@@ -682,7 +728,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
           FORALL x IN 1 .. VCREDITOS_PROCESAR.COUNT
              UPDATE PR.PR_REPRESTAMOS y
                 SET y.ESTADO         = 'X1', 
-                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||OBT_PARAMETROS('1', 'PR', 'PRECAL_DESEMBOLSO_PR')||' MESES'
+                    Y.OBSERVACIONES = 'EL CLIENTE TIENE OTRO PRESTAMO DESEMBOLSADO EN LOS ÚLTIMOS '||v_precal_desembolso_pr||' MESES'
              WHERE y.CODIGO_EMPRESA = VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
                AND y.CODIGO_CLIENTE = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE
                AND Y.FECHA_CORTE    = VCREDITOS_PROCESAR(x).FECHA_CORTE
@@ -693,7 +739,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
                          WHERE C.CODIGO_EMPRESA      =  VCREDITOS_PROCESAR(x).CODIGO_EMPRESA
                            AND C.NO_CREDITO          != VCREDITOS_PROCESAR(x).NO_CREDITO                       
                            AND C.CODIGO_CLIENTE      = VCREDITOS_PROCESAR(x).CODIGO_CLIENTE                        
-                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - OBT_PARAMETROS('1','PR', 'PRECAL_DESEMBOLSO_PR')) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
+                           AND C.F_PRIMER_DESEMBOLSO > ADD_MONTHS(SYSDATE, - v_precal_desembolso_pr) -- 9 - Excluir cliente que tengas prestamos desembolsados de los últimos 6 meses
                            AND C.ESTADO              IN (select COLUMN_VALUE FROM  TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros ( 'ESTADOS_CREDITOS'))));
   
           EXIT WHEN CREDITOS_PROCESAR%NOTFOUND;
@@ -710,7 +756,7 @@ PROCEDURE Precalifica_Repre_Cancelado IS
         UPDATE PR.PR_REPRESTAMOS P
            SET P.ESTADO         = 'X2',
                P.OBSERVACIONES  = 'EL CLIENTE TIENE EN LOS ULTIMOS 6 MESES ATRASO O MORA MAYOR IGUAL A '||P.DIAS_ATRASO||' DIAS'
-         WHERE P.DIAS_ATRASO    > OBT_PARAMETROS('1', 'PR', 'PRECAL_MORA_MAYOR_PR')
+         WHERE P.DIAS_ATRASO    > v_precal_mora_mayor_pr
            AND P.ESTADO         = 'RE';
         -- Se eliminan los represtamos que tienen creditos mancomunados
         DELETE  PR_REPRESTAMOS --PR_OPCIONES_REPRESTAMO
@@ -857,8 +903,13 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente
                         AND PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO ( 'CLIENTES_A_SOLA_FIRMA' ) = 'S')
-        -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA_HISTORICO(a.no_credito) = 0
+       -- Se valida que los clientes no tengan no garantes
+        AND NOT EXISTS (
+            SELECT 1
+              FROM PR.V_REPRE_CREDITOS_HI_GAR vg
+             WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+               AND vg.no_credito = a.no_credito
+        )
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -1136,7 +1187,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         
         
      END Precalifica_Repre_Cancelado_hi;   
-  PROCEDURE Precalifica_Represtamo_fiadores  IS 
+PROCEDURE Precalifica_Represtamo_fiadores  IS
   
        CURSOR CREDITOS_PROCESAR (P_FECHA_CORTE DATE)  IS
        select a.codigo_empresa
@@ -1236,7 +1287,12 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente)
         -- Se valida que los clientes no tengan no garantes 
-       AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0   
+       AND NOT EXISTS (
+             SELECT 1
+               FROM PR.V_REPRE_CREDITOS_GAR vg
+              WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+                AND vg.no_credito = a.no_credito
+           )
         -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -1582,8 +1638,13 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         and b.codigo_empresa = a1.codigo_empresa
                         and b.no_credito = a1.no_credito
                         and b.codigo_aval_repre != a1.codigo_cliente)
-        -- Se valida que los clientes no tengan no garantes 
-        AND   PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA_HISTORICO(a.no_credito) = 0
+       -- Se valida que los clientes no tengan no garantes
+        AND NOT EXISTS (
+            SELECT 1
+              FROM PR.V_REPRE_CREDITOS_HI_GAR vg
+             WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+               AND vg.no_credito = a.no_credito
+        )
                 -- Se valida que los clientes no esten en lista PEP
         AND   PR.PR_PKG_REPRESTAMOS.F_Validar_Listas_PEP (1, a.codigo_cliente)= 0 
         -- Se valida que los clientes no esten en lista NEGRA
@@ -1868,7 +1929,7 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
                         
         
      END Precalifica_Represtamo_fiadores_hi;
- PROCEDURE Precalifica_Carga_Dirigida IS
+PROCEDURE Precalifica_Carga_Dirigida IS
     
     CURSOR CREDITOS_PROCESAR(P_FECHA_CORTE DATE,P_ESTADO VARCHAR)  IS
         
@@ -1918,7 +1979,8 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
        v_Dias_atraso             NUMBER;
        v_Capital_Pagado          NUMBER;
        v_atraso_tc               NUMBER;
-       v_cancelacion             NUMBER;   
+       v_cancelacion             NUMBER;
+       v_tiene_garantia          NUMBER;
    BEGIN
        -- Para obtener la fecha m¿xima anterior
         SELECT MAX (P.FECHA_CORTE)  
@@ -2070,7 +2132,13 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
      END IF;
      -- Se valida que los clientes no tengan no garantes    
      IF PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('VALIDAR_TIENE_GARANTE_CARGADIRIGIDA') = 'S' THEN
-         IF  PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(A.no_credito) =  1 THEN
+         SELECT NVL(MAX(vg.cantidad_garantias), 0)
+           INTO v_tiene_garantia
+           FROM PR.V_REPRE_CREDITOS_GAR vg
+          WHERE vg.codigo_empresa = PR.PR_PKG_REPRESTAMOS.F_OBT_EMPRESA_REPRESTAMO
+            AND vg.no_credito = A.no_credito;
+
+         IF v_tiene_garantia = 1 THEN
               UPDATE PR.PR_CARGA_DIRECCIONADA SET ESTADO = 'E', OBSERVACIONES = 'Este cliente tiene garante',FECHA_MODIFICACION = SYSDATE, MODIFICADO_POR=NVL(SYS_CONTEXT('APEX$SESSION','APP_USER'),USER) WHERE NO_CREDITO = A.NO_CREDITO AND ESTADO='T';
               CONTINUE;
                DBMS_OUTPUT.PUT_LINE ( 'F_TIENE_GARANTIA ' );
@@ -5627,9 +5695,9 @@ PRAGMA AUTONOMOUS_TRANSACTION;
                                 pMensaje            IN OUT VARCHAR2) IS                                   
   CURSOR CUR_email IS
       SELECT C.EMAIL_USUARIO, 
-                 NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
-                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'D'), NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'R'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
-                 NVL(NVL(PA.obt_telefono_persona(C.COD_PER_FISICA, 'O'), PA.obt_telefono_persona(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
+                 NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
+                 NVL(NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'D'), NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'R'), PR.obt_telefono_persona(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
+                 NVL(NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'O'), PR.obt_telefono_persona(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
                  obt_direccion_actualizada(C.COD_PER_FISICA) detalle--D.DETALLE DIRECCION-- D.COD_DIRECCION, D.TIP_DIRECCION
             FROM PERSONAS_FISICAS c
            WHERE C.COD_PER_FISICA = pCodCliente;
@@ -8220,10 +8288,10 @@ END P_Registra_Solicitud_Campana;
                       PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
                       track_fin(10);
 
-                      track_inicio(11, 'PVALIDA_WORLD_COMPLIANCE');
-                      PR.PR_PKG_REPRESTAMOS.PVALIDA_WORLD_COMPLIANCE();
-                      COMMIT;
-                      track_fin(11);
+                      --track_inicio(11, 'PVALIDA_WORLD_COMPLIANCE');
+                      --PR.PR_PKG_REPRESTAMOS.PVALIDA_WORLD_COMPLIANCE();
+                      --COMMIT;
+                      --track_fin(11);
 
                       --PR.PR_PKG_REPRESTAMOS.PVALIDA_XCORE();
                       --COMMIT;
@@ -10022,48 +10090,29 @@ END P_Registra_Solicitud_Campana;
     END F_Existe_Plazo;
     
     FUNCTION F_TIENE_GARANTIA(pNoCredito IN NUMBER)
-   
-   RETURN NUMBER IS
-   vExiste     NUMBER := 0;
-   BEGIN
-           SELECT COUNT(1) INTO vExiste
-        FROM PR_CREDITOS A,
-             PR_GARANTIAS_X_CREDITO B,
-             PR_GARANTIAS C
-        WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
-        AND A.no_credito = pNoCredito
-        AND A.estado IN ('D','V','M','E','J') 
-        AND B.codigo_empresa = a.codigo_empresa
-        AND B.no_credito = a.no_credito
-        AND C.codigo_empresa = b.codigo_empresa 
-        AND C.numero_garantia = b.numero_garantia
-        AND C.codigo_tipo_garantia_sb != 'NA';
-        
-        RETURN vExiste;
-        
+      RETURN NUMBER IS
+      vExiste NUMBER := 0;
+    BEGIN
+      SELECT NVL(MAX(v.cantidad_garantias), 0)
+        INTO vExiste
+        FROM PR.V_REPRE_CREDITOS_GAR v
+       WHERE v.codigo_empresa = F_Obt_Empresa_Represtamo
+         AND v.no_credito = pNoCredito;
+
+      RETURN vExiste;
     END F_TIENE_GARANTIA;
-    
+
   FUNCTION F_TIENE_GARANTIA_HISTORICO(pNoCredito IN NUMBER)
-  
-   
-   RETURN NUMBER IS
-   vExiste     NUMBER := 0;
-   BEGIN
-           SELECT COUNT(1) INTO vExiste
-        FROM PR_CREDITOS_HI A,
-             PR_GARANTIAS_X_CREDITO B,
-             PR_GARANTIAS C
-        WHERE A.codigo_empresa = F_Obt_Empresa_Represtamo
-        AND A.no_credito = pNoCredito
-        AND A.estado IN ('D','V','M','E','J') 
-        AND B.codigo_empresa = a.codigo_empresa
-        AND B.no_credito = a.no_credito
-        AND C.codigo_empresa = b.codigo_empresa 
-        AND C.numero_garantia = b.numero_garantia
-        AND C.codigo_tipo_garantia_sb != 'NA';
-        
-        RETURN vExiste;
-  
+    RETURN NUMBER IS
+    vExiste NUMBER := 0;
+  BEGIN
+    SELECT NVL(MAX(v.cantidad_garantias), 0)
+      INTO vExiste
+      FROM PR.V_REPRE_CREDITOS_HI_GAR v
+     WHERE v.codigo_empresa = F_Obt_Empresa_Represtamo
+       AND v.no_credito = pNoCredito;
+
+    RETURN vExiste;
   END F_TIENE_GARANTIA_HISTORICO;
     FUNCTION F_Obtiene_Desc_Bitacora(pIdReprestamo      IN NUMBER,
                                      pEstado            IN VARCHAR2)
