@@ -57,6 +57,8 @@ desde las vistas.
 | `07_PATCH_TRACKING_PAQUETE_SNIPPETS.sql` | Snippets para instrumentar `P_Carga_Precalifica_Cancelado` sin cambiar la spec |
 | `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql` | Consulta ultimas ejecuciones, ranking por duracion e historico por proceso |
 | `09_ROLLBACK_TRACKING_PERSISTENTE_QA02.sql` | Elimina la tabla de tracking si se retira la instrumentacion |
+| `11_DIAGNOSTICO_LOTE_FECHA_CORTE.sql` | Diagnostica candidatos por fecha de corte para aumentar volumen procesado |
+| `12_HANDOFF_LOTE_FECHA_CORTE.md` | Contexto y prompt para continuar la investigacion del lote |
 | `HANDOFF_TRACKING_QA02.md` | Resumen de cierre, ubicaciones y contexto para continuar |
 | `RESULTADOS_QA.md` | Evidencia de creacion de vistas y validaciones en QA |
 | `RESULTADOS_QA02.md` | Evidencia de creacion de vistas, equivalencia y cambio local en QA02 |
