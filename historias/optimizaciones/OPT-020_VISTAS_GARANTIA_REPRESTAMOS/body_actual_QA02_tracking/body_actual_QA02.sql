@@ -2091,6 +2091,8 @@ PROCEDURE Precalifica_Carga_Dirigida IS
             AND D.FUENTE='PR'
             AND D.FECHA_CORTE=a.FECHA_CORTE
             AND D.CODIGO_CLIENTE=C.CODIGO_CLIENTE
+            AND D.CODIGO_EMPRESA=C.CODIGO_EMPRESA
+            AND D.NO_CREDITO=C.NO_CREDITO
             WHERE 
             C.CODIGO_EMPRESA=PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
             AND C.NO_CREDITO=a.NO_CREDITO
@@ -2469,6 +2471,8 @@ PROCEDURE Precalifica_Carga_Dirigida IS
             AND D.FUENTE='PR'
             AND D.FECHA_CORTE=a.FECHA_CORTE
             AND D.CODIGO_CLIENTE=C.CODIGO_CLIENTE
+            AND D.CODIGO_EMPRESA=C.CODIGO_EMPRESA
+            AND D.NO_CREDITO=C.NO_CREDITO
             WHERE 
             C.CODIGO_EMPRESA=PR_PKG_REPRESTAMOS.f_obt_Empresa_Represtamo
             AND C.NO_CREDITO=a.NO_CREDITO

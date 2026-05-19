@@ -1,7 +1,7 @@
 FUNCTION F_Obt_Body_Mensaje(pNombres IN VARCHAR2, 
                                 pFecha   IN DATE, 
                                 pCanal   IN VARCHAR2) RETURN VARCHAR2 IS
-        PRAGMA UDF; -- Optimización para Vistas
+        PRAGMA UDF;
         
         vBody           VARCHAR2(4000);
         vTextoTemplate  VARCHAR2(4000);

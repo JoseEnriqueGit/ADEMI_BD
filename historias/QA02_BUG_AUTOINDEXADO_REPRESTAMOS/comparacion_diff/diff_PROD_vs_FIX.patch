@@ -1,0 +1,431 @@
+diff --git a/InsertUrlReporte_PROD.sql b/InsertUrlReporte_FIX.sql
+index 95a19ea..7375ef4 100644
+--- a/InsertUrlReporte_PROD.sql
++++ b/InsertUrlReporte_FIX.sql
+@@ -1,240 +1,198 @@
+ -- ============================================================================
+--- PROD - InsertUrlReporte
+--- Version actualmente desplegada en PRODUCCION.
++-- FIX QA02 - InsertUrlReporte
++-- Version corregida para soportar Represtamos sin romper FEC/FUD/FCSCPF.
+ -- Paquete: PA.PKG_TIPO_DOCUMENTO_PKM
+--- Discriminador de formato: r.estado_reporte = 'R'
+--- No soporta orígenes Onboarding/TarjetaPC/Tarjeta.
++-- Discriminador de formato: posición 3 del codigo_referencia (IS NOT NULL)
++-- Soporta orígenes: Normal, Represtamo, Onboarding, TarjetaPC, Tarjeta.
+ -- ============================================================================
+ procedure inserturlreporte(pcodigoreferencia in  varchar2,
+-                               pfechareporte  in     date,
+-                               pid_aplicacion in     number,
+-                               pidtipodocumento in   varchar2,
+-                               porigenpkm     in     varchar2,
+-                               purlreporte    in     varchar2,
+-                               pformatodocumento in  varchar2,
+-                               pnombrearchivo in     varchar2,
+-                               pestado        in     varchar2 default 'P',
+-                               prespuesta     in out varchar2) is
+-        vdirectorio varchar2(256) := nvl(pa.param.parametro_x_empresa('1', 'DIR_REPORTES', 'IA'), 'RPT_REGULATORIOS');
+-        venviarapi varchar2(2);
+-        v_codigo_reporte number;
+-        v_tipo_identificacion varchar2(5);
+-        v_identificacion varchar2(30);
+-        v_num_prestamo varchar2(40);
+-        v_prest_anterior varchar2(40);
+-        v_id_tempfud varchar2(30);
+-        v_tipo_archivo varchar2(40);
+-        v_nombre_archivo varchar2(60);
+-        v_codigo_agencia varchar2(60);
+-        v_nombre_agencia varchar2(60);
+-        v_primer_nombre varchar2(60);
+-        v_segundo_nombre varchar2(60);
+-        v_primer_apellido varchar2(60);
+-        v_segundo_apellido varchar2(60);
+-        v_nacionalidad varchar2(60);
+-    begin
+-        begin
+-            select t.enviar_api
+-            into venviarapi
+-            from pa.pa_tipo_documento_pkm t
+-            where t.id_aplicacion = pid_aplicacion
+-            and   t.id_tipo_documento = pidtipodocumento;
+-        exception
+-            when no_data_found then
+-                venviarapi := 'S';
+-        end;
++                             pfechareporte  in     date,
++                             pid_aplicacion in     number,
++                             pidtipodocumento in   varchar2,
++                             porigenpkm     in     varchar2,
++                             purlreporte    in     varchar2,
++                             pformatodocumento in  varchar2,
++                             pnombrearchivo in     varchar2,
++                             pestado        in     varchar2 default 'P',
++                             prespuesta     in out varchar2) IS
++      vDirectorio   VARCHAR2(256) := NVL(PA.PARAM.PARAMETRO_X_EMPRESA('1', 'DIR_REPORTES', 'IA'), 'RPT_REGULATORIOS');
++      vEnviarAPI    VARCHAR2(2);
++      v_codigo_reporte  NUMBER;
++      v_tipo_identificacion VARCHAR2(5);
++      v_identificacion  VARCHAR2(30);
++      v_num_prestamo  VARCHAR2(40);
++      v_prest_anterior VARCHAR2(40);
++      v_Id_tempfud    VARCHAR2(30);
++      v_tipo_archivo VARCHAR2(40);
++      v_nombre_archivo VARCHAR2(60);
++      v_codigo_agencia	 VARCHAR2(60);
++      v_nombre_agencia	 VARCHAR2(60);
++      v_primer_nombre	     VARCHAR2(60);
++      v_segundo_nombre	 VARCHAR2(60);
++      v_primer_apellido	 VARCHAR2(60);
++      v_segundo_apellido	 VARCHAR2(60);
++      v_nacionalidad       VARCHAR2(60);
++ BEGIN
+ 
+-        begin
+-            insert into pa.pa_reportes_automaticos(codigo_referencia,
+-                                                   fecha_reporte,
+-                                                   id_aplicacion,
+-                                                   id_tipo_documento,
+-                                                   origen_pkm,
+-                                                   url_reporte,
+-                                                   formato_documento,
+-                                                   directorio_destino,
+-                                                   nombre_archivo,
+-                                                   enviar_api,
+-                                                   estado_reporte,
+-                                                   fecha_proceso)
+-            values (pcodigoreferencia,
+-                    pfechareporte,
+-                    pid_aplicacion,
+-                    pidtipodocumento,
+-                    porigenpkm,
+-                    purlreporte,
+-                    pformatodocumento,
+-                    vdirectorio,
+-                    pnombrearchivo,
+-                    nvl(venviarapi, 'S'),
+-                    nvl(pestado, 'P'),
+-                    sysdate);
+-        exception
+-            when others then
+-                prespuesta := 'Error: ' || sqlerrm;
+-                raise_application_error(-20100, prespuesta);
+-        end;
++      BEGIN
++          SELECT T.ENVIAR_API
++            INTO vEnviarAPI
++            FROM PA.PA_TIPO_DOCUMENTO_PKM t
++           WHERE T.ID_APLICACION = pId_Aplicacion
++             AND T.ID_TIPO_DOCUMENTO = pIdTipoDocumento;
++      EXCEPTION WHEN NO_DATA_FOUND THEN
++          vEnviarAPI := 'S';
++      END;
+ 
+-        select r.codigo_reporte,
+-               case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else null end
+-                   tipo_identificacion,
+-               case
+-                   when r.estado_reporte = 'R' then
+-                       pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                   (select mascara
+-                                                    from tipos_id
+-                                                    where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                   'ESPA')
+-                   else
+-                       null
+-               end
+-                   identificacion,
+-               case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3) else ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) end
+-                   f_num_prestamo,
+-               case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 4) else ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2) end
+-                   f_prest_anterior,
+-               substr(replace(r.nombre_archivo, ':', '_'), 1, instr(replace(r.nombre_archivo, ':', '_'), '_') - 1)
+-                   tipo_archivo,
+-               case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 6) else null end
+-                   id_tempfud,
+-               replace(r.nombre_archivo, ':', '_')
+-                   nombre_archivo,
+-               (select cr.codigo_agencia
+-                from pr.pr_creditos cr
+-                where cr.codigo_empresa = '1'
+-                and   cr.no_credito =
+-                      case
+-                          when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3)
+-                          else ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)
+-                      end)
+-                   codigo_agencia,
+-               (select a.descripcion
+-                from pr.pr_creditos cr, pa.agencia a
+-                where cr.codigo_empresa = '1'
+-                and   cr.no_credito =
+-                      case
+-                          when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3)
+-                          else ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)
+-                      end
+-                and   a.cod_empresa = to_char(cr.codigo_empresa)
+-                and   a.cod_agencia = to_char(cr.codigo_agencia))
+-                   nombre_agencia,
+-               (select pf.primer_nombre
+-                from pa.personas_fisicas pf, pa.id_personas i
++      BEGIN
++          INSERT INTO PA.PA_REPORTES_AUTOMATICOS
++          ( CODIGO_REFERENCIA, FECHA_REPORTE, ID_APLICACION, ID_TIPO_DOCUMENTO, ORIGEN_PKM, URL_REPORTE, FORMATO_DOCUMENTO, DIRECTORIO_DESTINO, NOMBRE_ARCHIVO, ENVIAR_API, ESTADO_REPORTE, FECHA_PROCESO )
++          VALUES ( pCodigoReferencia, pFechaReporte, pId_Aplicacion, pIdTipoDocumento, pOrigenPkm, pUrlReporte, pFormatoDocumento, vDirectorio, pNombreArchivo, NVL(vEnviarAPI,'S'), NVL(pEstado,'P'), SYSDATE );
++      EXCEPTION WHEN OTHERS THEN
++          pRespuesta := 'Error: '||SQLERRM;
++          RAISE_APPLICATION_ERROR(-20100, pRespuesta);
++      END;
++
++     SELECT  r.codigo_reporte,
++             r.tipo_identificacion,
++             r.identificacion,
++             r.f_num_prestamo,
++             r.f_prest_anterior,
++             r.tipo_archivo,
++             r.id_tempfud,
++             r.nombre_archivo,
++             r.codigo_agencia,
++             (select a.descripcion from pa.agencia a where a.cod_empresa = '1' and a.cod_agencia = r.codigo_agencia) as nombre_agencia,
++             (select pf.primer_nombre
++                 from pa.personas_fisicas pf, pa.id_personas i
+                 where pf.cod_per_fisica = i.cod_persona
+-                and   i.cod_tipo_id = case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else '1' end
+-                and   i.num_id = case
+-                                     when r.estado_reporte = 'R' then
+-                                         pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                                     (select mascara
+-                                                                      from tipos_id
+-                                                                      where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                                     'ESPA')
+-                                     else
+-                                         null
+-                                 end)
+-                   primer_nombre,
+-               (select pf.segundo_nombre
+-                from pa.personas_fisicas pf, pa.id_personas i
++                  and i.cod_tipo_id = r.tipo_identificacion
++                  and i.num_id = r.identificacion) as primer_nombre,
++             (select pf.segundo_nombre
++                 from pa.personas_fisicas pf, pa.id_personas i
+                 where pf.cod_per_fisica = i.cod_persona
+-                and   i.cod_tipo_id = case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else '1' end
+-                and   i.num_id = case
+-                                     when r.estado_reporte = 'R' then
+-                                         pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                                     (select mascara
+-                                                                      from tipos_id
+-                                                                      where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                                     'ESPA')
+-                                     else
+-                                         null
+-                                 end)
+-                   segundo_nombre,
+-               (select pf.primer_apellido
+-                from pa.personas_fisicas pf, pa.id_personas i
++                  and i.cod_tipo_id = r.tipo_identificacion
++                  and i.num_id = r.identificacion) as segundo_nombre,
++              (select pf.primer_apellido
++                 from pa.personas_fisicas pf, pa.id_personas i
+                 where pf.cod_per_fisica = i.cod_persona
+-                and   i.cod_tipo_id = case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else '1' end
+-                and   i.num_id = case
+-                                     when r.estado_reporte = 'R' then
+-                                         pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                                     (select mascara
+-                                                                      from tipos_id
+-                                                                      where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                                     'ESPA')
+-                                     else
+-                                         null
+-                                 end)
+-                   primer_apellido,
+-               (select pf.segundo_apellido
+-                from pa.personas_fisicas pf, pa.id_personas i
++                  and i.cod_tipo_id = r.tipo_identificacion
++                  and i.num_id = r.identificacion) as primer_apellido,
++              (select pf.segundo_apellido
++                 from pa.personas_fisicas pf, pa.id_personas i
+                 where pf.cod_per_fisica = i.cod_persona
+-                and   i.cod_tipo_id = case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else '1' end
+-                and   i.num_id = case
+-                                     when r.estado_reporte = 'R' then
+-                                         pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                                     (select mascara
+-                                                                      from tipos_id
+-                                                                      where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                                     'ESPA')
+-                                     else
+-                                         null
+-                                 end)
+-                   segundo_apellido,
+-               (select nvl(i.nacionalidad, pf.nacionalidad)
++                  and i.cod_tipo_id = r.tipo_identificacion
++                  and i.num_id = r.identificacion) as segundo_apellido,
++             (select nvl(i.nacionalidad, pf.nacionalidad)
+                 from pa.personas_fisicas pf, pa.id_personas i
+-                where pf.cod_per_fisica = i.cod_persona
+-                and   i.cod_tipo_id = case when r.estado_reporte = 'R' then ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1) else '1' end
+-                and   i.num_id = case
+-                                     when r.estado_reporte = 'R' then
+-                                         pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
+-                                                                     (select mascara
+-                                                                      from tipos_id
+-                                                                      where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
+-                                                                     'ESPA')
+-                                     else
+-                                         null
+-                                 end)
+-                   nacionalidad
+-        into v_codigo_reporte,
+-             v_tipo_identificacion,
+-             v_identificacion,
+-             v_num_prestamo,
+-             v_prest_anterior,
+-             v_tipo_archivo,
+-             v_id_tempfud,
+-             v_nombre_archivo,
+-             v_codigo_agencia,
+-             v_nombre_agencia,
+-             v_primer_nombre,
+-             v_segundo_nombre,
+-             v_primer_apellido,
+-             v_segundo_apellido,
+-             v_nacionalidad
+-        from pa.pa_reportes_automaticos r
+-        where r.codigo_reporte = (select max(x.codigo_reporte)
+-                                  from pa.pa_reportes_automaticos x);
++               where pf.cod_per_fisica = i.cod_persona
++                 and i.cod_tipo_id = r.tipo_identificacion
++                 and i.num_id =  r.identificacion) as nacionalidad
++     INTO v_codigo_reporte	 ,
++          v_tipo_identificacion,
++          v_identificacion	 ,
++          v_num_prestamo	     ,
++          v_prest_anterior	 ,
++          v_tipo_archivo	     ,
++          v_id_tempfud	     ,
++          v_nombre_archivo	 ,
++          v_codigo_agencia	 ,
++          v_nombre_agencia	 ,
++          v_primer_nombre	     ,
++          v_segundo_nombre	 ,
++          v_primer_apellido	 ,
++          v_segundo_apellido	 ,
++          v_nacionalidad
++      from (
++              SELECT r.CODIGO_REPORTE,
++                     r.CODIGO_REFERENCIA,
++                     r.ORIGEN_PKM,
++                         case when r.ORIGEN_PKM in ('Normal','Represtamo') then
++                              case when ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3) is not null then
++                                  nvl(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1), '1')
++                              else null end
++                              WHEN R.ORIGEN_PKM IN ('Onboarding', 'TarjetaPC', 'Tarjeta') THEN
++                                CASE WHEN r.URL_REPORTE is not null THEN
++                                  (SELECT st.COD_TIPO_ID
++                                     FROM TC.TC_SOLICITUD_TARJETA st
++                                    WHERE st.no_solicitud =  ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)
++                                  )
++                                  ELSE
++                                      nvl(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1), '1')
++                                END
++                         end as tipo_identificacion,
++                         case when r.ORIGEN_PKM in ('Normal','Represtamo') then
++                                  case when ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3) is not null then
++                                      pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
++                                                                  (select mascara from tipos_id where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
++                                                                  'ESPA')
++                                  else null end
++                              WHEN R.ORIGEN_PKM IN ('Onboarding', 'TarjetaPC', 'Tarjeta') THEN
++                                  case when r.url_reporte is not null then
++                                      (select st.num_id
++                                         from tc.tc_solicitud_tarjeta st
++                                        WHERE st.no_solicitud =  ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)
++                                      )
++                                  ELSE
++                                      pa.formatear_identificacion(ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 2),
++                                                                  (select mascara from tipos_id where cod_tipo_id = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 1)),
++                                                                  'ESPA')
++                                  END
++                         end as identificacion,
++                         case when r.ORIGEN_PKM in ('Normal','Represtamo') then
++                                  ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':',
++                                      case when ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3) is not null then 3 else 1 end)
++                              WHEN R.ORIGEN_PKM IN ('Onboarding', 'TarjetaPC', 'Tarjeta') THEN
++                                  ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', CASE WHEN r.url_reporte is not null THEN 1 ELSE 3 END)
++                         end as f_num_prestamo,
++                         ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 4) as f_prest_anterior,
++                         substr(replace(r.nombre_archivo, ':', '_'), 1, instr(replace(r.nombre_archivo, ':', '_'), '_') - 1) as tipo_archivo,
++                         ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 6) as id_tempfud,
++                         replace(r.nombre_archivo, ':', '_') as nombre_archivo,
++                         case when r.origen_pkm in ('Normal','Represtamo') then
++                                  (select cr.codigo_agencia
++                                     from pr.pr_creditos cr
++                                    where cr.codigo_empresa = '1'
++                                      and cr.no_credito = ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':',
++                                          case when ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', 3) is not null then 3 else 1 end)
++                                  )
++                              WHEN R.ORIGEN_PKM IN ('Onboarding', 'TarjetaPC', 'Tarjeta') THEN
++                                  (SELECT to_number(st.oficina)
++                                     FROM TC.TC_SOLICITUD_TARJETA st
++                                    WHERE st.no_solicitud =  ia.pkg_api_pkm.obtienepartereferencia(r.codigo_referencia, ':', CASE WHEN r.url_reporte is not null THEN 1 ELSE 3 END)
++                                  )
++                         END  as codigo_agencia
++                       from PA.PA_REPORTES_AUTOMATICOS r
++                      WHERE r.codigo_reporte = (select max(x.codigo_reporte)
++                                                  from pa.pa_reportes_automaticos x where x.origen_pkm = r.origen_pkm)
++                        and r.ORIGEN_PKM = porigenpkm) r;
++
++      InsertAutoIndexado
++      (
++        v_codigo_reporte,
++        pId_Aplicacion,
++        pIdTipoDocumento,
++        v_tipo_identificacion,
++        v_identificacion	 ,
++        v_num_prestamo       ,
++        v_prest_anterior     ,
++        v_tipo_archivo         ,
++        v_Id_tempfud           ,
++        pOrigenPkm             ,
++        pUrlReporte          ,
++        v_nombre_archivo       ,
++        pCodigoReferencia    ,
++        NVL(vEnviarAPI,'S')     ,
++        v_codigo_agencia       ,
++        v_nombre_agencia       ,
++        NVL(pEstado,'P')       ,
++        v_primer_nombre        ,
++        v_segundo_nombre       ,
++        v_primer_apellido      ,
++        v_segundo_apellido     ,
++        v_nacionalidad         ,
++        NULL ,
++        pRespuesta
++      );
+ 
+-        insertautoindexado(v_codigo_reporte,
+-                           pid_aplicacion,
+-                           pidtipodocumento,
+-                           v_tipo_identificacion,
+-                           v_identificacion,
+-                           v_num_prestamo,
+-                           v_prest_anterior,
+-                           v_tipo_archivo,
+-                           v_id_tempfud,
+-                           porigenpkm,
+-                           purlreporte,
+-                           v_nombre_archivo,
+-                           pcodigoreferencia,
+-                           nvl(venviarapi, 'S'),
+-                           v_codigo_agencia,
+-                           v_nombre_agencia,
+-                           nvl(pestado, 'P'),
+-                           v_primer_nombre,
+-                           v_segundo_nombre,
+-                           v_primer_apellido,
+-                           v_segundo_apellido,
+-                           v_nacionalidad,
+-                           null,
+-                           prespuesta);
+-    end inserturlreporte;
++ END InsertUrlReporte;

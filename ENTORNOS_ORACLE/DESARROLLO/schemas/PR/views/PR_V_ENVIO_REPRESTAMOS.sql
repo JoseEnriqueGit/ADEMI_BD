@@ -25,6 +25,7 @@ base AS (
            r.estado,
            c.numero_identificacion,
            c.nombres,
+           pf.primer_nombre AS nombre_mensaje,
            c.primer_apellido || ' ' || c.segundo_apellido AS apellidos,
            cr.canal,
            cr.valor,
@@ -43,6 +44,8 @@ base AS (
     JOIN clientes_b2000 c
       ON c.codigo_empresa = r.codigo_empresa
      AND c.codigo_cliente = r.codigo_cliente
+    LEFT JOIN pa.personas_fisicas pf
+      ON pf.cod_per_fisica = r.codigo_cliente
     JOIN pr.pr_canales_represtamo cr
       ON cr.codigo_empresa = r.codigo_empresa
      AND cr.id_represtamo = r.id_represtamo
@@ -67,7 +70,7 @@ SELECT b.id_represtamo,
        CASE
            WHEN b.canal_desc = 'CANAL_EMAIL' THEN pr.pr_pkg_represtamos.f_obt_subject_email(b.id_represtamo)
        END AS subject_email,
-       pr.pr_pkg_represtamos.f_obt_body_mensaje(b.id_represtamo, b.canal) AS texto_mensaje,
+       pr.pr_pkg_represtamos.f_obt_body_mensaje(b.nombre_mensaje, b.fecha_proceso, b.canal) AS texto_mensaje,
        b.fecha_proceso,
        TRUNC(LAST_DAY(b.fecha_proceso)) AS fecha_vencimiento,
        b.estado
