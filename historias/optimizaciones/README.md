@@ -1,24 +1,20 @@
-# Indice de Optimizaciones
+# optimizaciones/
 
-> Registro de todas las optimizaciones de rendimiento realizadas a objetos Oracle.
-> Cada optimizacion tiene su propia carpeta con documentacion, diff y rollback.
+Casos de optimizacion de objetos Oracle. Cada caso conserva su `README.md` original; el estado operativo vive en `ESTADO.md` por carpeta y en [historias/INVENTARIO.md](../INVENTARIO.md).
 
----
+## Estados
 
-| ID      | Objeto                 | Procedure/SQL              | Cost Antes | Cost Despues | Entorno | Fecha      |
-|---------|------------------------|----------------------------|------------|--------------|---------|------------|
-| OPT-001 | PR_PKG_REPRESTAMOS     | PVALIDA_WORLD_COMPLIANCE   | 18,293     | 15           | QA      | 2026-03-18 |
-| OPT-002 | PR_PKG_REPRESTAMOS     | CUR_DE08_SIB, CUR_DE05_SIB | ~16,963    | <100         | QA      | 2026-03-19 |
-| OPT-003 | PR_PKG_REPRESTAMOS     | Actualiza_Precalificacion   | N/A (redo) | -99% flushes | QA      | 2026-03-19 |
-| OPT-005 | PR_PKG_REPRESTAMOS     | Actualiza_XCORE_CUSTOM      | N*M iters  | 1 UPDATE     | QA      | 2026-03-19 |
-| OPT-006 | PR_PKG_REPRESTAMOS     | P_REGISTRO_SOLICITUD        | N/A (redo) | -99% flushes | QA      | 2026-03-19 |
-| OPT-007 | PR_PKG_REPRESTAMOS     | PVALIDA_XCORE               | N/A (redo) | -99% flushes | QA      | 2026-03-19 |
-| OPT-008 | PR_PKG_REPRESTAMOS     | P_Carga_Precalifica_Cancel  | 3-9 SELECTs| 3 SELECTs    | QA      | 2026-03-19 |
-| OPT-009 | PR_PKG_REPRESTAMOS     | F_Obtener_Nuevo_Credito     | 17,232     | 909          | QA      | 2026-04-06 |
-| OPT-004 | PR_PKG_REPRESTAMOS     | Actualiza_Precalificacion   | N iters    | 2 UPDATEs    | QA      | 2026-03-19 |
-| OPT-010 | PR_PKG_REPRESTAMOS     | CREDITOS_PROCESAR (x3)      | N ctx sw   | ANTI JOIN    | QA      | 2026-03-19 |
-| OPT-011 | PR_PKG_REPRESTAMOS     | CUR_Anular_creditos_cancel  | 10,656     | 9,748        | QA      | 2026-04-07 |
-| OPT-012 | PR_PKG_REPRESTAMOS     | UPDATE PROMOCION_PERSONA    | 8,332      | NO OPTIMIZABLE| QA      | 2026-04-07 |
-| OPT-013 | PA.PA_DE05_SIB         | CUR_DE05_SIB (Dirigida+Campana) | 120,122 | 11           | QA      | 2026-04-07 |
-| OPT-014 | PR_PKG_REPRESTAMOS     | Medicion real indices (002,009,011,013) | 24.2 min | 14.2 min (-41%) | DESA | 2026-04-13 |
-| OPT-015 | PR_PKG_REPRESTAMOS     | Cancelado+Cancelado_hi set-based+NOT EXISTS | 23 min | 11.3 min (-51%) | DESA | 2026-04-14 |
+- [produccion/](produccion/) — en PROD. Hoy solo: pase de [INDICES_2026-04-23/](produccion/INDICES_2026-04-23/).
+- [probados_no_promovidos/](probados_no_promovidos/) — codigo probado en QA/QA02/DESARROLLO, sin pase a PROD.
+- [descartados/](descartados/) — no entregaron beneficio o fueron reemplazados. Artefactos preservados.
+- [diagnosticos/](diagnosticos/) — mediciones, explain plans, equivalencias. No modifican objetos productivos.
+- [propuestas/](propuestas/) — propuestas documentadas, pendientes de aprobacion.
+- [soporte/](soporte/) — material reusable: scripts de medicion, mapa de jobs, listas de pendientes, plan de sesion.
+
+## Regla de movimiento
+
+Cuando un caso cambia de estado:
+1. `git mv` la carpeta a la nueva categoria.
+2. Actualizar `ESTADO.md` (fecha, estado, decision).
+3. Actualizar `historias/INVENTARIO.md`.
+4. Si paso a PROD, registrar en `ENTORNOS_ORACLE/Produccion/CHANGELOG.md` en el mismo commit.

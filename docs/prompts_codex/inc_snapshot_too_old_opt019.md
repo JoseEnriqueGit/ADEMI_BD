@@ -1,4 +1,4 @@
-# inc_snapshot_too_old_opt019
+﻿# inc_snapshot_too_old_opt019
 
 ## Cuando usarlo
 Cuando quieras continuar el incidente `INC SNAPSHOT TOO OLD - JOB_PRECALIFICA_REPRESTAMO`
@@ -13,18 +13,18 @@ Estoy retomando el incidente INC SNAPSHOT TOO OLD - JOB_PRECALIFICA_REPRESTAMO.
 Trabaja en espanol y sigue AGENTS.md. Usa como fuente de verdad:
 
 - docs/instrucciones_ai/BASE_OPERATIVA.md
-- historias/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/HANDOFF_SESION_NUEVA.md
-- historias/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/README.md
-- historias/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/bitacora_resolucion.md
-- historias/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/EXPLICACION_PROBLEMA_Y_SOLUCION.md
-- historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/README.md
-- historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/BEFORE.sql
-- historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/AFTER.sql
-- historias/optimizaciones/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/ROLLBACK.sql
-- historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/README.md
-- historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/BEFORE.sql
-- historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/AFTER.sql
-- historias/optimizaciones/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/ROLLBACK.sql
+- historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/HANDOFF_SESION_NUEVA.md
+- historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/README.md
+- historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/bitacora_resolucion.md
+- historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/EXPLICACION_PROBLEMA_Y_SOLUCION.md
+- historias/optimizaciones/probados_no_promovidos/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/README.md
+- historias/optimizaciones/probados_no_promovidos/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/BEFORE.sql
+- historias/optimizaciones/probados_no_promovidos/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/AFTER.sql
+- historias/optimizaciones/probados_no_promovidos/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/ROLLBACK.sql
+- historias/optimizaciones/probados_no_promovidos/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/README.md
+- historias/optimizaciones/probados_no_promovidos/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/BEFORE.sql
+- historias/optimizaciones/probados_no_promovidos/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/AFTER.sql
+- historias/optimizaciones/probados_no_promovidos/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/ROLLBACK.sql
 
 Entorno objetivo: DESARROLLO.
 

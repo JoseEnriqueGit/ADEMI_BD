@@ -19,10 +19,21 @@ Esta es la fuente de verdad compartida para trabajar con Claude y Codex en `ADEM
 
 ## Contexto del repositorio
 - `ENTORNOS_ORACLE/` sigue la estructura `ENTORNOS_ORACLE/{ENTORNO}/schemas/{SCHEMA}/{tipo_objeto}/`
-- `historias/` guarda trazabilidad por ticket, iniciativa o caso de trabajo
+- `historias/` guarda trazabilidad por ticket, iniciativa o caso de trabajo. Organizada por tipo y estado:
+  - `historias/optimizaciones/{produccion|probados_no_promovidos|descartados|diagnosticos|propuestas|soporte}/`
+  - `historias/incidentes/{abiertos|diagnosticos|cerrados}/`
+  - `historias/soporte_qa02/`
+  - `historias/apex/{produccion|en_qa|pendientes_confirmacion|champion}/`
+  - `historias/INVENTARIO.md` mantiene la tabla maestra de estados; `historias/_plantillas/ESTADO.md` es la plantilla de metadato operativo.
 - `diff/` almacena comparaciones before/after
 - `docs/` contiene guías, QA, profiler, notas y documentación complementaria
 - `backups/` almacena material legado o de respaldo
+
+## Regla de trazabilidad por estado
+- Cada carpeta de historia tiene `README.md` (detalle técnico) y `ESTADO.md` (metadato operativo: estado, entorno, decisión).
+- Al cambiar el estado de un caso, mover la carpeta a la nueva categoría con `git mv` y actualizar `ESTADO.md` y `historias/INVENTARIO.md` en el mismo commit.
+- Si un caso se promueve a PROD, registrar la fila en `ENTORNOS_ORACLE/Produccion/CHANGELOG.md` en ese mismo commit.
+- Los CHANGELOG por entorno (`ENTORNOS_ORACLE/{ENTORNO}/CHANGELOG.md`) son la fuente de verdad de qué está desplegado.
 
 ## Schemas más frecuentes
 - `PR` - préstamos y represtamos
@@ -148,3 +159,4 @@ Usar los anexos en `docs/instrucciones_ai/referencias/`:
 
 ## Historial
 - `2026-04-16` - Se consolidó la base común para Claude y Codex, con entorno obligatorio, optimización orientada a propuesta primero y nueva estructura en `docs/instrucciones_ai/`.
+- `2026-05-19` - Reorganización de `historias/` por tipo y estado (produccion / probados_no_promovidos / descartados / diagnosticos / propuestas / soporte). Se agregó `INVENTARIO.md` maestro, plantilla `ESTADO.md` y regla de movimiento por cambio de estado.

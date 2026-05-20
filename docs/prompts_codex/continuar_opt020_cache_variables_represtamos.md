@@ -1,20 +1,20 @@
-# Prompt para continuar OPT-020 cache de variables
+﻿# Prompt para continuar OPT-020 cache de variables
 
 Trabaja en espanol y usa `docs/instrucciones_ai/BASE_OPERATIVA.md` como fuente
 de verdad. Entorno confirmado: `QA02`.
 
 Contexto:
 
-- Historia: `historias/optimizaciones/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/`
-- Handoff: `historias/optimizaciones/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/HANDOFF_TRACKING_QA02.md`
+- Historia: `historias/optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/`
+- Handoff: `historias/optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/HANDOFF_TRACKING_QA02.md`
 - Body de trabajo con tracking:
-  `historias/optimizaciones/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/body_actual_QA02_tracking/body_actual_QA02.sql`
+  `historias/optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/body_actual_QA02_tracking/body_actual_QA02.sql`
 - Backup antes del tracking:
-  `historias/optimizaciones/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/body_actual_QA02_tracking/body_actual_QA02_BEFORE_TRACKING.sql`
+  `historias/optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/body_actual_QA02_tracking/body_actual_QA02_BEFORE_TRACKING.sql`
 - Tabla de tracking:
   `PR.PR_JOB_PRECALIFICA_TRACK`
 - Query de resultados:
-  `historias/optimizaciones/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`
+  `historias/optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`
 
 Situacion actual:
 

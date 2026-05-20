@@ -1,24 +1,43 @@
-# proyectos/ — Soluciones de dominio
+# historias/
 
-Aquí viven desarrollos funcionales (experimentos, dashboards, campañas, certificados digitales, etc.). Cada subcarpeta agrupa scripts, documentación y pruebas específicas del dominio.
+Trazabilidad por iniciativa (OPT, incidente, APEX), separada por estado.
 
-Estructura típica por proyecto
-- `README.md`: objetivo, dependencias de BD, cómo ejecutar, rollback.
-- `*.sql`: scripts de lógica de negocio/consultas.
-- `TEST/`: validaciones ligeras (evidencias `SELECT`, conteos, casos de prueba).
-- Otras carpetas frecuentes: `SCRIPT OFICIAL/`, `PROMPTS/`, `HEADER.sql/`.
+## Indice rapido
 
-Guía de uso
-- Coloca en `proyectos/*` la lógica de negocio y evidencias; deja DDL/objetos persistentes en `db/*`.
-- Mantén referencias claras a dependencias de BD (tablas/vistas/paquetes).
-- Los nombres de archivos permanecen como están (no convertir espacios a guiones bajos).
+- [INVENTARIO.md](INVENTARIO.md) — tabla maestra con el estado de cada caso. Empezar aqui.
 
-Ejemplos
-- Ejecutar un script de proyecto: `sqlplus USER/PASS@DB @proyectos/CHAMPION/PR_PKG_REPRESTAMOS.sql`
-- Consultas de dashboard: `@proyectos/421 Dashboard para Gerentes y Directores de Negocios/CARDS.SQL`
+## Convencion de carpetas
 
-Al crear un proyecto nuevo
-1) Crea la carpeta bajo `proyectos/Nombre del Proyecto`.
-2) Añade `README.md` con objetivo, dependencias, ejecución y checklist de rollback.
-3) Coloca evidencias en `TEST/` y, si aplica, separa scripts “oficiales” de borradores.
+```
+historias/
+├── INVENTARIO.md              # Tabla maestra
+├── README.md                  # Este archivo
+├── optimizaciones/
+│   ├── produccion/            # OPT con cambio en PROD (ver CHANGELOG PROD)
+│   ├── probados_no_promovidos/# OPT probada en QA/QA02/DESA, no esta en PROD
+│   ├── descartados/           # OPT que no entrego beneficio o fue reemplazada
+│   ├── diagnosticos/          # Mediciones, explain plans, equivalencias
+│   ├── propuestas/            # Propuestas pendientes de aprobacion
+│   └── soporte/               # Material reusable (scripts de medicion, mapas, planes)
+├── incidentes/
+│   ├── abiertos/              # Incidentes en investigacion / accion pendiente
+│   ├── diagnosticos/          # Diagnosticos no concluidos
+│   └── cerrados/              # Incidentes resueltos
+├── soporte_qa02/              # Fixes y diagnosticos en QA02 que no son incidente formal
+└── apex/
+    ├── produccion/            # Releases APEX confirmados en PROD
+    ├── en_qa/                 # Releases APEX probados en QA, no en PROD
+    ├── pendientes_confirmacion/ # Historias sin estado documentado
+    └── champion/              # Paquetes y plantillas de referencia
+```
 
+## Regla operativa
+
+- Cada carpeta de historia debe tener `README.md` (detalle tecnico, historico) y `ESTADO.md` (metadato operativo).
+- Cuando cambia el estado, **mover la carpeta** y actualizar `INVENTARIO.md` en el mismo commit.
+- No borrar carpetas: los casos descartados se mueven a `descartados/`, no se eliminan.
+- Cuando se promueve algo a PROD, registrar en `ENTORNOS_ORACLE/Produccion/CHANGELOG.md` el mismo dia.
+
+## Plantilla ESTADO.md
+
+Copiar [_plantillas/ESTADO.md](_plantillas/ESTADO.md) al crear una nueva historia.
