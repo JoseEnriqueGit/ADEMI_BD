@@ -5,6 +5,7 @@ Trazabilidad por iniciativa (OPT, incidente, APEX), separada por estado.
 ## Indice rapido
 
 - [INVENTARIO.md](INVENTARIO.md) — tabla maestra con el estado de cada caso. Empezar aqui.
+- [_promociones/](_promociones/) — registro cronologico de eventos de pase entre entornos (auditable).
 
 ## Convencion de carpetas
 

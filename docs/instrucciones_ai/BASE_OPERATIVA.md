@@ -25,6 +25,7 @@ Esta es la fuente de verdad compartida para trabajar con Claude y Codex en `ADEM
   - `historias/soporte_qa02/`
   - `historias/apex/{produccion|en_qa|pendientes_confirmacion|champion}/`
   - `historias/INVENTARIO.md` mantiene la tabla maestra de estados; `historias/_plantillas/ESTADO.md` es la plantilla de metadato operativo.
+  - `historias/_promociones/` guarda un archivo por cada evento de pase entre entornos (auditable, no se mueve aunque la historia cambie de estado).
 - `diff/` almacena comparaciones before/after
 - `docs/` contiene guías, QA, profiler, notas y documentación complementaria
 - `backups/` almacena material legado o de respaldo
