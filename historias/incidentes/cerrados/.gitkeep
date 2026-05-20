@@ -1,0 +1,3 @@
+# Carpeta reservada para incidentes resueltos oficialmente.
+# Al cerrar un incidente, mover desde `incidentes/abiertos/` o
+# `incidentes/diagnosticos/` aqui y actualizar `ESTADO.md`.

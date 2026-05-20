@@ -1,0 +1,3 @@
+# Carpeta reservada para releases APEX confirmados en PROD.
+# Al confirmar un release, mover la historia desde `apex/en_qa/` aqui
+# y registrar el evento en `historias/_promociones/`.
