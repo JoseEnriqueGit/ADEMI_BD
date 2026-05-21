@@ -20,6 +20,9 @@
   - `ENTORNOS_ORACLE/Produccion/schemas/PA/tables/PA_PARAMETROS_MVP/indexes.sql`
 - **Promocion**: `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX.md`
 - **Rollback**: `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK.sql`
+- **Package rollback incluido**:
+  - `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/PR_PKG_REPRESTAMOS_spec_anterior.sql`
+  - `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/PR_PKG_REPRESTAMOS_body_anterior.sql`
 - **Pendientes de verificar en PROD**:
   1. `PR.PR_PKG_REPRESTAMOS` spec/body compilan `VALID`.
   2. `PR.PR_V_ENVIO_REPRESTAMOS` compila `VALID` y devuelve registros esperados.

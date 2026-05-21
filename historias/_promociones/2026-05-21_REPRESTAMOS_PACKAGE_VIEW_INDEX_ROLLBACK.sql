@@ -6,23 +6,25 @@
 -- IMPORTANTE:
 -- 1. Antes de ejecutar rollback, confirmar con DBA si PR.PR_V_ENVIO_REPRESTAMOS
 --    y el sinonimo publico existian antes del pase.
--- 2. Para PR.PR_PKG_REPRESTAMOS se debe recompilar el spec/body anterior desde
---    el respaldo productivo tomado antes del pase. Este archivo no inventa ni
---    reconstruye la version anterior del package.
+-- 2. La version previa de PR.PR_PKG_REPRESTAMOS para rollback queda incluida en:
+--    historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/
+--    Origen entregado para rollback: PR_PKG_REPRESTAMOS 1 21-5.pks/.pkb.
+
+DEFINE REPO_ROOT = C:\Users\joogando\Desktop\ADEMI_BD
 
 PROMPT ============================================================
 PROMPT ROLLBACK 2026-05-21 - PR_PKG_REPRESTAMOS / VISTA / INDICE
 PROMPT ============================================================
 
-PROMPT Paso 1 - Recompilar package anterior desde respaldo DBA
+PROMPT Paso 1 - Recompilar package anterior incluido en este rollback
 PROMPT Ejecutar primero el spec anterior de PR.PR_PKG_REPRESTAMOS
 PROMPT Ejecutar luego el body anterior de PR.PR_PKG_REPRESTAMOS
 
--- Ejemplo operativo:
--- @<RUTA_RESPALDO_DBA>\PR_PKG_REPRESTAMOS_spec_anterior.sql
--- SHOW ERRORS PACKAGE PR.PR_PKG_REPRESTAMOS;
--- @<RUTA_RESPALDO_DBA>\PR_PKG_REPRESTAMOS_body_anterior.sql
--- SHOW ERRORS PACKAGE BODY PR.PR_PKG_REPRESTAMOS;
+@&REPO_ROOT\historias\_promociones\2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK\PR_PKG_REPRESTAMOS_spec_anterior.sql
+SHOW ERRORS PACKAGE PR.PR_PKG_REPRESTAMOS;
+
+@&REPO_ROOT\historias\_promociones\2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK\PR_PKG_REPRESTAMOS_body_anterior.sql
+SHOW ERRORS PACKAGE BODY PR.PR_PKG_REPRESTAMOS;
 
 PROMPT Paso 2 - Recompilar vista anterior si existia antes del pase
 

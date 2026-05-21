@@ -21,12 +21,24 @@
 | 4 | `PUBLIC.PR_V_ENVIO_REPRESTAMOS` | Public synonym | `ENTORNOS_ORACLE/Produccion/schemas/PR/views/PR_V_ENVIO_REPRESTAMOS.sql` |
 | 5 | `PA.IDX_PARAM_MVP_EMP_MVP_PARAM` | Index | `ENTORNOS_ORACLE/Produccion/schemas/PA/tables/PA_PARAMETROS_MVP/indexes.sql` |
 
+## Artefactos de rollback
+
+| # | Objeto | Tipo | Archivo rollback |
+|---|---|---|---|
+| 1 | `PR.PR_PKG_REPRESTAMOS` | Package spec anterior | `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/PR_PKG_REPRESTAMOS_spec_anterior.sql` |
+| 2 | `PR.PR_PKG_REPRESTAMOS` | Package body anterior | `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/PR_PKG_REPRESTAMOS_body_anterior.sql` |
+
+- Origen confirmado por usuario: `PR_PKG_REPRESTAMOS 1 21-5.pks` y `PR_PKG_REPRESTAMOS 1 21-5.pkb`.
+- Hash spec anterior SHA256: `D9621E38392DF48FAF2D90F99A97D2EF813492D9CB26A7E3A7361236CD970E29`.
+- Hash body anterior SHA256: `91BAD000CEE80A62EDE0DB57E76721F3A47156594AF0F97E5CE73CF259627C45`.
+
 ## Normalizacion de archivos
 
 - `PR_PKG_REPRESTAMOS.pks` fue normalizado como `ENTORNOS_ORACLE/Produccion/schemas/PR/packages/PR_PKG_REPRESTAMOS/spec.sql`.
 - `PR_PKG_REPRESTAMOS.pkb` fue normalizado como `ENTORNOS_ORACLE/Produccion/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`.
 - Ambos archivos sueltos de la raiz fueron verificados por SHA256 contra la ruta formal antes de retirarlos de la raiz del repo.
-- Los archivos `PR_PKG_REPRESTAMOS 1 1 ORIGINAL.*`, `PR_PKG_REPRESTAMOS 1 21-5.*` y scripts QA no forman parte de esta normalizacion.
+- Los archivos `PR_PKG_REPRESTAMOS 1 21-5.*` fueron normalizados como rollback del package.
+- Los archivos `PR_PKG_REPRESTAMOS 1 1 ORIGINAL.*` y scripts QA no forman parte de esta normalizacion.
 
 ## Orden de ejecucion sugerido
 
@@ -64,7 +76,7 @@ SELECT *
 
 Script preparado: `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK.sql`.
 
-1. Recompilar el `spec` y `body` anteriores de `PR.PR_PKG_REPRESTAMOS` desde el respaldo productivo tomado por DBA antes del pase.
+1. Recompilar el `spec` y `body` anteriores incluidos en `historias/_promociones/2026-05-21_REPRESTAMOS_PACKAGE_VIEW_INDEX_ROLLBACK/`.
 2. Recompilar la version anterior de `PR.PR_V_ENVIO_REPRESTAMOS` si existia en Produccion.
 3. Si el sinonimo publico fue creado nuevo y debe retirarse:
 
