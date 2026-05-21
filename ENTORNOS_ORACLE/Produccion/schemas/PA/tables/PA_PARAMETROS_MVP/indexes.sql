@@ -1,0 +1,6 @@
+-- OPT-019: Covering index para F_Obt_Parametro_Represtamo (PR_PKG_REPRESTAMOS)
+-- Evidencia: Q01 paso de TABLE ACCESS FULL (costo 3) a INDEX RANGE SCAN (costo 2) en DESARROLLO
+-- Tablespace: PA_IDX (estandar ADEMI, indices fuera de tablespace DATA)
+CREATE INDEX PA.IDX_PARAM_MVP_EMP_MVP_PARAM
+ON PA.PA_PARAMETROS_MVP (CODIGO_EMPRESA, CODIGO_MVP, CODIGO_PARAMETRO)
+TABLESPACE PA_IDX;
