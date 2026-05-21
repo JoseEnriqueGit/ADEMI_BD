@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Validar el impacto del indice `PA.IDX_PA_PARAM_MVP_01` sobre la consulta de
+Validar el impacto del indice `PA.IDX_PARAM_MVP_EMP_MVP_PARAM` sobre la consulta de
 parametros usada por `F_Obt_Parametro_Represtamo`.
 
 ## ANTES
@@ -29,8 +29,9 @@ Cardinality: 1
 ## Crear indice
 
 ```sql
-CREATE INDEX PA.IDX_PA_PARAM_MVP_01
-ON PA.PA_PARAMETROS_MVP (CODIGO_EMPRESA, CODIGO_MVP, CODIGO_PARAMETRO);
+CREATE INDEX PA.IDX_PARAM_MVP_EMP_MVP_PARAM
+ON PA.PA_PARAMETROS_MVP (CODIGO_EMPRESA, CODIGO_MVP, CODIGO_PARAMETRO)
+TABLESPACE PA_IDX;
 ```
 
 ## DESPUES
@@ -51,7 +52,7 @@ Resultado validado en DESARROLLO:
 
 ```text
 TABLE ACCESS BY INDEX ROWID BATCHED PA.PA_PARAMETROS_MVP
-INDEX RANGE SCAN PA.IDX_PA_PARAM_MVP_01
+INDEX RANGE SCAN PA.IDX_PARAM_MVP_EMP_MVP_PARAM
 Cost total: 2
 Cost indice: 1
 Cardinality: 1
@@ -59,7 +60,7 @@ Cardinality: 1
 
 ## Decision
 
-Mantener recomendado `PA.IDX_PA_PARAM_MVP_01`.
+Mantener recomendado `PA.IDX_PARAM_MVP_EMP_MVP_PARAM`.
 
 No crear `PR.IDX_REPRE_ESTADO_ID_01`; ya existe
 `IDX_REPRESTAMOS_ESTADO_COV(ESTADO, ID_REPRESTAMO, XCORE_GLOBAL)`.
@@ -69,5 +70,5 @@ No crear `PR.IDX_REPRE_ESTADO_ID_01`; ya existe
 Usar solo si se decide revertir la prueba:
 
 ```sql
-DROP INDEX PA.IDX_PA_PARAM_MVP_01;
+DROP INDEX PA.IDX_PARAM_MVP_EMP_MVP_PARAM;
 ```

@@ -43,8 +43,9 @@ reproduce `ORA-01555`. Solo compara planes antes/despues de indices candidatos.
 ### Firme para probar
 
 ```sql
-CREATE INDEX PA.IDX_PA_PARAM_MVP_01
-ON PA.PA_PARAMETROS_MVP (CODIGO_EMPRESA, CODIGO_MVP, CODIGO_PARAMETRO);
+CREATE INDEX PA.IDX_PARAM_MVP_EMP_MVP_PARAM
+ON PA.PA_PARAMETROS_MVP (CODIGO_EMPRESA, CODIGO_MVP, CODIGO_PARAMETRO)
+TABLESPACE PA_IDX;
 ```
 
 Motivo: `F_Obt_Parametro_Represtamo` busca exactamente por esas columnas y el
@@ -87,7 +88,7 @@ lo que este indice seria redundante y menos completo para Q02A/Q02B.
 
 ## Criterio de decision
 
-- Aprobar `IDX_PA_PARAM_MVP_01` si Q01 cambia de full scan a index access o
+- Aprobar `IDX_PARAM_MVP_EMP_MVP_PARAM` si Q01 cambia de full scan a index access o
   reduce costo/lecturas de forma clara.
 - No aprobar `IDX_REPRE_ESTADO_ID_01` si Q00 muestra
   `IDX_REPRESTAMOS_ESTADO_COV(ESTADO, ID_REPRESTAMO, XCORE_GLOBAL)` o cualquier
@@ -98,12 +99,14 @@ lo que este indice seria redundante y menos completo para Q02A/Q02B.
 
 ## Resultado validado en DESARROLLO
 
-- Q01 antes de crear `PA.IDX_PA_PARAM_MVP_01`: `TABLE ACCESS FULL` sobre
+- Q01 antes de crear `PA.IDX_PARAM_MVP_EMP_MVP_PARAM`: `TABLE ACCESS FULL` sobre
   `PA.PA_PARAMETROS_MVP`, costo 3, cardinalidad 1.
-- Q01 despues de crear `PA.IDX_PA_PARAM_MVP_01`: `INDEX RANGE SCAN` sobre
-  `PA.IDX_PA_PARAM_MVP_01` y `TABLE ACCESS BY INDEX ROWID BATCHED`, costo total
+- Q01 despues de crear `PA.IDX_PARAM_MVP_EMP_MVP_PARAM`: `INDEX RANGE SCAN` sobre
+  `PA.IDX_PARAM_MVP_EMP_MVP_PARAM` y `TABLE ACCESS BY INDEX ROWID BATCHED`, costo total
   2, costo de indice 1, cardinalidad 1.
-- Decision: mantener recomendado `PA.IDX_PA_PARAM_MVP_01` como indice de bajo
-  riesgo para la ruta de parametros.
+- Decision: mantener recomendado `PA.IDX_PARAM_MVP_EMP_MVP_PARAM` como indice de bajo
+  riesgo para la ruta de parametros. Aprobado para pase a PROD (renombrado desde
+  el candidato historico `IDX_PA_PARAM_MVP_01` para alinear con la convencion de
+  los 8 indices ya en PROD y agregar TABLESPACE PA_IDX explicito).
 - Decision: no crear `PR.IDX_REPRE_ESTADO_ID_01`; en DESARROLLO ya existe
   `IDX_REPRESTAMOS_ESTADO_COV(ESTADO, ID_REPRESTAMO, XCORE_GLOBAL)`.
