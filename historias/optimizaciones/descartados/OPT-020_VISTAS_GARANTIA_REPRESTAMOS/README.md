@@ -55,8 +55,13 @@ desde las vistas.
 | `05_VALIDAR_INDICES.sql` | Muestra indices existentes sobre tablas base |
 | `06_CREATE_TRACKING_TABLE_JOB_PRECALIFICA_RD.sql` | Crea tabla persistente para tiempos por proceso del job |
 | `07_PATCH_TRACKING_PAQUETE_SNIPPETS.sql` | Snippets para instrumentar `P_Carga_Precalifica_Cancelado` sin cambiar la spec |
-| `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql` | Consulta ultimas ejecuciones, ranking por duracion e historico por proceso |
+| `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql` | Consulta ultimas ejecuciones, ranking por duracion, historico por proceso y detalle de medicion de telefonos |
 | `09_ROLLBACK_TRACKING_PERSISTENTE_QA02.sql` | Elimina la tabla de tracking si se retira la instrumentacion |
+| `15_CREATE_TEL_BENCH_TRACK_QA02.sql` | Crea tabla persistente para medir la llamada compilada a `obt_telefono_persona` durante el job |
+| `16_ROLLBACK_TEL_BENCH_TRACK_QA02.sql` | Elimina la tabla de medicion de telefonos si se retira la instrumentacion |
+| `17_RECREATE_PR_V_ENVIO_REPRESTAMOS_QA02.sql` | Recrea `PR.PR_V_ENVIO_REPRESTAMOS` para llamar la sobrecarga de `F_OBT_BODY_MENSAJE` con nombre, fecha y canal, y expone `CANAL_DESC` para APEX |
+| `18_ROLLBACK_PR_V_ENVIO_REPRESTAMOS_QA02.sql` | Restaura el DDL actual de QA02 con llamada vieja por `ID_REPRESTAMO` y canal |
+| `19_VALIDAR_PR_V_ENVIO_REPRESTAMOS_QA02.sql` | Valida conteo, muestreo sin mensaje, muestreo con mensaje, estado y DDL de la vista |
 | `11_DIAGNOSTICO_LOTE_FECHA_CORTE.sql` | Diagnostica candidatos por fecha de corte para aumentar volumen procesado |
 | `12_HANDOFF_LOTE_FECHA_CORTE.md` | Contexto y prompt para continuar la investigacion del lote |
 | `HANDOFF_TRACKING_QA02.md` | Resumen de cierre, ubicaciones y contexto para continuar |
@@ -96,10 +101,15 @@ Si faltan columnas en QA02, detener el pase y agregar los DDL reales al repo.
 9. Comparar conteos finales de estados `RE`, `NP`, `RXT`, `CP`, `AN`.
 10. Para dejar tracking al ejecutar el job normal en QA02, ejecutar una sola vez
     `06_CREATE_TRACKING_TABLE_JOB_PRECALIFICA_RD.sql`.
-11. Aplicar los snippets de `07_PATCH_TRACKING_PAQUETE_SNIPPETS.sql` en el body
+11. Para medir telefonos PA o PR durante el job, ejecutar una sola vez
+    `15_CREATE_TEL_BENCH_TRACK_QA02.sql`.
+12. En `F_QA02_Medir_Telefono`, dejar compilada la llamada que se quiere medir:
+    `PA.obt_telefono_persona` para la primera corrida o `PR.obt_telefono_persona`
+    para la segunda corrida.
+13. Aplicar los snippets de `07_PATCH_TRACKING_PAQUETE_SNIPPETS.sql` en el body
     del paquete y compilar `PR.PR_PKG_REPRESTAMOS`.
-12. Ejecutar `PR.JOB_CARGA_PRECALIFICA_RD` normalmente desde Scheduler/Toad.
-13. Consultar tiempos por proceso con `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`.
+14. Ejecutar `PR.JOB_CARGA_PRECALIFICA_RD` normalmente desde Scheduler/Toad.
+15. Consultar tiempos por proceso y telefonos con `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`.
 
 ## Tracking QA02
 
@@ -111,6 +121,32 @@ body recibido antes del cambio quedo como
 El contexto de cierre y siguiente trabajo quedo documentado en
 `HANDOFF_TRACKING_QA02.md`. El prompt listo para continuar esta en
 `docs/prompts_codex/continuar_opt020_cache_variables_represtamos.md`.
+
+## PR_V_ENVIO_REPRESTAMOS QA02
+
+El 2026-05-20 se confirmo en QA02 que `PR.PR_PKG_REPRESTAMOS` ya tenia la
+sobrecarga nueva de `F_OBT_BODY_MENSAJE(pNombres, pFecha, pCanal)`, pero el DDL
+vivo de `PR.PR_V_ENVIO_REPRESTAMOS` seguia llamando la firma vieja
+`F_OBT_BODY_MENSAJE(R.ID_REPRESTAMO, CR.CANAL)`.
+
+Medicion observada en Toad sobre QA02:
+
+- `COUNT(*)` de la vista: 3,991 filas en 0.18s.
+- Muestreo de 20 filas sin `TEXTO_MENSAJE`: 0.08s.
+- Muestreo de 20 filas con `SUBSTR(TEXTO_MENSAJE, 1, 120)`: 21.92s.
+
+Conclusion: el costo esta concentrado en la columna `TEXTO_MENSAJE`, porque la
+vista todavia ejecuta la funcion vieja por fila. El script
+`17_RECREATE_PR_V_ENVIO_REPRESTAMOS_QA02.sql` conserva la estructura actual de
+la vista y cambia solo la fuente de `TEXTO_MENSAJE` para usar la sobrecarga
+nueva. Se pasa `PF.PRIMER_NOMBRE` para preservar el texto generado por la firma
+vieja, que usaba el primer nombre aunque la vista exponga `C.NOMBRES`.
+
+Al probar APEX, el reporte interactivo fallo con `ORA-00904: "D"."CANAL_DESC"`.
+La causa es que la metadata del reporte referencia `CANAL_DESC`, pero el DDL
+vivo de QA02 no exponia esa columna. El script `17_RECREATE...` agrega
+`CANAL_DESC` por `CASE` directo sobre `CR.CANAL` para mantener compatible el
+reporte sin reintroducir la llamada lenta de `TEXTO_MENSAJE`.
 
 ## Resultado QA02
 

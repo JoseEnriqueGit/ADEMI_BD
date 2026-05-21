@@ -48,8 +48,8 @@
 | OPT-016 | Codigo P_REGISTRO_SOLICITUD asociado | PROBADO_NO_PROMOVIDO | DESARROLLO | 2026-04 | (Reportado dentro de OPT-017 - sin carpeta propia) |
 | OPT-017 | Bulk collect P_REGISTRO_SOLICITUD | PROBADO_NO_PROMOVIDO | DESARROLLO | 2026-05-06 | `optimizaciones/probados_no_promovidos/OPT-017_BULKCOLLECT_P_REGISTRO_SOLICITUD/` |
 | OPT-018 | Bulk collect final P_Carga_Precalifica_Cancelado | PROBADO_NO_PROMOVIDO | DESARROLLO | 2026-05-06 | `optimizaciones/probados_no_promovidos/OPT-018_BULKCOLLECT_FINAL_P_CARGA_PRECALIFICA_CANCELADO/` |
-| OPT-019 | Explain plan + propuesta `IDX_PA_PARAM_MVP_01` | DIAGNOSTICO | DESARROLLO | 2026-05 | `optimizaciones/diagnosticos/OPT-019_EXPLAIN_PLAN_INDICES_SNAPSHOT/` |
-| OPT-020 | Vistas garantia + cambio body QA02 | DESCARTADO | QA02 | 2026-05-18 | `optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/` |
+| OPT-019 | Explain plan + indice `IDX_PARAM_MVP_EMP_MVP_PARAM` (aprobado para PROD) | DIAGNOSTICO | DESARROLLO | 2026-05-20 | `optimizaciones/diagnosticos/OPT-019_EXPLAIN_PLAN_INDICES_SNAPSHOT/` |
+| OPT-020 | Vistas garantia + cambio body QA02 + script PR_V_ENVIO_REPRESTAMOS | DESCARTADO | QA02 | 2026-05-20 | `optimizaciones/descartados/OPT-020_VISTAS_GARANTIA_REPRESTAMOS/` |
 | VALIDACION_ACUMULADA | Validacion acumulada base OPT-015 | DIAGNOSTICO | DESARROLLO | 2026-04-17 | `optimizaciones/diagnosticos/VALIDACION_ACUMULADA_REPRESTAMOS_BASE_OPT015/` |
 | Propuestas hardcodeo | SQL371 + CURSORES_ANULAR | PROPUESTA | - | 2026-03-19 | `optimizaciones/propuestas/` |
 | MAPA_JOBS / PENDIENTES / SESION_PENDIENTE / scripts_medicion | Material reusable | SOPORTE | - | varias | `optimizaciones/soporte/` |

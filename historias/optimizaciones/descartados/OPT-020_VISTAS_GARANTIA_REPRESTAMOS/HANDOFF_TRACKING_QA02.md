@@ -20,8 +20,10 @@ No se cambio la `spec`. La interfaz publica sigue igual.
 | `body_actual_QA02_tracking/body_actual_QA02.sql` | Body actual de QA02 con tracking persistente aplicado |
 | `body_actual_QA02_tracking/body_actual_QA02_BEFORE_TRACKING.sql` | Respaldo del body recibido antes del tracking |
 | `06_CREATE_TRACKING_TABLE_JOB_PRECALIFICA_RD.sql` | Crea/valida `PR.PR_JOB_PRECALIFICA_TRACK`, indices de tracking e indice MVP |
-| `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql` | Consulta ultimas ejecuciones, ranking por proceso e historico |
+| `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql` | Consulta ultimas ejecuciones, ranking por proceso, historico y medicion de telefonos |
 | `07_PATCH_TRACKING_PAQUETE_SNIPPETS.sql` | Resumen del patch aplicado y mapa de pasos |
+| `15_CREATE_TEL_BENCH_TRACK_QA02.sql` | Crea/valida `PR.PR_TEL_PERSONA_BENCH_TRACK` para detalle de telefonos |
+| `16_ROLLBACK_TEL_BENCH_TRACK_QA02.sql` | Elimina `PR.PR_TEL_PERSONA_BENCH_TRACK` si se retira la medicion |
 | `RESULTADOS_QA02.md` | Evidencia de vistas/equivalencia en QA02 |
 
 ## Tracking aplicado
@@ -29,6 +31,7 @@ No se cambio la `spec`. La interfaz publica sigue igual.
 La tabla de salida del tracking es:
 
 - `PR.PR_JOB_PRECALIFICA_TRACK`
+- `PR.PR_TEL_PERSONA_BENCH_TRACK` para detalle por llamada durante `P_REGISTRO_SOLICITUD`
 
 El script `06_CREATE_TRACKING_TABLE_JOB_PRECALIFICA_RD.sql` crea la tabla con
 PK por `ID_EJECUCION, ID_PASO` y los indices:
@@ -72,11 +75,15 @@ En `body_actual_QA02_tracking/body_actual_QA02.sql`:
 
 ## Validacion pendiente en QA02
 
-1. Compilar `body_actual_QA02_tracking/body_actual_QA02.sql` en QA02.
-2. Si compila, ejecutar `PR.JOB_CARGA_PRECALIFICA_RD` normalmente.
-3. Consultar `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`.
-4. Revisar ranking por `DURACION_SEGUNDOS`.
-5. Si falla compilacion, usar `body_actual_QA02_BEFORE_TRACKING.sql` como respaldo para comparar.
+1. Ejecutar `06_CREATE_TRACKING_TABLE_JOB_PRECALIFICA_RD.sql` si la tabla de pasos no existe.
+2. Ejecutar `15_CREATE_TEL_BENCH_TRACK_QA02.sql` si la tabla de telefonos no existe.
+3. En `F_QA02_Medir_Telefono`, dejar compilada la llamada a `PA.obt_telefono_persona`.
+4. Compilar el body instrumentado en QA02.
+5. Ejecutar `PR.JOB_CARGA_PRECALIFICA_RD` normalmente y guardar el `ID_EJECUCION`.
+6. En `F_QA02_Medir_Telefono`, cambiar manualmente a `PR.obt_telefono_persona` y recompilar.
+7. Ejecutar `PR.JOB_CARGA_PRECALIFICA_RD` nuevamente y guardar el `ID_EJECUCION`.
+8. Consultar `08_CONSULTAR_TRACKING_JOB_PRECALIFICA_RD.sql`; usar Q06/Q10 para comparar las dos corridas.
+9. Si falla compilacion, usar el respaldo previo como base para comparar.
 
 ## Proxima optimizacion
 

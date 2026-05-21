@@ -159,4 +159,134 @@ SELECT NVL(a.id_paso, b.id_paso)                          AS id_paso,
        (SELECT * FROM PR.PR_JOB_PRECALIFICA_TRACK
          WHERE id_ejecucion = '&P_EJECUCION_B') b
     ON a.id_paso = b.id_paso
- ORDER BY id_paso;
+  ORDER BY id_paso;
+
+PROMPT
+PROMPT Q07 - Resumen telefonos de la ultima ejecucion
+PROMPT
+
+WITH ultima AS (
+    SELECT id_ejecucion
+      FROM (
+            SELECT id_ejecucion, MIN(fecha_inicio) inicio
+              FROM PR.PR_JOB_PRECALIFICA_TRACK
+             GROUP BY id_ejecucion
+             ORDER BY MIN(fecha_inicio) DESC
+           )
+     WHERE ROWNUM = 1
+)
+SELECT b.proveedor,
+       b.tipo_telefono,
+       COUNT(*) AS llamadas,
+       ROUND(SUM(b.duracion_ms), 3) AS total_ms,
+       ROUND(AVG(b.duracion_ms), 3) AS avg_ms,
+       ROUND(MIN(b.duracion_ms), 3) AS min_ms,
+       ROUND(MAX(b.duracion_ms), 3) AS max_ms,
+       SUM(CASE WHEN b.error_code IS NOT NULL OR b.error_message IS NOT NULL THEN 1 ELSE 0 END) AS errores
+  FROM PR.PR_TEL_PERSONA_BENCH_TRACK b
+  JOIN ultima u
+    ON u.id_ejecucion = b.id_ejecucion
+ GROUP BY b.proveedor, b.tipo_telefono
+ ORDER BY b.proveedor, b.tipo_telefono;
+
+PROMPT
+PROMPT Q08 - Top 50 llamadas mas lentas de la ultima ejecucion
+PROMPT
+
+WITH ultima AS (
+    SELECT id_ejecucion
+      FROM (
+            SELECT id_ejecucion, MIN(fecha_inicio) inicio
+              FROM PR.PR_JOB_PRECALIFICA_TRACK
+             GROUP BY id_ejecucion
+             ORDER BY MIN(fecha_inicio) DESC
+           )
+     WHERE ROWNUM = 1
+)
+SELECT *
+  FROM (
+        SELECT TO_CHAR(b.fecha_medicion, 'YYYY-MM-DD HH24:MI:SS') AS fecha_medicion,
+               b.proveedor,
+               b.cod_persona,
+               b.tipo_telefono,
+               b.duracion_ms,
+               SUBSTR(b.valor_telefono, 1, 40) AS valor_telefono,
+               b.error_code,
+               SUBSTR(b.error_message, 1, 120) AS error_message
+          FROM PR.PR_TEL_PERSONA_BENCH_TRACK b
+          JOIN ultima u
+            ON u.id_ejecucion = b.id_ejecucion
+         ORDER BY b.duracion_ms DESC NULLS LAST
+       )
+ WHERE ROWNUM <= 50;
+
+PROMPT
+PROMPT Q09 - Errores de telefonos de la ultima ejecucion
+PROMPT
+
+WITH ultima AS (
+    SELECT id_ejecucion
+      FROM (
+            SELECT id_ejecucion, MIN(fecha_inicio) inicio
+              FROM PR.PR_JOB_PRECALIFICA_TRACK
+             GROUP BY id_ejecucion
+             ORDER BY MIN(fecha_inicio) DESC
+           )
+     WHERE ROWNUM = 1
+)
+SELECT TO_CHAR(b.fecha_medicion, 'YYYY-MM-DD HH24:MI:SS') AS fecha_medicion,
+       b.proveedor,
+       b.cod_persona,
+       b.tipo_telefono,
+       b.duracion_ms,
+       SUBSTR(b.valor_telefono, 1, 80) AS valor_telefono,
+       b.error_code,
+       SUBSTR(b.error_message, 1, 200) AS error_message
+  FROM PR.PR_TEL_PERSONA_BENCH_TRACK b
+  JOIN ultima u
+    ON u.id_ejecucion = b.id_ejecucion
+ WHERE b.error_code IS NOT NULL
+    OR b.error_message IS NOT NULL
+ ORDER BY b.fecha_medicion;
+
+PROMPT
+PROMPT Q10 - Comparacion telefonos PA vs PR por 2 ejecuciones
+PROMPT   Usar los mismos IDs definidos en Q06.
+PROMPT
+
+SELECT NVL(a.tipo_telefono, b.tipo_telefono) AS tipo_telefono,
+       a.proveedor AS proveedor_a,
+       b.proveedor AS proveedor_b,
+       a.llamadas AS llamadas_a,
+       b.llamadas AS llamadas_b,
+       a.total_ms AS total_ms_a,
+       b.total_ms AS total_ms_b,
+       b.total_ms - a.total_ms AS delta_ms,
+       a.avg_ms AS avg_ms_a,
+       b.avg_ms AS avg_ms_b,
+       a.errores AS errores_a,
+       b.errores AS errores_b
+  FROM (
+        SELECT proveedor,
+               tipo_telefono,
+               COUNT(*) AS llamadas,
+               ROUND(SUM(duracion_ms), 3) AS total_ms,
+               ROUND(AVG(duracion_ms), 3) AS avg_ms,
+               SUM(CASE WHEN error_code IS NOT NULL OR error_message IS NOT NULL THEN 1 ELSE 0 END) AS errores
+          FROM PR.PR_TEL_PERSONA_BENCH_TRACK
+         WHERE id_ejecucion = '&P_EJECUCION_A'
+         GROUP BY proveedor, tipo_telefono
+       ) a
+  FULL OUTER JOIN (
+        SELECT proveedor,
+               tipo_telefono,
+               COUNT(*) AS llamadas,
+               ROUND(SUM(duracion_ms), 3) AS total_ms,
+               ROUND(AVG(duracion_ms), 3) AS avg_ms,
+               SUM(CASE WHEN error_code IS NOT NULL OR error_message IS NOT NULL THEN 1 ELSE 0 END) AS errores
+          FROM PR.PR_TEL_PERSONA_BENCH_TRACK
+         WHERE id_ejecucion = '&P_EJECUCION_B'
+         GROUP BY proveedor, tipo_telefono
+       ) b
+    ON b.tipo_telefono = a.tipo_telefono
+ ORDER BY tipo_telefono;
