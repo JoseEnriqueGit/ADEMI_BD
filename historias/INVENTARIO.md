@@ -1,7 +1,7 @@
 # INVENTARIO MAESTRO DE HISTORIAS
 
 > Tabla viva con el estado de cada caso del repositorio. Mantener al dia con cada cambio de estado.
-> Ultima actualizacion: 2026-05-19.
+> Ultima actualizacion: 2026-05-22.
 
 ## Convencion de estados
 
@@ -80,6 +80,7 @@
 | 442_OPT_SOLICITUDES | QA (query v1 listo para PROD, indices PENDIENTES) | QA | 2026 | `apex/en_qa/442_OPT_SOLICITUDES/` |
 | 519_REPROCESAR_ESTADO_H | DESARROLLO (pruebas OK 2026-04-15) | DESARROLLO | 2026-04-15 | `apex/en_qa/519_REPROCESAR_ESTADO_H/` |
 | 530_CARD_INFORMATIVA_BACKOFFICE | QA (validado) | QA | 2026 | `apex/en_qa/530_CARD_INFORMATIVA_BACKOFFICE/` |
+| IRD-525_GESTION_ESTADOS_TRAZABILIDAD | QA (validado, pendiente confirmar promocion) | QA | 2026-05-22 | `apex/pendientes_confirmacion/IRD-525_GESTION_ESTADOS_TRAZABILIDAD/` |
 | IRD-546_PAGINA_77_ORIGEN_FIADOR_CODIGO_SUCURSAL | PENDIENTE_CONFIRMAR | - | - | `apex/pendientes_confirmacion/IRD-546_PAGINA_77_ORIGEN_FIADOR_CODIGO_SUCURSAL/` |
 | MENU_AGRUPAR_PRODUCTOS_DIGITALES | PENDIENTE_CONFIRMAR | - | - | `apex/pendientes_confirmacion/MENU_AGRUPAR_PRODUCTOS_DIGITALES/` |
 | PAGINA_134_CARDS_SALDO_PESO_DOLAR | PENDIENTE_CONFIRMAR | - | - | `apex/pendientes_confirmacion/PAGINA_134_CARDS_SALDO_PESO_DOLAR/` |

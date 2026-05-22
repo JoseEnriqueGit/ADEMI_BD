@@ -1,0 +1,78 @@
+SELECT
+  R.ID_REPRESTAMO,
+  R.FECHA_ADICION,
+  PA.OBT_NOMBRE_PERSONA(R.CODIGO_CLIENTE) AS NOMBRES,
+  E.DES_ESTADO AS ESTADO,
+  R.ESTADO AS CODIGO_ESTADO,
+  '<a
+      title="Origen Fuente de Datos"
+      href="' || APEX_PAGE.GET_URL(p_page => 130, p_items => 'P130_ID_REPRESTAMO', p_values => R.ID_REPRESTAMO) || '"
+    >
+      <span aria-hidden="true" class="fa fa-pencil-square-o"></span>
+    </a>' AS ACTUALIZAR_ESTADO,
+  B.ADICIONADO_POR AS USUARIO_QUE_MODIFICO,
+  B.FECHA_ADICION AS FECHA_MODIFICACION,
+  REPLACE(
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(B.OBSERVACIONES,
+                  'Repr' || CHR(191) || 'stamo',
+                  UNISTR('Repr\00E9stamo')),
+                'Notificaci' || CHR(191) || 'n',
+                UNISTR('Notificaci\00F3n')),
+              'Validaci' || CHR(191) || 'n',
+              UNISTR('Validaci\00F3n')),
+            'Cr' || CHR(191) || 'dito',
+            UNISTR('Cr\00E9dito')),
+          'm' || CHR(191) || 's',
+          UNISTR('m\00E1s')) AS COMENTARIO_MODIFICACION
+FROM
+  PR.PR_REPRESTAMOS R
+  LEFT JOIN PR.PR_ESTADOS_REPRESTAMO E
+       ON E.CODIGO_ESTADO = R.ESTADO
+  LEFT JOIN (
+    SELECT CODIGO_EMPRESA,
+           ID_REPRESTAMO,
+           CODIGO_ESTADO,
+           ADICIONADO_POR,
+           FECHA_ADICION,
+           OBSERVACIONES
+    FROM (
+      SELECT BR.CODIGO_EMPRESA,
+             BR.ID_REPRESTAMO,
+             BR.CODIGO_ESTADO,
+             BR.ADICIONADO_POR,
+             BR.FECHA_ADICION,
+             BR.OBSERVACIONES,
+             ROW_NUMBER() OVER (
+               PARTITION BY BR.CODIGO_EMPRESA, BR.ID_REPRESTAMO, BR.CODIGO_ESTADO
+               ORDER BY BR.ID_BITACORA DESC, BR.FECHA_ADICION DESC
+             ) AS RN
+      FROM PR.PR_BITACORA_REPRESTAMO BR
+    )
+    WHERE RN = 1
+  ) B
+       ON B.CODIGO_EMPRESA = R.CODIGO_EMPRESA
+      AND B.ID_REPRESTAMO = R.ID_REPRESTAMO
+      AND B.CODIGO_ESTADO = R.ESTADO
+WHERE
+  R.ESTADO IN (
+    SELECT COLUMN_VALUE
+    FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_Obt_Valor_Parametros('LISTA_ESTADOS_REPRESTAMOS_VISUALIZAR'))
+  )
+  AND (
+    :P112_BUSQUEDA IS NULL
+    OR R.ID_REPRESTAMO IN (
+      SELECT TRIM(REGEXP_SUBSTR(:P112_BUSQUEDA, '[^,]+', 1, LEVEL)) AS SPLIT_VALUE
+      FROM DUAL
+      CONNECT BY REGEXP_SUBSTR(:P112_BUSQUEDA, '[^,]+', 1, LEVEL) IS NOT NULL
+      AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+      AND LEVEL <= LENGTH(:P112_BUSQUEDA) - LENGTH(REPLACE(:P112_BUSQUEDA, ',', '')) + 1
+    )
+  )
+ORDER BY
+  CASE WHEN B.FECHA_ADICION IS NULL THEN 1 ELSE 0 END,
+  B.FECHA_ADICION DESC,
+  R.FECHA_ADICION DESC,
+  R.ID_REPRESTAMO DESC;
