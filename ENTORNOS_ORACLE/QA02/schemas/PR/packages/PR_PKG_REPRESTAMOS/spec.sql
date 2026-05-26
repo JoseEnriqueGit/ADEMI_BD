@@ -34,8 +34,8 @@ CREATE OR REPLACE PACKAGE PR.PR_PKG_REPRESTAMOS IS
    -- FUNCTION f_obt_cel_sms(pCod_cliente IN VARCHAR2) RETURN VARCHAR2;
   -- Se obtiene un celular asociado a un cliente de represtamos
   -- se filtra solo por tipo celular prque los residenciales no se puede enviar SMS
-  -- se ordena por fecha de inclusión descendente. si es nula se toma el primer dia en producción del core 01072016
-  -- y como segundo criterio de orden la fechs de modificación.
+  -- se ordena por fecha de inclusi�n descendente. si es nula se toma el primer dia en producci�n del core 01072016
+  -- y como segundo criterio de orden la fechs de modificaci�n.
     PROCEDURE P_Montos_Represtamos(
                             pNoCredito              IN     NUMBER,
                             pTipo_Credito           IN     NUMBER,
@@ -268,7 +268,9 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
      
    FUNCTION F_Obt_Body_Mensaje(pIdReprestamo     IN VARCHAR2,
                             pCanal           IN VARCHAR2)
-     RETURN VARCHAR2;                             
+     RETURN VARCHAR2;
+    
+    FUNCTION F_Obt_Body_Mensaje(pNombres IN VARCHAR2, pFecha IN DATE, pCanal IN VARCHAR2) RETURN VARCHAR2;  
    
    PROCEDURE P_Registrar_Solicitud(pIdReprestamo     IN     VARCHAR2,
                                    pUsuario          IN     VARCHAR2,
@@ -379,10 +381,10 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                                 pRespuesta       IN OUT  VARCHAR2);   
                                                                                                                                
     PROCEDURE P_Anular_Represtamos_Inactivos(pIdReprestamo IN NUMBER DEFAULT NULL);
-    -- Elaborado por Jose Díaz. 22/08/2022
+    -- Elaborado por Jose D�az. 22/08/2022
     -- Historia del BackLog RD-24
     -- Se inactivan todos los represtamos que no concluyeron el proceso
-    -- Este proceso debe de ejecutarse previo a la recarga automática diaria   
+    -- Este proceso debe de ejecutarse previo a la recarga autom�tica diaria   
     
     FUNCTION F_Validar_Existe_IdDeclinar(pIdDeclinar     IN VARCHAR2)
       RETURN BOOLEAN;
@@ -756,7 +758,13 @@ PROCEDURE P_Desactivar_Activar_FrontEnd(pIdReprestamo     IN     VARCHAR2,
                     p_rel_cuota_exced_fam    OUT VARCHAR2,
                     p_ventas_mensual         OUT VARCHAR2 );
                     
-
-
+PROCEDURE P_ACTUALIZA_COMENTARIO_CAMPANA(pComentario in VARCHAR2);       
+PROCEDURE P_Registrar_Ejecucion_Param(pCodigoParametro IN VARCHAR2,
+                                     pTotalRegistros  IN NUMBER);    
+PROCEDURE P_ACTUALIZAR_CAMPO_APPADEMI(pIdReprestamo IN VARCHAR2, pOrigen IN VARCHAR2);
+    FUNCTION OBT_TELEFONO_PERSONA(
+        inCodPersona   IN VARCHAR2,
+        inTipoTelefono IN VARCHAR2
+    ) RETURN VARCHAR2;
 END PR_PKG_REPRESTAMOS;
 /
