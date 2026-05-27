@@ -4,7 +4,7 @@
 
   Objetivo:
   - Contar cuantos candidatos descarta cada filtro del cursor.
-  - Mostrar fallas independientes y embudo secuencial.
+  - Mostrar el embudo secuencial real del cursor + limite de lote.
   - Dar una muestra de creditos para validar manualmente en Toad.
 
   Definicion de candidato:
@@ -14,27 +14,24 @@
 
   Notas:
   - Solo ejecuta SELECT.
-  - Fecha de corte forzada para esta validacion historica: 31/07/2025.
-  - Precalifica_Represtamo usa MAX(PA.PA_DETALLADO_DE08.FECHA_CORTE) con FUENTE = 'PR';
-    la consulta 0 valida si esa MAX(FECHA_CORTE) coincide con 31/07/2025.
+  - Fecha de corte por defecto: la MAX(PA.PA_DETALLADO_DE08.FECHA_CORTE) con FUENTE = 'PR',
+    igual que Precalifica_Represtamo.
+  - Para forzar una fecha historica reemplazar CAST(NULL AS DATE) por DATE 'YYYY-MM-DD' en params.
+  - La consulta 0 muestra que fecha tomara el tracker para esta corrida.
 */
 
 --------------------------------------------------------------------------------
--- 0) Validacion de la FECHA_CORTE que tomaria Precalifica_Represtamo.
+-- 0) Validacion de la FECHA_CORTE que tomara el tracker (= la del cursor).
 --------------------------------------------------------------------------------
 WITH fecha_cursor AS (
     SELECT MAX(p.fecha_corte) fecha_corte
       FROM PA.PA_DETALLADO_DE08 p
      WHERE p.fuente = 'PR'
 )
-SELECT DATE '2025-07-31' fecha_corte_tracker,
+SELECT fc.fecha_corte fecha_corte_tracker,
        fc.fecha_corte fecha_corte_cursor_precalifica,
-       CASE
-         WHEN fc.fecha_corte = DATE '2025-07-31' THEN 'SI: EL CURSOR USARIA ESTA FECHA'
-         ELSE 'NO: EL CURSOR USARIA OTRA FECHA'
-       END validacion_fecha_corte,
-       COUNT(CASE WHEN p.fecha_corte = DATE '2025-07-31' THEN 1 END) registros_fecha_tracker,
-       COUNT(CASE WHEN p.fecha_corte = fc.fecha_corte THEN 1 END) registros_fecha_cursor
+       'SI: TRACKER Y CURSOR USAN LA MISMA FECHA' validacion_fecha_corte,
+       COUNT(CASE WHEN p.fecha_corte = fc.fecha_corte THEN 1 END) registros_fecha_corte
   FROM fecha_cursor fc
   LEFT JOIN PA.PA_DETALLADO_DE08 p
     ON p.fuente = 'PR'
@@ -45,7 +42,7 @@ SELECT DATE '2025-07-31' fecha_corte_tracker,
 --------------------------------------------------------------------------------
 WITH params AS (
     SELECT NVL(
-               DATE '2025-07-31',
+               CAST(NULL AS DATE),
                (SELECT MAX(p.fecha_corte)
                   FROM PA.PA_DETALLADO_DE08 p
                  WHERE p.fuente = 'PR')
@@ -304,39 +301,6 @@ resumen_secuencial AS (
       CROSS JOIN scored s
      GROUP BY p.orden, p.filtro
 ),
-resumen_independiente AS (
-    SELECT 2 tipo_orden,
-           'FALLA_INDEPENDIENTE' tipo_medicion,
-           orden,
-           filtro,
-           COUNT(DISTINCT candidato_id) candidatos_antes,
-           COUNT(DISTINCT CASE WHEN flag_ok = 1 THEN candidato_id END) candidatos_pasan,
-           COUNT(DISTINCT CASE WHEN flag_ok = 0 THEN candidato_id END) candidatos_descartados,
-           COUNT(DISTINCT CASE WHEN flag_ok = 0 THEN no_credito END) creditos_descartados,
-           COUNT(DISTINCT CASE WHEN flag_ok = 0 THEN codigo_cliente END) clientes_descartados,
-           'No excluyente: un credito puede fallar varios filtros' observacion
-      FROM (
-            SELECT 1 orden, 'TIPO_CREDITO existe en PR_TIPO_CREDITO_REPRESTAMO' filtro, candidato_id, no_credito, codigo_cliente, f_tipo_represtamo flag_ok FROM scored UNION ALL
-            SELECT 2, 'PERIODOS_CUOTA permitido o parametro vacio', candidato_id, no_credito, codigo_cliente, f_periodo_cuota FROM scored UNION ALL
-            SELECT 3, 'PA_DETALLADO_DE08 en fecha corte y fuente PR', candidato_id, no_credito, codigo_cliente, f_de08_fecha_fuente FROM scored UNION ALL
-            SELECT 4, 'PA_DETALLADO_DE08.TIPO_CREDITO coincide', candidato_id, no_credito, codigo_cliente, f_de08_tipo_credito FROM scored UNION ALL
-            SELECT 5, 'PR_TIPO_CREDITO_REPRESTAMO.CARGA = S', candidato_id, no_credito, codigo_cliente, f_tipo_carga FROM scored UNION ALL
-            SELECT 6, 'DIAS_ATRASO <= PRECAL_MORA_MAYOR_PR', candidato_id, no_credito, codigo_cliente, f_mora_actual FROM scored UNION ALL
-            SELECT 7, 'CALIFICA_CLIENTE en CLASIFICACION_SIB', candidato_id, no_credito, codigo_cliente, f_clasificacion_sib FROM scored UNION ALL
-            SELECT 8, 'CAPITAL_PAGADO cumple parametro', candidato_id, no_credito, codigo_cliente, f_capital_pagado FROM scored UNION ALL
-            SELECT 9, 'CODIGO_EMPRESA = F_OBT_EMPRESA_REPRESTAMO', candidato_id, no_credito, codigo_cliente, f_empresa FROM scored UNION ALL
-            SELECT 10, 'Sin otro prestamo desembolsado reciente', candidato_id, no_credito, codigo_cliente, f_sin_desembolso_reciente FROM scored UNION ALL
-            SELECT 11, 'Sin otro credito estado E', candidato_id, no_credito, codigo_cliente, f_sin_reestructurado FROM scored UNION ALL
-            SELECT 12, 'Cliente persona fisica', candidato_id, no_credito, codigo_cliente, f_persona_fisica FROM scored UNION ALL
-            SELECT 13, 'Nacionalidad y tipo documento validos', candidato_id, no_credito, codigo_cliente, f_nacionalidad_documento FROM scored UNION ALL
-            SELECT 14, 'Sin represtamo en estados no reproceso', candidato_id, no_credito, codigo_cliente, f_sin_reproceso FROM scored UNION ALL
-            SELECT 15, 'No incumple regla de sola firma', candidato_id, no_credito, codigo_cliente, f_sola_firma FROM scored UNION ALL
-            SELECT 16, 'F_TIENE_GARANTIA = 0', candidato_id, no_credito, codigo_cliente, f_sin_garantia FROM scored UNION ALL
-            SELECT 17, 'No esta en listas PEP', candidato_id, no_credito, codigo_cliente, f_no_pep FROM scored UNION ALL
-            SELECT 18, 'No esta en lista negra', candidato_id, no_credito, codigo_cliente, f_no_lista_negra FROM scored
-           )
-     GROUP BY orden, filtro
-),
 resumen_lote AS (
     SELECT 3 tipo_orden,
            'LIMITE_LOTE' tipo_medicion,
@@ -364,8 +328,6 @@ SELECT tipo_medicion,
   FROM (
         SELECT * FROM resumen_secuencial
         UNION ALL
-        SELECT * FROM resumen_independiente
-        UNION ALL
         SELECT * FROM resumen_lote
        )
  ORDER BY tipo_orden, orden;
@@ -376,7 +338,7 @@ SELECT tipo_medicion,
 --------------------------------------------------------------------------------
 WITH params AS (
     SELECT NVL(
-               DATE '2025-07-31',
+               CAST(NULL AS DATE),
                (SELECT MAX(p.fecha_corte)
                   FROM PA.PA_DETALLADO_DE08 p
                  WHERE p.fuente = 'PR')
