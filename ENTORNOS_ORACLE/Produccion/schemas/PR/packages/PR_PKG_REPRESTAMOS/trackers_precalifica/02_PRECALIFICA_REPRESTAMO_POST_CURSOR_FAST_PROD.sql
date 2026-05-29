@@ -11,6 +11,13 @@
   - Aplica ROWNUM <= LOTE_DE_CARAGA_REPRESTAMO antes de los filtros post cursor.
   - Los filtros post cursor se calculan solo sobre el lote que simula insertar el SP.
   - Es mas cercano al flujo operativo del procedimiento y mucho mas liviano.
+
+  Como leerlo:
+  - Cada bloque del WITH es un "colador": parte del bloque anterior y le quita
+    los creditos que no cumplen UN filtro. El nombre del bloque dice que filtro aplica.
+  - La cadena va: base_creditos -> ... -> no_lista_negra (filtros del cursor),
+    luego lote_cursor (corta al tamano del lote), luego los filtros post cursor.
+  - Al final se cuentan las filas de cada bloque para armar la tabla resumen.
 */
 
 WITH params AS (
@@ -29,19 +36,19 @@ WITH params AS (
            PR.PR_PKG_REPRESTAMOS.F_OBT_PARAMETRO_REPRESTAMO('CLIENTES_A_SOLA_FIRMA') clientes_a_sola_firma
       FROM dual
 ),
-s00 AS (
+base_creditos AS (
     SELECT a.*
       FROM PR.PR_CREDITOS a
 ),
-s01 AS (
+con_tipo_represtamo AS (
     SELECT a.*, c.carga carga_represtamo
-      FROM s00 a
+      FROM base_creditos a
       JOIN PR.PR_TIPO_CREDITO_REPRESTAMO c
         ON c.tipo_credito = a.tipo_credito
 ),
-s02 AS (
+periodo_cuota_ok AS (
     SELECT a.*
-      FROM s01 a
+      FROM con_tipo_represtamo a
      WHERE EXISTS (
               SELECT 1
                 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS('PERIODOS_CUOTA')) subq
@@ -52,7 +59,7 @@ s02 AS (
                 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS('PERIODOS_CUOTA')) subq
            )
 ),
-s03 AS (
+con_de08 AS (
     SELECT ROWNUM candidato_id,
            a.codigo_empresa,
            a.codigo_cliente,
@@ -68,7 +75,7 @@ s03 AS (
            b.monto_desembolsado de08_monto_desembolsado,
            b.monto_credito de08_monto_credito,
            a.carga_represtamo
-      FROM s02 a
+      FROM periodo_cuota_ok a
       CROSS JOIN params p
       JOIN PA.PA_DETALLADO_DE08 b
         ON b.tipo_credito = a.tipo_credito
@@ -76,43 +83,43 @@ s03 AS (
        AND b.no_credito = a.no_credito
        AND b.fuente = 'PR'
 ),
-s04 AS (
+carga_si AS (
     SELECT a.*
-      FROM s03 a
+      FROM con_de08 a
      WHERE a.carga_represtamo = 'S'
 ),
-s05 AS (
+mora_actual_ok AS (
     SELECT a.*
-      FROM s04 a
+      FROM carga_si a
       CROSS JOIN params p
      WHERE a.de08_dias_atraso <= p.mora_max
 ),
-s06 AS (
+clasificacion_sib_ok AS (
     SELECT a.*
-      FROM s05 a
+      FROM mora_actual_ok a
      WHERE a.de08_califica_cliente IN (
               SELECT column_value
                 FROM TABLE(PR.PR_PKG_REPRESTAMOS.F_OBT_VALOR_PARAMETROS('CLASIFICACION_SIB'))
            )
 ),
-s07 AS (
+capital_pagado_ok AS (
     SELECT a.*
-      FROM s06 a
+      FROM clasificacion_sib_ok a
       CROSS JOIN params p
      WHERE NVL(CASE WHEN a.de08_monto_desembolsado = 0 THEN a.de08_monto_credito ELSE a.de08_monto_desembolsado END, 0) <> 0
        AND ((a.de08_mto_balance_capital /
             CASE WHEN a.de08_monto_desembolsado = 0 THEN a.de08_monto_credito ELSE a.de08_monto_desembolsado END) * 100)
             <= 100 - p.capital_pagado
 ),
-s08 AS (
+empresa_ok AS (
     SELECT a.*
-      FROM s07 a
+      FROM capital_pagado_ok a
       CROSS JOIN params p
      WHERE a.codigo_empresa = p.empresa
 ),
-s09 AS (
+sin_desembolso_reciente AS (
     SELECT a.*
-      FROM s08 a
+      FROM empresa_ok a
       CROSS JOIN params p
      WHERE NOT EXISTS (
               SELECT 1
@@ -127,9 +134,9 @@ s09 AS (
                  )
            )
 ),
-s10 AS (
+sin_credito_estado_e AS (
     SELECT a.*
-      FROM s09 a
+      FROM sin_desembolso_reciente a
      WHERE NOT EXISTS (
               SELECT 1
                 FROM PR.PR_CREDITOS c
@@ -139,9 +146,9 @@ s10 AS (
                  AND c.estado = 'E'
            )
 ),
-s11 AS (
+persona_fisica_ok AS (
     SELECT a.*
-      FROM s10 a
+      FROM sin_credito_estado_e a
       CROSS JOIN params p
      WHERE EXISTS (
               SELECT 1
@@ -150,9 +157,9 @@ s11 AS (
                  AND per.es_fisica = p.persona_fisica
            )
 ),
-s12 AS (
+nacionalidad_documento_ok AS (
     SELECT a.*
-      FROM s11 a
+      FROM persona_fisica_ok a
      WHERE EXISTS (
               SELECT 1
                 FROM PA.ID_PERSONAS idp
@@ -167,9 +174,9 @@ s12 AS (
                  )
            )
 ),
-s13 AS (
+sin_represtamo_en_proceso AS (
     SELECT a.*
-      FROM s12 a
+      FROM nacionalidad_documento_ok a
      WHERE NOT EXISTS (
               SELECT 1
                 FROM PR.PR_REPRESTAMOS r
@@ -181,9 +188,9 @@ s13 AS (
                  )
            )
 ),
-s14 AS (
+sola_firma_ok AS (
     SELECT a.*
-      FROM s13 a
+      FROM sin_represtamo_en_proceso a
       CROSS JOIN params p
      WHERE NOT EXISTS (
               SELECT 1
@@ -197,31 +204,31 @@ s14 AS (
                  AND p.clientes_a_sola_firma = 'S'
            )
 ),
-s15 AS (
+sin_garantia AS (
     SELECT a.*
-      FROM s14 a
+      FROM sola_firma_ok a
      WHERE PR.PR_PKG_REPRESTAMOS.F_TIENE_GARANTIA(a.no_credito) = 0
 ),
-s16 AS (
+no_pep AS (
     SELECT a.*
-      FROM s15 a
+      FROM sin_garantia a
      WHERE PR.PR_PKG_REPRESTAMOS.F_VALIDAR_LISTAS_PEP(1, a.codigo_cliente) = 0
 ),
-s17 AS (
+no_lista_negra AS (
     SELECT a.*
-      FROM s16 a
+      FROM no_pep a
      WHERE PR.PR_PKG_REPRESTAMOS.F_VALIDAR_LISTA_NEGRA(1, a.codigo_cliente) = 0
 ),
-cursor_lote AS (
+lote_cursor AS (
     SELECT q.*
-      FROM s17 q
+      FROM no_lista_negra q
       CROSS JOIN params p
      WHERE ROWNUM <= p.lote
 ),
 mora_6m AS (
     SELECT l.candidato_id,
            NVL(MAX(d.dias_atraso), 0) dias_atraso_6m
-      FROM cursor_lote l
+      FROM lote_cursor l
       LEFT JOIN PA.PA_DETALLADO_DE08 d
         ON d.fuente = 'PR'
        AND d.fecha_corte >= ADD_MONTHS(l.fecha_corte_param, -6)
@@ -231,7 +238,7 @@ mora_6m AS (
 ),
 tc_atraso AS (
     SELECT DISTINCT l.candidato_id
-      FROM cursor_lote l
+      FROM lote_cursor l
       CROSS JOIN params p
       JOIN PA.PA_DETALLADO_DE08 d
         ON d.fuente = 'TC'
@@ -243,7 +250,7 @@ tc_atraso AS (
 ),
 desembolso_reciente AS (
     SELECT DISTINCT l.candidato_id
-      FROM cursor_lote l
+      FROM lote_cursor l
       CROSS JOIN params p
       JOIN PR.PR_CREDITOS pc
         ON pc.codigo_empresa = l.codigo_empresa
@@ -257,7 +264,7 @@ desembolso_reciente AS (
 ),
 mancomunado AS (
     SELECT DISTINCT l.candidato_id
-      FROM cursor_lote l
+      FROM lote_cursor l
       JOIN PA.CUENTA_CLIENTE_RELACION rel
         ON rel.cod_sistema = 'PR'
        AND rel.num_cuenta = l.no_credito
@@ -269,7 +276,7 @@ edad AS (
              WHEN PR.PR_PKG_REPRESTAMOS.F_VALIDAR_EDAD(l.codigo_cliente, 'CARGA') = 0 THEN 0
              ELSE 1
            END f_edad_valida
-      FROM cursor_lote l
+      FROM lote_cursor l
 ),
 post_flags AS (
     SELECT l.*,
@@ -279,7 +286,7 @@ post_flags AS (
            CASE WHEN m.dias_atraso_6m > p.mora_post THEN 1 ELSE 0 END f_mora_6m,
            CASE WHEN man.candidato_id IS NOT NULL THEN 1 ELSE 0 END f_mancomunado,
            e.f_edad_valida
-      FROM cursor_lote l
+      FROM lote_cursor l
       CROSS JOIN params p
       LEFT JOIN mora_6m m
         ON m.candidato_id = l.candidato_id
@@ -305,24 +312,24 @@ post_scored AS (
       FROM post_flags pf
 ),
 conteos_cursor AS (
-    SELECT 0 orden, COUNT(*) cantidad FROM s00 UNION ALL
-    SELECT 1, COUNT(*) FROM s01 UNION ALL
-    SELECT 2, COUNT(*) FROM s02 UNION ALL
-    SELECT 3, COUNT(*) FROM s03 UNION ALL
-    SELECT 4, COUNT(*) FROM s04 UNION ALL
-    SELECT 5, COUNT(*) FROM s05 UNION ALL
-    SELECT 6, COUNT(*) FROM s06 UNION ALL
-    SELECT 7, COUNT(*) FROM s07 UNION ALL
-    SELECT 8, COUNT(*) FROM s08 UNION ALL
-    SELECT 9, COUNT(*) FROM s09 UNION ALL
-    SELECT 10, COUNT(*) FROM s10 UNION ALL
-    SELECT 11, COUNT(*) FROM s11 UNION ALL
-    SELECT 12, COUNT(*) FROM s12 UNION ALL
-    SELECT 13, COUNT(*) FROM s13 UNION ALL
-    SELECT 14, COUNT(*) FROM s14 UNION ALL
-    SELECT 15, COUNT(*) FROM s15 UNION ALL
-    SELECT 16, COUNT(*) FROM s16 UNION ALL
-    SELECT 17, COUNT(*) FROM s17
+    SELECT 0 orden, COUNT(*) cantidad FROM base_creditos UNION ALL
+    SELECT 1, COUNT(*) FROM con_tipo_represtamo UNION ALL
+    SELECT 2, COUNT(*) FROM periodo_cuota_ok UNION ALL
+    SELECT 3, COUNT(*) FROM con_de08 UNION ALL
+    SELECT 4, COUNT(*) FROM carga_si UNION ALL
+    SELECT 5, COUNT(*) FROM mora_actual_ok UNION ALL
+    SELECT 6, COUNT(*) FROM clasificacion_sib_ok UNION ALL
+    SELECT 7, COUNT(*) FROM capital_pagado_ok UNION ALL
+    SELECT 8, COUNT(*) FROM empresa_ok UNION ALL
+    SELECT 9, COUNT(*) FROM sin_desembolso_reciente UNION ALL
+    SELECT 10, COUNT(*) FROM sin_credito_estado_e UNION ALL
+    SELECT 11, COUNT(*) FROM persona_fisica_ok UNION ALL
+    SELECT 12, COUNT(*) FROM nacionalidad_documento_ok UNION ALL
+    SELECT 13, COUNT(*) FROM sin_represtamo_en_proceso UNION ALL
+    SELECT 14, COUNT(*) FROM sola_firma_ok UNION ALL
+    SELECT 15, COUNT(*) FROM sin_garantia UNION ALL
+    SELECT 16, COUNT(*) FROM no_pep UNION ALL
+    SELECT 17, COUNT(*) FROM no_lista_negra
 ),
 pasos_cursor AS (
     SELECT 0 orden, 'BASE: PR_CREDITOS' filtro FROM dual UNION ALL
@@ -364,9 +371,9 @@ resumen_lote AS (
            'LIMITE_LOTE' tipo_medicion,
            99 orden,
            'ROWNUM <= LOTE_DE_CARAGA_REPRESTAMO aplicado antes del post cursor' filtro,
-           (SELECT COUNT(*) FROM s17) candidatos_antes,
-           (SELECT COUNT(*) FROM cursor_lote) candidatos_pasan,
-           (SELECT COUNT(*) FROM s17) - (SELECT COUNT(*) FROM cursor_lote) candidatos_descartados,
+           (SELECT COUNT(*) FROM no_lista_negra) candidatos_antes,
+           (SELECT COUNT(*) FROM lote_cursor) candidatos_pasan,
+           (SELECT COUNT(*) FROM no_lista_negra) - (SELECT COUNT(*) FROM lote_cursor) candidatos_descartados,
            CAST(NULL AS NUMBER) creditos_descartados,
            CAST(NULL AS NUMBER) clientes_descartados,
            'Simula el lote que el cursor insertaria antes de updates/deletes posteriores' observacion
