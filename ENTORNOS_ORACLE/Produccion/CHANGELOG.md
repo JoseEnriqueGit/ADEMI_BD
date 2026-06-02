@@ -12,6 +12,21 @@
 
 <!-- Agregar nuevas entradas al inicio -->
 
+## (BORRADOR - PENDIENTE DE DESPLIEGUE) | 419 + incidente regresion - PR.PR_V_ENVIO_REPRESTAMOS
+> NO desplegado aun. Finalizar esta entrada al pegar en PROD: poner fecha real, sha-propuesto y firmante,
+> y quitar el marcador BORRADOR. Ver historias/419_CANALES_HABILITADO/promocion/04_SIGNOFF.md.
+- **Modificado**: `PR.PR_V_ENVIO_REPRESTAMOS` (VIEW) - se amplia el CASE de CANAL_DESC para mapear
+  canales 3 (CANAL_CARGA_DIRIGIDA) y 4 (CANAL_CAMPANA_ESPECIAL), que estaban cayendo al ELSE.
+  Forma parametrizada (f_obt_parametro_Represtamo). Resto del cuerpo identico a lo que estaba vivo.
+- **commit-baseline**: `7181eaf` (placeholder) -> DDL real de PROD en el commit de esta entrega
+- **commit-propuesto**: `<sha de 02_propuesto>`
+- **inventario**: historias/419_CANALES_HABILITADO/promocion/03_INVENTARIO_SEMANTICO.md (0 perdidas reales)
+- **Pre-requisito**: parametros CANAL_CARGA_DIRIGIDA/CANAL_CAMPANA_ESPECIAL existen (confirmado).
+  Verificar que CANALES_HABILITADOS los incluya, si no, actualizar tambien ese parametro.
+- **desplego / firmo**: `____ / ____`
+
+---
+
 ## 2026-06-02 | Anti-regresion - Estructura de baseline y consolidacion (solo repo, sin tocar PROD)
 - **Estructura**: creado el espejo `Produccion/schemas/PR/views/` (baseline de `PR.PR_V_ENVIO_REPRESTAMOS` PENDIENTE de extraer de PROD).
 - **Normalizado**: `Produccion/PKG_TIPO_DOCUMENTO_PKM.sql` (suelto) -> `Produccion/schemas/PA/packages/PKG_TIPO_DOCUMENTO_PKM/body.sql`.

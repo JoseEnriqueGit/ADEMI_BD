@@ -38,8 +38,16 @@
 | `fecha_vencimiento` | conservado (semántica distinta) | regresiva: `fecha + DIA_CADUCA_LINK`; correcta: `TRUNC(LAST_DAY(fecha))`. Revisar cuál es la de negocio. |
 
 ### Resultado
-- [x] **HAY 5 ítems en ELIMINADO sin justificación válida → NO se debe desplegar.** ❌
-- [ ] (No se cumple) Confirmé contra `git log` que la propuesta incluye toda la lógica previa.
-- **Conclusión:** la versión correcta es la de `DESARROLLO`. Acción de recuperación: ver
-  `docs/guias/RUNBOOK_PROMOCION_PROD.md` (extraer baseline vivo de PROD → confirmar target con el
-  usuario → re-desplegar la versión con ramas de campaña → sellar en CHANGELOG).
+- [x] **La versión viva en PROD perdió la diferenciación de canales 3/4 → hay que corregir.** ❌
+- **Diagnóstico afinado (tras leer los scripts de la 419 y `PR_CANALES_REPRESTAMO`):**
+  - PROD **sí conserva** el filtro `CANALES_HABILITADOS`. Lo que perdió es el **mapeo de `CANAL_DESC`**:
+    los canales **3** (carga dirigida) y **4** (campaña) caen al `ELSE` y devuelven el código crudo.
+  - El mecanismo real es **por código de canal** (1=SMS, 2=EMAIL, 3=dirigida, 4=campaña), confirmado por
+    `DIRIGIDA.sql:134` (CANAL=3), `CAMPANA.sql:126` (CANAL=4) y la PK `(empresa,id_represtamo,CANAL)`.
+  - ⚠️ **La versión de `DESARROLLO` NO es el target correcto:** usa un modelo distinto
+    (deriva dirigida/campaña de `id_carga_dirigida`/`id_repre_campana_especiales` con `canal=SMS`),
+    que no coincide con cómo se cargan los datos (canal 3/4). Desplegarla dropearía esas filas.
+- **Target de recuperación:** `02_propuesto_PR_V_ENVIO_REPRESTAMOS.sql` — parche quirúrgico sobre lo VIVO,
+  solo amplía `CANAL_DESC` (forma parametrizada, parámetros confirmados existentes en PROD).
+- Guardrail PROD→propuesto: agrega `canal_carga_dirigida`/`canal_campana_especial`, 0 pérdidas reales
+  (la única marca, el literal `'1'`, es el cambio intencional hardcode→parametrizado).
