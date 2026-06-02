@@ -1,11 +1,36 @@
 # CHANGELOG - PRODUCCION
 
 > Registro cronologico de cambios desplegados en el entorno de Produccion.
-> Formato: Fecha | Historia/Ticket | Objetos afectados
+> Formato por entrada: Fecha | Historia/Ticket | Objetos afectados
+> Campos obligatorios de cada despliegue (compuerta anti-regresion, ver docs/guias/RUNBOOK_PROMOCION_PROD.md):
+>   - **commit-baseline**: sha del DDL VIVO de PROD extraido ANTES de sobrescribir
+>   - **commit-propuesto**: sha de la version desplegada
+>   - **inventario**: ruta al 03_INVENTARIO_SEMANTICO firmado (0 ELIMINADO sin justificar)
+>   - **desplego / firmo**: responsables
 
 ---
 
 <!-- Agregar nuevas entradas al inicio -->
+
+## (BORRADOR - PENDIENTE DE DESPLIEGUE) | 419 + incidente regresion - PR.PR_V_ENVIO_REPRESTAMOS
+> NO desplegado aun. Finalizar esta entrada al pegar en PROD: poner fecha real, sha-propuesto y firmante,
+> y quitar el marcador BORRADOR. Ver historias/419_CANALES_HABILITADO/promocion/04_SIGNOFF.md.
+- **Modificado**: `PR.PR_V_ENVIO_REPRESTAMOS` (VIEW) - se amplia el CASE de CANAL_DESC para mapear
+  canales 3 (CANAL_CARGA_DIRIGIDA) y 4 (CANAL_CAMPANA_ESPECIAL), que estaban cayendo al ELSE.
+  Forma parametrizada (f_obt_parametro_Represtamo). Resto del cuerpo identico a lo que estaba vivo.
+- **commit-baseline**: `7181eaf` (placeholder) -> DDL real de PROD en el commit de esta entrega
+- **commit-propuesto**: `<sha de 02_propuesto>`
+- **inventario**: historias/419_CANALES_HABILITADO/promocion/03_INVENTARIO_SEMANTICO.md (0 perdidas reales)
+- **Pre-requisito**: parametros CANAL_CARGA_DIRIGIDA/CANAL_CAMPANA_ESPECIAL existen (confirmado).
+  Verificar que CANALES_HABILITADOS los incluya, si no, actualizar tambien ese parametro.
+- **desplego / firmo**: `____ / ____`
+
+---
+
+## 2026-06-02 | Anti-regresion - Estructura de baseline y consolidacion (solo repo, sin tocar PROD)
+- **Estructura**: creado el espejo `Produccion/schemas/PR/views/` (baseline de `PR.PR_V_ENVIO_REPRESTAMOS` PENDIENTE de extraer de PROD).
+- **Normalizado**: `Produccion/PKG_TIPO_DOCUMENTO_PKM.sql` (suelto) -> `Produccion/schemas/PA/packages/PKG_TIPO_DOCUMENTO_PKM/body.sql`.
+- **Notas**: no hay cambios en la base de datos. Pendiente real de PROD: extraer y versionar el DDL VIVO de `PR.PR_V_ENVIO_REPRESTAMOS` y decidir recuperacion de las ramas CANAL_CARGA_DIRIGIDA/CANAL_CAMPANA_ESPECIAL.
 
 ## 2026-04-23 | OPT-002/004/009/010/011/013/015/016 - Pase de 8 indices de apoyo
 

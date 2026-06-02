@@ -1,0 +1,17 @@
+-- ============================================================================
+-- ENTORNO        : Produccion
+-- OBJETO         : PR.PR_PKG_REPRESTAMOS
+-- TIPO           : PACKAGE
+-- ESTADO         : *** BASELINE PENDIENTE - NO DESPLEGAR ESTE ARCHIVO ***
+-- MOTIVO         : Placeholder de baseline. Pegar aqui el DDL VIVO extraido de Produccion.
+-- ============================================================================
+--
+-- ESTE ARCHIVO ES UN MARCADOR. No contiene DDL ejecutable a proposito.
+--
+-- COMO COMPLETARLO (en Toad, conectado a Produccion):
+--   1. SET LONG 200000
+--   2. SELECT DBMS_METADATA.GET_DDL('PACKAGE','PR_PKG_REPRESTAMOS','PR') FROM dual;
+--   3. Reemplazar TODO el contenido por el DDL obtenido.
+--   4. Agregar la cabecera de procedencia (docs/instrucciones_ai/PLANTILLA_CABECERA_PROCEDENCIA.sql).
+--   5. git add + commit.
+-- ============================================================================
