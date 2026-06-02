@@ -1,5 +1,122 @@
 CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
 
+   g_tel_bench_enabled       VARCHAR2(1) := 'N';
+   g_tel_bench_id_ejecucion  VARCHAR2(32);
+   g_tel_bench_proceso       VARCHAR2(120);
+
+   FUNCTION F_QA02_Tel_Elapsed_Ms(pInicio IN TIMESTAMP WITH TIME ZONE,
+                                  pFin    IN TIMESTAMP WITH TIME ZONE)
+      RETURN NUMBER IS
+      vDelta INTERVAL DAY TO SECOND;
+   BEGIN
+      vDelta := pFin - pInicio;
+
+      RETURN EXTRACT(DAY    FROM vDelta) * 86400000
+           + EXTRACT(HOUR   FROM vDelta) * 3600000
+           + EXTRACT(MINUTE FROM vDelta) * 60000
+           + EXTRACT(SECOND FROM vDelta) * 1000;
+   END F_QA02_Tel_Elapsed_Ms;
+
+   PROCEDURE P_QA02_Set_Tel_Bench(pEnabled     IN VARCHAR2,
+                                  pIdEjecucion IN VARCHAR2 DEFAULT NULL,
+                                  pProceso     IN VARCHAR2 DEFAULT NULL) IS
+   BEGIN
+      g_tel_bench_enabled := NVL(pEnabled, 'N');
+
+      IF g_tel_bench_enabled = 'S' THEN
+         g_tel_bench_id_ejecucion := pIdEjecucion;
+         g_tel_bench_proceso := NVL(pProceso, 'P_Datos_Secundarios');
+      ELSE
+         g_tel_bench_id_ejecucion := NULL;
+         g_tel_bench_proceso := NULL;
+      END IF;
+   END P_QA02_Set_Tel_Bench;
+
+   PROCEDURE P_QA02_Insert_Tel_Bench(pIdEjecucion IN VARCHAR2,
+                                     pProceso     IN VARCHAR2,
+                                     pProveedor   IN VARCHAR2,
+                                     pCodPersona  IN VARCHAR2,
+                                     pTipoTel     IN VARCHAR2,
+                                     pValorTel    IN VARCHAR2,
+                                     pDuracionMs  IN NUMBER,
+                                     pErrorCode   IN NUMBER,
+                                     pErrorMsg    IN VARCHAR2) IS
+      PRAGMA AUTONOMOUS_TRANSACTION;
+      vIdMedicion VARCHAR2(32);
+   BEGIN
+      vIdMedicion := RAWTOHEX(SYS_GUID());
+
+      EXECUTE IMMEDIATE
+         'INSERT INTO PR.PR_TEL_PERSONA_BENCH_TRACK ' ||
+         '(ID_MEDICION, ID_EJECUCION, JOB_NAME, PROCESO, PROVEEDOR, COD_PERSONA, TIPO_TELEFONO, ' ||
+         ' VALOR_TELEFONO, DURACION_MS, ERROR_CODE, ERROR_MESSAGE, SID, MODULE, ACTION, ' ||
+         ' ADICIONADO_POR, FECHA_MEDICION) ' ||
+         'VALUES ' ||
+         '(:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, USER, SYSTIMESTAMP)'
+      USING vIdMedicion,
+            pIdEjecucion,
+            'JOB_CARGA_PRECALIFICA_RD',
+            pProceso,
+            SUBSTR(UPPER(TRIM(pProveedor)), 1, 2),
+            SUBSTR(pCodPersona, 1, 30),
+            SUBSTR(pTipoTel, 1, 1),
+            SUBSTR(pValorTel, 1, 4000),
+            ROUND(pDuracionMs, 3),
+            pErrorCode,
+            SUBSTR(pErrorMsg, 1, 4000),
+            TO_NUMBER(SYS_CONTEXT('USERENV', 'SID')),
+            'PR.JOB_CARGA_PRECALIFICA_RD',
+            SUBSTR('TEL_' || pTipoTel, 1, 64);
+
+      COMMIT;
+   EXCEPTION
+      WHEN OTHERS THEN
+         ROLLBACK;
+   END P_QA02_Insert_Tel_Bench;
+
+   FUNCTION F_QA02_Medir_Telefono(pCodPersona   IN VARCHAR2,
+                                  pTipoTelefono IN VARCHAR2)
+      RETURN VARCHAR2 IS
+      vInicio TIMESTAMP WITH TIME ZONE;
+      vFin    TIMESTAMP WITH TIME ZONE;
+      vValor   VARCHAR2(4000);
+      vError   VARCHAR2(4000);
+      vErrCode NUMBER;
+      vMs      NUMBER := 0;
+      vProveedor VARCHAR2(2) := 'PR';
+   BEGIN
+      IF NVL(g_tel_bench_enabled, 'N') <> 'S' THEN
+         RETURN PR.obt_telefono_persona(pCodPersona, pTipoTelefono);
+      END IF;
+
+      vInicio := SYSTIMESTAMP;
+      BEGIN
+         -- Para comparar PA vs PR, cambiar estas dos lineas y recompilar antes de cada corrida:
+         -- vProveedor := 'PA'; vValor := PA.obt_telefono_persona(TO_NUMBER(pCodPersona), pTipoTelefono);
+         vProveedor := 'PR';
+         vValor := PR.obt_telefono_persona(pCodPersona, pTipoTelefono);
+      EXCEPTION
+         WHEN OTHERS THEN
+            vErrCode := SQLCODE;
+            vError := SQLERRM;
+            vValor := NULL;
+      END;
+      vFin := SYSTIMESTAMP;
+      vMs := F_QA02_Tel_Elapsed_Ms(vInicio, vFin);
+
+      P_QA02_Insert_Tel_Bench(g_tel_bench_id_ejecucion,
+                              NVL(g_tel_bench_proceso, 'P_Datos_Secundarios'),
+                              vProveedor,
+                              pCodPersona,
+                              pTipoTelefono,
+                              vValor,
+                              vMs,
+                              vErrCode,
+                              vError);
+
+      RETURN vValor;
+   END F_QA02_Medir_Telefono;
+
    PROCEDURE Precalifica_Represtamo  IS 
        
        --- => Condicones a tomar en cuenta para la Precalificaci¿n de Cr¿ditos
@@ -5677,21 +5794,35 @@ PRAGMA AUTONOMOUS_TRANSACTION;
                                 pCodDireccion       IN OUT VARCHAR2,
                                 pTipDireccion       IN OUT VARCHAR2,
                                 pDireccion          IN OUT VARCHAR2,
-                                pMensaje            IN OUT VARCHAR2) IS                                   
-  CURSOR CUR_email IS
-      SELECT C.EMAIL_USUARIO, 
-                 NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'C'), 'N/A') telefono_celular,
-                 NVL(NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'D'), NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'R'), PR.obt_telefono_persona(C.COD_PER_FISICA, 'T'))), 'N/A') telefono_residencia,
-                 NVL(NVL(PR.obt_telefono_persona(C.COD_PER_FISICA, 'O'), PR.obt_telefono_persona(C.COD_PER_FISICA, 'X')), 'N/A') telefono_oficina,
-                 obt_direccion_actualizada(C.COD_PER_FISICA) detalle--D.DETALLE DIRECCION-- D.COD_DIRECCION, D.TIP_DIRECCION
-            FROM PERSONAS_FISICAS c
-           WHERE C.COD_PER_FISICA = pCodCliente;
+                                pMensaje            IN OUT VARCHAR2) IS
+     vTelD VARCHAR2(4000);
+     vTelR VARCHAR2(4000);
+     vTelT VARCHAR2(4000);
+     vTelO VARCHAR2(4000);
+     vTelX VARCHAR2(4000);
   BEGIN
-     --  Consulta del datos secundarios del Core 
-     OPEN  CUR_email;
-     FETCH CUR_email INTO pCorreo, pTelefonoCelular, pTelefonoResidencia, pTelefonoTrabajo, pDireccion;
-     CLOSE CUR_email;
-  EXCEPTION WHEN OTHERS THEN   
+     -- F_QA02_Medir_Telefono esta en el body, no se puede llamar desde SQL; se llama procedimental.
+     BEGIN
+        SELECT C.EMAIL_USUARIO, obt_direccion_actualizada(C.COD_PER_FISICA)
+          INTO pCorreo, pDireccion
+          FROM PERSONAS_FISICAS c
+         WHERE C.COD_PER_FISICA = pCodCliente;
+     EXCEPTION WHEN NO_DATA_FOUND THEN
+        pCorreo    := NULL;
+        pDireccion := NULL;
+     END;
+
+     pTelefonoCelular    := NVL(F_QA02_Medir_Telefono(pCodCliente, 'C'), 'N/A');
+
+     vTelD := F_QA02_Medir_Telefono(pCodCliente, 'D');
+     vTelR := F_QA02_Medir_Telefono(pCodCliente, 'R');
+     vTelT := F_QA02_Medir_Telefono(pCodCliente, 'T');
+     pTelefonoResidencia := NVL(NVL(vTelD, NVL(vTelR, vTelT)), 'N/A');
+
+     vTelO := F_QA02_Medir_Telefono(pCodCliente, 'O');
+     vTelX := F_QA02_Medir_Telefono(pCodCliente, 'X');
+     pTelefonoTrabajo    := NVL(NVL(vTelO, vTelX), 'N/A');
+  EXCEPTION WHEN OTHERS THEN
         DECLARE
             vIdError      PLS_INTEGER := 0;
         BEGIN                                    
@@ -8225,10 +8356,11 @@ END P_Registra_Solicitud_Campana;
          EXCEPTION
              WHEN OTHERS THEN
                  NULL;
-         END track_error;
+          END track_error;
 
-                   BEGIN
-                       -- Inicio del proceso de trazabilidad
+                    BEGIN
+                        -- Inicio del proceso de trazabilidad
+                      P_QA02_Set_Tel_Bench('N');
                       track_inicio(0, 'TOTAL_JOB');
 
                       track_inicio(1, 'P_Actualizar_Anular_Represtamo');
@@ -8270,7 +8402,15 @@ END P_Registra_Solicitud_Campana;
                       track_fin(9);
 
                       track_inicio(10, 'P_REGISTRO_SOLICITUD');
-                      PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
+                      P_QA02_Set_Tel_Bench('S', v_id_ejecucion_track, 'P_REGISTRO_SOLICITUD');
+                      BEGIN
+                         PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
+                      EXCEPTION
+                         WHEN OTHERS THEN
+                            P_QA02_Set_Tel_Bench('N');
+                            RAISE;
+                      END;
+                      P_QA02_Set_Tel_Bench('N');
                       track_fin(10);
 
                       --track_inicio(11, 'PVALIDA_WORLD_COMPLIANCE');
@@ -8318,6 +8458,7 @@ END P_Registra_Solicitud_Campana;
        track_fin(0, p_registros_re => v_conteo);
        COMMIT;
       EXCEPTION WHEN OTHERS THEN
+          P_QA02_Set_Tel_Bench('N');
           track_error(v_paso_actual_track, v_proceso_track, SQLCODE, SQLERRM || CHR(10) || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
           track_error(0, 'TOTAL_JOB', SQLCODE, SQLERRM || CHR(10) || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
 
@@ -13723,4 +13864,3 @@ BEGIN
 END;
 END PR_PKG_REPRESTAMOS;
 /
-

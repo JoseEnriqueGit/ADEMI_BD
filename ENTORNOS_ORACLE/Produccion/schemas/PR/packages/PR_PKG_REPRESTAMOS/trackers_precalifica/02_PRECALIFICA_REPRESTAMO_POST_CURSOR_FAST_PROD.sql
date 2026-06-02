@@ -1,25 +1,3 @@
-/*
-  Produccion - PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo
-  Tracker FAST read-only del cursor CREDITOS_PROCESAR y filtros post cursor.
-
-  Uso recomendado:
-  - Ejecutar como una sola sentencia en Toad/F9.
-  - Colocar el cursor en la linea WITH params AS o seleccionar todo el SQL.
-  - No tiene terminador final para evitar ORA-00911 invalid character.
-
-  Diferencia contra el tracker completo:
-  - Aplica ROWNUM <= LOTE_DE_CARAGA_REPRESTAMO antes de los filtros post cursor.
-  - Los filtros post cursor se calculan solo sobre el lote que simula insertar el SP.
-  - Es mas cercano al flujo operativo del procedimiento y mucho mas liviano.
-
-  Como leerlo:
-  - Cada bloque del WITH es un "colador": parte del bloque anterior y le quita
-    los creditos que no cumplen UN filtro. El nombre del bloque dice que filtro aplica.
-  - La cadena va: base_creditos -> ... -> no_lista_negra (filtros del cursor),
-    luego lote_cursor (corta al tamano del lote), luego los filtros post cursor.
-  - Al final se cuentan las filas de cada bloque para armar la tabla resumen.
-*/
-
 WITH params AS (
     SELECT (SELECT MAX(p.fecha_corte)
               FROM PA.PA_DETALLADO_DE08 p
@@ -353,7 +331,7 @@ pasos_cursor AS (
 ),
 resumen_cursor AS (
     SELECT 1 tipo_orden,
-           'SECUENCIAL_CURSOR_FAST' tipo_medicion,
+           'SECUENCIAL_CURSOR' tipo_medicion,
            p.orden,
            p.filtro,
            b.cantidad candidatos_antes,
@@ -389,7 +367,7 @@ post_pasos AS (
 ),
 resumen_post AS (
     SELECT 3 tipo_orden,
-           'SECUENCIAL_POST_CURSOR_FAST' tipo_medicion,
+           'SECUENCIAL_POST_CURSOR' tipo_medicion,
            p.orden,
            p.filtro,
            COUNT(CASE WHEN p.orden = 0 OR ps.paso_post_alcanzado >= p.orden - 1 THEN 1 END) candidatos_antes,
@@ -414,7 +392,7 @@ resumen_post AS (
 ),
 resumen_cleanup AS (
     SELECT 4 tipo_orden,
-           'POST_CLEANUP_FAST' tipo_medicion,
+           'POST_CLEANUP' tipo_medicion,
            98 orden,
            'DELETE PR_REPRESTAMOS WHERE ESTADO LIKE X%' filtro,
            COUNT(*) candidatos_antes,

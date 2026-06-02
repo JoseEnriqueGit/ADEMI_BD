@@ -1,4 +1,4 @@
--- QA02 - PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo - tracker FAST con post filtros
+-- PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo
 WITH params AS (
     SELECT (SELECT MAX(p.fecha_corte)
               FROM PA.PA_DETALLADO_DE08 p
