@@ -126,6 +126,18 @@ Optimizar el proceso sin cambiar la lógica de negocio original.
 - Si no se puede validar directamente en Oracle desde este entorno, dejar siempre pasos concretos de verificación en Toad.
 - Separar claramente lo observado en el repo de lo que solo puede confirmarse en base de datos.
 
+## Compuerta de promoción a PROD (anti-regresión)
+Regla de la fuente de verdad para evitar la pérdida silenciosa de lógica al promover cambios.
+Detalle operativo en `docs/guias/RUNBOOK_PROMOCION_PROD.md`.
+- `ENTORNOS_ORACLE/<ENTORNO>/schemas/<SCHEMA>/<tipo>/<OBJETO>.sql` es el espejo de **lo que está VIVO** en ese entorno; no borradores ni variantes.
+- Un objeto **no puede desplegarse** a un entorno si antes no se extrajo su baseline VIVO a ese archivo espejo (Toad: `DBMS_METADATA.GET_DDL`).
+- **Un solo canónico por objeto/entorno.** Variantes (`_OLD`, `copy`, `_ORIGINAL`, `BACKUP`, `_v1`, `_TEST`) van a `backups/sombras_consolidadas/`, nunca dentro de `schemas/`.
+- Cada archivo lleva **cabecera de procedencia** (`docs/instrucciones_ai/PLANTILLA_CABECERA_PROCEDENCIA.sql`).
+- No se compara texto a ojo: se llena un **inventario semántico** (`docs/guias/PLANTILLA_INVENTARIO_SEMANTICO.md`); no se firma con ítems `ELIMINADO` sin justificación.
+- Antes de promover: correr `git log -- <archivo>` y leer **todas** las historias que tocaron el objeto (reconciliar líneas paralelas).
+- Un cambio **no está promovido a PROD** hasta tener entrada en `ENTORNOS_ORACLE/Produccion/CHANGELOG.md` con el sha del baseline + el inventario firmado, y haber re-extraído de PROD para confirmar (checklist `docs/guias/CHECKLIST_DEPLOY_PROD.md`).
+- Toda historia debe listar en "Objetos afectados" los archivos **reales** que toca (verificable contra `git diff` de la historia).
+
 ## Flujos formalizados
 - explicar
 - optimizar
@@ -133,6 +145,7 @@ Optimizar el proceso sin cambiar la lógica de negocio original.
 - incorporar objeto
 - documentar historia
 - preparar validación en Toad
+- promover a PROD (runbook + checklist + inventario semántico)
 
 ## Referencias por tipo de objeto
 Usar los anexos en `docs/instrucciones_ai/referencias/`:
@@ -148,3 +161,4 @@ Usar los anexos en `docs/instrucciones_ai/referencias/`:
 
 ## Historial
 - `2026-04-16` - Se consolidó la base común para Claude y Codex, con entorno obligatorio, optimización orientada a propuesta primero y nueva estructura en `docs/instrucciones_ai/`.
+- `2026-06-02` - Se añadió la compuerta de promoción a PROD (anti-regresión): baseline VIVO versionado por entorno, un solo canónico por objeto, cabecera de procedencia, inventario semántico, checklist de deploy y runbook. Origen: incidente de regresión en `PR.PR_V_ENVIO_REPRESTAMOS`.

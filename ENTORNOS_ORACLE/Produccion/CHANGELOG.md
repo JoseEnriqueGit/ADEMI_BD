@@ -1,11 +1,21 @@
 # CHANGELOG - PRODUCCION
 
 > Registro cronologico de cambios desplegados en el entorno de Produccion.
-> Formato: Fecha | Historia/Ticket | Objetos afectados
+> Formato por entrada: Fecha | Historia/Ticket | Objetos afectados
+> Campos obligatorios de cada despliegue (compuerta anti-regresion, ver docs/guias/RUNBOOK_PROMOCION_PROD.md):
+>   - **commit-baseline**: sha del DDL VIVO de PROD extraido ANTES de sobrescribir
+>   - **commit-propuesto**: sha de la version desplegada
+>   - **inventario**: ruta al 03_INVENTARIO_SEMANTICO firmado (0 ELIMINADO sin justificar)
+>   - **desplego / firmo**: responsables
 
 ---
 
 <!-- Agregar nuevas entradas al inicio -->
+
+## 2026-06-02 | Anti-regresion - Estructura de baseline y consolidacion (solo repo, sin tocar PROD)
+- **Estructura**: creado el espejo `Produccion/schemas/PR/views/` (baseline de `PR.PR_V_ENVIO_REPRESTAMOS` PENDIENTE de extraer de PROD).
+- **Normalizado**: `Produccion/PKG_TIPO_DOCUMENTO_PKM.sql` (suelto) -> `Produccion/schemas/PA/packages/PKG_TIPO_DOCUMENTO_PKM/body.sql`.
+- **Notas**: no hay cambios en la base de datos. Pendiente real de PROD: extraer y versionar el DDL VIVO de `PR.PR_V_ENVIO_REPRESTAMOS` y decidir recuperacion de las ramas CANAL_CARGA_DIRIGIDA/CANAL_CAMPANA_ESPECIAL.
 
 ## 2026-04-23 | OPT-002/004/009/010/011/013/015/016 - Pase de 8 indices de apoyo
 

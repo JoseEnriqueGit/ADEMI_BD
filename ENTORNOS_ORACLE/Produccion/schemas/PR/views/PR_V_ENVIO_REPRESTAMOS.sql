@@ -1,0 +1,41 @@
+-- ============================================================================
+-- ENTORNO        : Produccion
+-- OBJETO         : PR.PR_V_ENVIO_REPRESTAMOS
+-- TIPO           : VIEW
+-- ESTADO         : *** BASELINE PENDIENTE — NO DESPLEGAR ESTE ARCHIVO ***
+-- CREADO         : 2026-06-02
+-- MOTIVO         : Materializar el baseline real de PROD que hoy NO existe en git.
+--                  La vista solo estaba versionada en DESARROLLO/, por lo que la
+--                  "version de PROD" vivia fuera del repo (archivo local en Toad) y
+--                  no era diffeable. Esa es la causa raiz #1 del incidente de
+--                  regresion (perdida de las ramas CANAL_CARGA_DIRIGIDA /
+--                  CANAL_CAMPANA_ESPECIAL al sobrescribir la vista en PROD).
+-- ============================================================================
+--
+-- ESTE ARCHIVO ES UN MARCADOR. No contiene DDL ejecutable a proposito: el
+-- baseline debe ser el SQL REAL extraido de PROD, no una copia inventada ni la
+-- version de DESARROLLO (eso reintroduciria el riesgo de baseline envenenado).
+--
+-- COMO COMPLETARLO (paso manual en Toad, lo hace el operador con acceso a PROD):
+--
+--   1. Conectarse a PROD en Toad / SQL Developer.
+--   2. Ejecutar:
+--
+--        SET LONG 200000
+--        SELECT DBMS_METADATA.GET_DDL('VIEW','PR_V_ENVIO_REPRESTAMOS','PR') FROM dual;
+--
+--      (Alternativa sin DBMS_METADATA: click derecho sobre la vista -> Generate DDL / Script.)
+--
+--   3. Reemplazar TODO el contenido de este archivo por el DDL obtenido.
+--   4. Agregar arriba la cabecera de procedencia
+--      (ver docs/instrucciones_ai/PLANTILLA_CABECERA_PROCEDENCIA.sql),
+--      rellenando DESPLEGADO / COMMIT-ORIGEN / EXTRAIDO-DE / HISTORIA.
+--   5. git add + commit: "baseline PROD PR_V_ENVIO_REPRESTAMOS (extraido de <conexion>)".
+--   6. git diff de este baseline contra
+--      ENTORNOS_ORACLE/DESARROLLO/schemas/PR/views/PR_V_ENVIO_REPRESTAMOS.sql
+--      para CONFIRMAR si PROD esta regresionado (la version de DESARROLLO SI tiene
+--      las ramas CANAL_CARGA_DIRIGIDA linea 38 y CANAL_CAMPANA_ESPECIAL linea 39).
+--
+-- Una vez completado, este archivo pasa a ser la fuente de verdad de lo que esta
+-- VIVO en PROD: lo que diga este archivo ES lo que esta en PROD.
+-- ============================================================================

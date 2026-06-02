@@ -1,0 +1,21 @@
+-- ============================================================================
+-- PLANTILLA DE CABECERA DE PROCEDENCIA
+-- ----------------------------------------------------------------------------
+-- Copiar este bloque al TOPE de todo archivo bajo ENTORNOS_ORACLE/<ENTORNO>/schemas/.
+-- Es solo un comentario PL/SQL: Oracle lo ignora al compilar, se pega a Toad tal cual.
+-- Convierte cada archivo en su propia hoja de procedencia: con abrirlo se sabe qué
+-- versión está viva, de qué commit salió y bajo qué historia.
+-- Formaliza y extiende la cabecera ya exigida por BASE_OPERATIVA ("Incorporación manual de objetos").
+-- ============================================================================
+-- ENTORNO        : DESARROLLO | QA | QA02 | Produccion
+-- OBJETO         : SCHEMA.NOMBRE_OBJETO
+-- TIPO           : VIEW | PACKAGE BODY | PACKAGE SPEC | PROCEDURE | FUNCTION | TABLE | JOB | TRIGGER | SEQUENCE
+-- DESPLEGADO     : YYYY-MM-DD        (fecha en que esta versión tocó este entorno)
+-- COMMIT-ORIGEN  : <sha del commit que aprobó esta versión>
+-- HISTORIA/TICKET: <id de historia(s) / ticket(s); listar TODAS las que tocan el objeto>
+-- DESPLEGO       : <quién pegó el cambio>
+-- EXTRAIDO-DE    : <conexión Toad usada para extraer/confirmar el DDL vivo>
+-- INVENTARIO     : historias/<HISTORIA>/promocion/03_INVENTARIO_SEMANTICO.md
+-- NOTA           : Este archivo ES lo que está vivo en este entorno.
+--                  No editar sin re-desplegar y sellar en el CHANGELOG del entorno.
+-- ============================================================================
