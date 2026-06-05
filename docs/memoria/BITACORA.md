@@ -9,6 +9,22 @@
 
 ---
 
+## 2026-06-05 - Codex - Word resultados filtros candidatos QA02
+
+- **Objetivo:** crear un archivo Word con referencias a los cinco scripts de trackers y sus resultados.
+- **Hecho:** generado `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx` junto a la documentacion Markdown, con tabla de scripts, resumen de resultados, detalle del filtro DE08 y conclusiones.
+- **Decisiones:** no se inserto una imagen distinta a la enviada; se dejo apartado de evidencia visual pendiente porque la captura del chat no existe como archivo local.
+- **Pendientes:** insertar la captura cuando el usuario la guarde o indique una ruta de imagen valida.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-05 - Codex - Documentacion filtros candidatos QA02
+
+- **Objetivo:** documentar de forma corta los filtros trabajados en los trackers de precalificacion de `PR.PR_PKG_REPRESTAMOS`.
+- **Hecho:** creada nota `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.md` en `diagnosticos_precalifica`, consolidando los resultados TXT/capturas y explicando el embudo cursor, lote y post cursor.
+- **Decisiones:** no se cambio SQL ni logica Oracle; se dejo como evidencia QA02 puntual, separando DE08 con/sin `FECHA_CORTE` y los flujos HI que quedaron en cero por `F_CANCELACION`.
+- **Pendientes:** validar nuevamente en Toad si cambian parametros (`DIAS_CANCELACION`, `LOTE_DE_CARAGA_REPRESTAMO`) o llega un nuevo corte DE08.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DOCUMENTACION_FILTROS_CANDIDATOS_QA02.md`, `docs/memoria/BITACORA.md`.
+
 ## 2026-06-05 · Claude Code · Archivo de rama `claude/cool-yonath` (antes de borrar)
 
 - **Objetivo:** preservar el contenido único de `cool-yonath` antes de borrarla.
