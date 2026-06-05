@@ -16,6 +16,10 @@ Ordenar el repo sin perder trazabilidad. La organizacion debe reflejar estado re
 - No mezclar cambios de organizacion con cambios Oracle.
 - Usar `git status --short` antes y despues.
 - Si hay cambios ajenos, trabajar alrededor de ellos.
+- Mantener la higiene de contexto: `backups/`, `_cuarentena/`, `diff/` y volcados grandes
+  (`docs/notas/NOTAS_HISTORICO.md`) son zona fria; localizar por indice, no cargar en bloque.
+- Los archivos dudosos o huerfanos van a `_cuarentena/` con su fila en `_cuarentena/INDICE.md`
+  (sin borrar ni renombrar hasta confirmar destino con el usuario).
 
 ## Estructura recomendada
 ```text

@@ -20,6 +20,13 @@ Usar `docs/instrucciones_ai/BASE_OPERATIVA.md` antes de actuar. Esta skill no re
 - Si falta una dependencia, pedirla al usuario.
 - Separar diagnostico, propuesta, implementacion, validacion y rollback.
 
+## Higiene de contexto (que leer / que NO cargar)
+- Leer el archivo del objeto puntual (y `spec.sql`+`body.sql` si es package); NO hacer glob del
+  schema entero ni cargar `ENTORNOS_ORACLE/**` en bloque.
+- Tratar como zona fria (no abrir salvo orden explicita): `backups/`, `_cuarentena/`, `diff/` y
+  `docs/notas/NOTAS_HISTORICO.md` completo (para este ultimo, usar `docs/notas/INDICE_NOTAS_HISTORICO.md`).
+- Empezar la sesion leyendo `docs/memoria/CONTEXTO_ACTUAL.md` (ver skill `memoria-engram`).
+
 ## Flujo minimo
 1. Confirmar entorno y objeto.
 2. Ubicar archivos reales en `ENTORNOS_ORACLE/`, `historias/`, `diff/` o ruta dada.

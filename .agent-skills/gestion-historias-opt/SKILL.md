@@ -25,6 +25,12 @@ Mantener las historias ordenadas por estado real sin perder evidencia, handoffs 
 - No mezclar incidentes con optimizaciones salvo que la historia lo documente.
 - `OPT-020_VISTAS_GARANTIA_REPRESTAMOS` puede marcarse como `DESCARTADO` solo con aprobacion explicita del usuario.
 
+## Higiene de contexto
+- Partir de `historias/INVENTARIO.md`; abrir solo la carpeta del caso concreto (su `README.md` y
+  `ESTADO.md`), no el arbol completo de `historias/`.
+- Tratar `backups/`, `_cuarentena/` y `diff/` como zona fria (no leer salvo orden explicita).
+- Arrancar la sesion con `docs/memoria/CONTEXTO_ACTUAL.md` (ver skill `memoria-engram`).
+
 ## Flujo
 1. Revisar `git status --short`.
 2. Identificar historia, estado actual y evidencia.
