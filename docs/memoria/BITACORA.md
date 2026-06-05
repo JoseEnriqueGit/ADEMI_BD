@@ -9,6 +9,24 @@
 
 ---
 
+## 2026-06-05 · Claude Code · Consolidación a master + topología de ramas
+
+- **Objetivo:** fusionar el trabajo a la rama principal y limpiar ramas.
+- **Hecho:**
+  - `master` ← `claude/directory-structure-review-rA8GH` por **fast-forward** limpio (7 commits, 36
+    archivos). Pusheado. Rama de trabajo borrada en local.
+- **Hallazgos de ramas (fetch):** además de master existen 4 ramas:
+  - `anti-regresion-promocion-prod`: 0 commits únicos → **ya contenida en master** (redundante).
+  - `claude/cool-yonath`: 166 commits, **historia NO relacionada** con master (sin ancestro común);
+    su contenido OPT-015/HANDOFF parece ya estar en master vía `historias/`.
+  - `feature/api-bitacora-logs`: 102 commits, **historia NO relacionada**; estructura distinta
+    (`SCRIPTS`, `db`, `env`, `proyectos`, `Certificado digital ORACLE FORMS`) con contenido único.
+- **Decisiones:** NO fusionar las dos ramas huérfanas (forzar `--allow-unrelated-histories`
+  corrompería master). Dejarlas intactas. El borrado remoto se hace desde GitHub (push delete da 403).
+- **Pendiente (usuario, en GitHub):** borrar las ramas seguras `claude/directory-structure-review-rA8GH`
+  y `anti-regresion-promocion-prod`. Conservar `cool-yonath` y `feature/api-bitacora-logs` hasta
+  decidir si rescatar contenido único con cherry-pick.
+
 ## 2026-06-05 · Claude Code (web) · Reorganización de directorios + sistema de memoria
 
 - **Objetivo:** criticar la organización del repo y mejorar el contexto/experiencia para Codex y
