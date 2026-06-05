@@ -2,6 +2,14 @@
 
 Repositorio local de objetos de base de datos Oracle para ADEMI. Contiene paquetes PL/SQL, tablas, vistas, jobs y documentación organizados por entorno y schema, más el historial de trabajo agrupado por tipo y estado.
 
+## Empieza aquí
+
+Al abrir el repo (en cualquier máquina, incluida Claude Code en web), **lee primero**
+[`docs/memoria/CONTEXTO_ACTUAL.md`](docs/memoria/CONTEXTO_ACTUAL.md): el estado vivo del proyecto,
+qué hay en PROD, qué está abierto y las reglas duras. El diario de sesiones está en
+[`docs/memoria/BITACORA.md`](docs/memoria/BITACORA.md). Toda la memoria vive en el repo (git),
+sin herramientas externas.
+
 ## Estructura del proyecto
 
 ```
@@ -39,7 +47,9 @@ ADEMI_BD/
 │
 ├── diff/                        Comparaciones before/after de procedimientos
 ├── backups/                     Respaldos y archivos legacy
+├── _cuarentena/                 Archivos dudosos por clasificar (ver _cuarentena/INDICE.md)
 ├── docs/                        Documentación general
+│   ├── memoria/                 Memoria operativa: CONTEXTO_ACTUAL.md + BITACORA.md (empezar aquí)
 │   ├── instrucciones_ai/        BASE_OPERATIVA + referencias por tipo de objeto
 │   ├── prompts_codex/           Prompts listos para Codex
 │   ├── digcert/, guias/, notas/, profiler/, QA_PR/
