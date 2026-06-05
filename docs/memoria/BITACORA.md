@@ -9,6 +9,19 @@
 
 ---
 
+## 2026-06-05 · Claude Code · Archivo de rama `claude/cool-yonath` (antes de borrar)
+
+- **Objetivo:** preservar el contenido único de `cool-yonath` antes de borrarla.
+- **Hecho:** comparación por hash de blob master vs cool-yonath → de 110 archivos "únicos por ruta",
+  solo **40 únicos por contenido**. Extraídos a `docs/memoria/ramas_archivadas/cool-yonath/artefactos/`
+  + README de archivo + índice `ramas_archivadas/README.md`.
+- **Qué se preservó:** READMEs originales OPT-001..015, MAPA_JOBS.md, HANDOFF OPT-015, scripts de
+  medición/explain plans, doc QA02 auto-indexado, baselines alternos de PR_PKG_REPRESTAMOS (QA/QA02)
+  y vista PR_V_ENVIO_REPRESTAMOS (marcados como reconciliar, no baseline vivo).
+- **Decisión:** no fusionar (historia no relacionada; master ya reorganizó casi todo). Con el archivo
+  hecho, la rama remota puede borrarse desde GitHub sin pérdida (tip `d87a427`).
+- **Pendiente (usuario):** borrar en GitHub `cool-yonath` y `feature/api-bitacora-logs`.
+
 ## 2026-06-05 · Claude Code · Archivo de rama `feature/api-bitacora-logs` (antes de borrar)
 
 - **Objetivo:** documentar razones/objetivo y preservar el código de la rama
