@@ -10,6 +10,27 @@ Esta es la fuente de verdad compartida para trabajar con Claude y Codex en `ADEM
 - `docs/prompts_codex/*.md`
 - `docs/instrucciones_ai/referencias/*.md`
 
+## Memoria operativa (engram)
+La memoria del proyecto vive en el repo (texto plano + git), sin herramientas externas, para poder
+reconstruirla en cualquier máquina (incluida la PC del trabajo, que no instala software).
+- **Al iniciar la sesión**, leer `docs/memoria/CONTEXTO_ACTUAL.md` (estado vivo, casos abiertos,
+  pendientes, reglas duras). Es el único punto de entrada obligatorio.
+- **Al cerrar trabajo relevante**, agregar una entrada en `docs/memoria/BITACORA.md` (más reciente
+  arriba; usar la plantilla `docs/memoria/_plantillas/ENTRADA_BITACORA.md`) y, si cambió el panorama,
+  actualizar `CONTEXTO_ACTUAL.md`.
+- En Claude Code (web) el hook `SessionStart` (`.claude/hooks/session-start.sh`) recuerda esto
+  automáticamente. Detalle en la skill `memoria-engram`.
+
+## Higiene de contexto (qué cargar y qué NO)
+Cargar poco y relevante. Capas:
+- **Caliente (siempre):** `docs/memoria/CONTEXTO_ACTUAL.md`.
+- **Tibio (solo el ítem puntual):** un objeto Oracle concreto, el `README.md`/`ESTADO.md` de UN caso.
+- **Frío (NO leer salvo orden explícita):** `backups/`, `_cuarentena/`, `diff/`, `ENTORNOS_ORACLE/**`
+  en bloque y `docs/notas/NOTAS_HISTORICO.md` completo (para este último usar
+  `docs/notas/INDICE_NOTAS_HISTORICO.md` y saltar a la línea exacta).
+No hacer glob de un schema entero ni abrir volcados de cientos de KB "por las dudas": ensucia el
+contexto y degrada las respuestas. Localizar por índice/grep y leer lo puntual.
+
 ## Idioma y estilo
 - Responder siempre en español.
 - Mantener nombres originales de objetos Oracle, schemas, columnas y packages.
@@ -28,7 +49,9 @@ Esta es la fuente de verdad compartida para trabajar con Claude y Codex en `ADEM
   - `historias/_promociones/` guarda un archivo por cada evento de pase entre entornos (auditable, no se mueve aunque la historia cambie de estado).
 - `diff/` almacena comparaciones before/after
 - `docs/` contiene guías, QA, profiler, notas y documentación complementaria
+- `docs/memoria/` guarda la memoria operativa: `CONTEXTO_ACTUAL.md` (snapshot vivo, punto de entrada) y `BITACORA.md` (diario append-only)
 - `backups/` almacena material legado o de respaldo
+- `_cuarentena/` guarda archivos dudosos o huérfanos pendientes de clasificar (no se borran ni renombran; ver `_cuarentena/INDICE.md`)
 
 ## Regla de trazabilidad por estado
 - Cada carpeta de historia tiene `README.md` (detalle técnico) y `ESTADO.md` (metadato operativo: estado, entorno, decisión).
@@ -172,6 +195,7 @@ Usar los anexos en `docs/instrucciones_ai/referencias/`:
 - `sinonimos.md`
 
 ## Historial
+- `2026-06-05` - Se añadió la memoria operativa (engram) en `docs/memoria/` (CONTEXTO_ACTUAL + BITACORA), la skill `memoria-engram`, el hook `SessionStart`, el modelo de higiene de contexto (capas caliente/tibio/frío) y la carpeta `_cuarentena/`. Origen: revisión de organización de directorios para agilizar el uso en Claude Code y Codex entre máquinas.
 - `2026-04-16` - Se consolidó la base común para Claude y Codex, con entorno obligatorio, optimización orientada a propuesta primero y nueva estructura en `docs/instrucciones_ai/`.
 - `2026-05-19` - Reorganización de `historias/` por tipo y estado (produccion / probados_no_promovidos / descartados / diagnosticos / propuestas / soporte). Se agregó `INVENTARIO.md` maestro, plantilla `ESTADO.md` y regla de movimiento por cambio de estado.
 - `2026-06-02` - Se añadió la compuerta de promoción a PROD (anti-regresión): baseline VIVO versionado por entorno, un solo canónico por objeto, cabecera de procedencia, inventario semántico, checklist de deploy y runbook. Origen: incidente de regresión en `PR.PR_V_ENVIO_REPRESTAMOS`.

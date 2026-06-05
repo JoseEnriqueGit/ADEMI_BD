@@ -6,7 +6,13 @@ Usa `docs/instrucciones_ai/BASE_OPERATIVA.md` como fuente de verdad del proyecto
 - La fuente canonica de skills del repo vive en `.agent-skills/`.
 - Cuando una tarea coincida con una skill, leer su `SKILL.md` antes de actuar y aplicar sus reglas.
 - Para sincronizar skills nativas de Codex, usar `scripts/sync_agent_skills.ps1 -Target Codex`.
-- Skills actuales: `git-trazabilidad-proyecto`, `oracle-adm-bd`, `gestion-historias-opt`, `validacion-qa-rollback`, `organizacion-repo-admi`.
+- Skills actuales: `git-trazabilidad-proyecto`, `oracle-adm-bd`, `gestion-historias-opt`, `validacion-qa-rollback`, `organizacion-repo-admi`, `memoria-engram`.
+
+## Memoria del proyecto (leer primero)
+- Al iniciar la sesión, leer `docs/memoria/CONTEXTO_ACTUAL.md` (estado vivo, casos abiertos, reglas).
+- Al cerrar trabajo relevante, agregar una entrada en `docs/memoria/BITACORA.md`.
+- Higiene de contexto: no cargar `backups/`, `_cuarentena/`, `diff/`, ni `docs/notas/NOTAS_HISTORICO.md`
+  completo salvo orden explícita. Ver skill `memoria-engram` y los prompts `docs/prompts_codex/contexto.md` y `bitacora.md`.
 
 ## Notas específicas para Codex
 - Trabajar siempre en español.
