@@ -61,8 +61,8 @@ mejoras aplicadas en esta revisión y las que quedan como propuesta.
 
 - **Reconciliar discrepancia PROD** entre `INVENTARIO.md` y `Produccion/CHANGELOG.md`.
 - **Clasificar `_cuarentena/`** caso por caso (destino real, nombres sin espacios).
-- **Reglas `deny` opcionales** en `.claude/settings.json` para bloquear lectura de zonas frías
-  (`backups/`, `_cuarentena/`, `diff/`). Hoy es guía por instrucción; aplicar solo si se confirma.
+- **Reglas `deny` de zonas frías:** DESCARTADO (2026-06-05). Se mantiene la higiene como guía por
+  instrucción (no bloqueo duro), por preferencia del usuario, para no impedir lecturas legítimas.
 - **Workstream D:** documentar QA02 vacío, baseline mínimo de PROD y normalización de `historias/apex/`.
 
 ## 5. Cómo agiliza esto el uso (Codex y Claude Code)

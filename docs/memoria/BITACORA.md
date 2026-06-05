@@ -26,6 +26,9 @@
   - Análisis completo en `docs/memoria/ANALISIS_ESTRUCTURA_2026-06-05.md`.
 - **Decisiones:** memoria = índice de contexto vivo + bitácora + hook (todo texto plano + git);
   archivos dudosos a cuarentena sin borrar ni renombrar; reorganizaciones grandes solo propuestas.
-- **Pendientes:** confirmar reglas `deny` opcionales de zonas frías; clasificar archivos en
-  `_cuarentena/INDICE.md` caso por caso; reconciliar discrepancia PROD (INVENTARIO vs CHANGELOG).
+- **Decisión adicional (2026-06-05):** la higiene de contexto queda como **guía por instrucción**,
+  no como bloqueo `deny` en settings (el usuario prefiere flexibilidad para lecturas legítimas).
+  El hook `SessionStart` aplica también en la extensión de VS Code (no es solo web).
+- **Pendientes:** clasificar archivos en `_cuarentena/INDICE.md` caso por caso;
+  reconciliar discrepancia PROD (INVENTARIO vs CHANGELOG).
 - **Archivos tocados:** ver `git log` de la rama `claude/directory-structure-review-rA8GH`.
