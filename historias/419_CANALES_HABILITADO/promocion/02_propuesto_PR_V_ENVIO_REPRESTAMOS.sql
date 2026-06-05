@@ -1,17 +1,16 @@
 -- ============================================================================
--- ENTORNO        : Produccion
+-- ENTORNO        : Produccion (PROPUESTO — pendiente de desplegar)
 -- OBJETO         : PR.PR_V_ENVIO_REPRESTAMOS
 -- TIPO           : VIEW
--- DESPLEGADO     : (version actualmente VIVA en PROD al 2026-06-02)
--- COMMIT-ORIGEN  : (desconocido; version regresiva que no paso por git)
--- HISTORIA/TICKET: -
--- DESPLEGO       : -
--- EXTRAIDO-DE    : Confirmado por el usuario (pegado en chat) 2026-06-02
--- INVENTARIO     : historias/419_CANALES_HABILITADO/promocion/03_INVENTARIO_SEMANTICO.md
--- NOTA           : Este ES el DDL vivo en PROD hoy. REGRESIVO: su CANAL_DESC solo mapea
---                  SMS(1)/EMAIL(2); los canales 3 (carga dirigida) y 4 (campana especial)
---                  caen al ELSE y devuelven el codigo crudo en vez de su descripcion.
---                  Pendiente de correccion (ver propuesta en chat / runbook).
+-- DESPLEGADO     : (pendiente)
+-- HISTORIA/TICKET: 419 (recuperacion de canales habilitados) + incidente regresion
+-- MOTIVO         : Reimplementar el mapeo de CANAL_DESC para los canales 3 (carga
+--                  dirigida) y 4 (campana especial), que en PROD caian al ELSE y
+--                  devolvian el codigo crudo. Cambio QUIRURGICO sobre la version VIVA:
+--                  SOLO se amplia el CASE de CANAL_DESC (forma parametrizada). El filtro
+--                  CANALES_HABILITADOS y el resto del cuerpo quedan identicos a PROD.
+-- REQUISITO PROD : deben existir en PA_PARAMETROS_MVP los parametros
+--                  CANAL_CARGA_DIRIGIDA y CANAL_CAMPANA_ESPECIAL (ver checks pre-deploy).
 -- ============================================================================
 CREATE OR REPLACE FORCE VIEW PR.PR_V_ENVIO_REPRESTAMOS
 (ID_REPRESTAMO, NUMERO_IDENTIFICACION, CANAL, CANAL_DESC, NOMBRES,
@@ -23,8 +22,10 @@ SELECT R.ID_REPRESTAMO,
        C.NUMERO_IDENTIFICACION,
        CR.CANAL,
        CASE CR.CANAL
-          WHEN '1' THEN 'CANAL_SMS'
-          WHEN '2' THEN 'CANAL_EMAIL'
+          WHEN PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CANAL_SMS')              THEN 'CANAL_SMS'
+          WHEN PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CANAL_EMAIL')            THEN 'CANAL_EMAIL'
+          WHEN PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CANAL_CARGA_DIRIGIDA')   THEN 'CANAL_CARGA_DIRIGIDA'
+          WHEN PR.PR_PKG_REPRESTAMOS.f_obt_parametro_Represtamo('CANAL_CAMPANA_ESPECIAL') THEN 'CANAL_CAMPANA_ESPECIAL'
           ELSE CR.CANAL
        END CANAL_DESC,
        C.NOMBRES,
