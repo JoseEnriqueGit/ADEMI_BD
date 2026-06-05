@@ -9,6 +9,19 @@
 
 ---
 
+## 2026-06-05 · Claude Code · Archivo de rama `feature/api-bitacora-logs` (antes de borrar)
+
+- **Objetivo:** documentar razones/objetivo y preservar el código de la rama
+  `feature/api-bitacora-logs` (dejada de lado) para poder borrarla sin perder memoria.
+- **Hecho:** creado `docs/memoria/ramas_archivadas/feature-api-bitacora-logs/` con README (objetivo,
+  motivación, diseño, recuperación) y `artefactos/` (paquete `IA_API_LOGGER`, tablas `IA_API_LOGS` y
+  `IA_HTTP_STATUS_CATALOG`, secuencia, doc de flujo y ejemplo ORDS).
+- **Resumen del cambio archivado:** componente institucional de bitácora/logs para APIs ORDS con
+  transacciones autónomas, saneo de payloads sensibles y clasificación por catálogo HTTP.
+- **Decisión:** estado DESCARTADO/dejado de lado; no se fusiona (historia no relacionada). Con el
+  archivo hecho, la rama remota ya puede borrarse desde GitHub sin pérdida (tip `a3cedad`).
+- **Pendiente (usuario):** borrar en GitHub `feature/api-bitacora-logs` cuando confirme el archivo.
+
 ## 2026-06-05 · Claude Code · Consolidación a master + topología de ramas
 
 - **Objetivo:** fusionar el trabajo a la rama principal y limpiar ramas.
