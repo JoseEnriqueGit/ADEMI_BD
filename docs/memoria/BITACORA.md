@@ -9,6 +9,46 @@
 
 ---
 
+## 2026-06-05 - Codex - Ajuste lenguaje revision lote precalifica QA02
+
+- **Objetivo:** quitar jerga tecnica como "post cursor" del desglose para que sea mas claro para lectores funcionales.
+- **Hecho:** reemplazada la seccion "Descartes post cursor" por "Revision adicional del lote" y ajustadas referencias relacionadas.
+- **Decisiones:** se mantuvieron nombres tecnicos solo cuando son nombres de scripts, estados o columnas reales.
+- **Pendientes:** ninguno.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-05 - Codex - Reorden cronologico desglose precalifica QA02
+
+- **Objetivo:** reorganizar el desglose de filtros como una campana real, desde el arranque del job hasta el cierre de estado.
+- **Hecho:** reestructurado `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` por etapas cronologicas: arranque, carga por flujos, descartes post cursor, candidatos `RE`, precalificacion, XCORE, solicitud/canal y estados finales.
+- **Decisiones:** se uso el orden real del job para los flujos y se dejo nota de que la numeracion de scripts corresponde al analisis.
+- **Pendientes:** ninguno.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-05 - Codex - Ajuste redaccion XCORE desglose QA02
+
+- **Objetivo:** evitar que el desglose documente XCORE como valor fijo de QA02 cuando el proceso debe entenderse con criterio de produccion.
+- **Hecho:** ajustada la redaccion de XCORE en `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` y agregada referencia al package de produccion.
+- **Decisiones:** se dejo XCORE como calculo/asignacion del proceso, no como numero fijo.
+- **Pendientes:** ninguno.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-05 - Codex - Ampliacion score y solicitud en desglose QA02
+
+- **Objetivo:** completar el desglose simple con filtros/validaciones posteriores al cursor, incluyendo score/XCORE y creacion de solicitud.
+- **Hecho:** ampliado `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` con proceso comun post filtros, validaciones adicionales, aclaracion XCORE y referencias exactas del body.
+- **Decisiones:** se documento que `Actualiza_XCORE_CUSTOM` corre en el job, mientras `PVALIDA_XCORE` y `PVALIDA_WORLD_COMPLIANCE` existen pero estan comentados en el flujo revisado.
+- **Pendientes:** decidir si este desglose ampliado tambien debe pasarse al Word.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-05 - Codex - Desglose simple filtros precalifica QA02
+
+- **Objetivo:** explicar uno por uno los filtros de los cinco trackers de precalificacion en lenguaje simple.
+- **Hecho:** creado `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` con secciones por flujo, filtros del cursor, filtros post cursor y resumen corto.
+- **Decisiones:** se mantuvo como documentacion funcional, sin SQL extenso ni cambios de logica Oracle.
+- **Pendientes:** revisar si se quiere incorporar este desglose al Word existente.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md`, `docs/memoria/BITACORA.md`.
+
 ## 2026-06-05 - Codex - Word resultados filtros candidatos QA02
 
 - **Objetivo:** crear un archivo Word con referencias a los cinco scripts de trackers y sus resultados.
