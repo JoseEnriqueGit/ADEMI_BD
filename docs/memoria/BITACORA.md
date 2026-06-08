@@ -9,6 +9,30 @@
 
 ---
 
+## 2026-06-08 - Codex - DOCX generado desde desglose simple QA02
+
+- **Objetivo:** convertir `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` al DOCX del mismo nombre base.
+- **Hecho:** generado `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.docx` respetando titulos, listas, tablas y contenido del Markdown.
+- **Decisiones:** se uso orientacion horizontal por la amplitud de las tablas y no se agregaron encabezados, pies ni contenido adicional.
+- **Validacion:** coincidencia de 201 bloques entre Markdown y DOCX; 10 tablas y OpenXML valido.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.docx`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Codex - DOCX sincronizado exactamente con Markdown QA02
+
+- **Objetivo:** convertir `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.md` al DOCX del mismo nombre base.
+- **Hecho:** sobrescrito `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx` con el contenido exacto del Markdown y eliminado el archivo alterno `_DESDE_MD`.
+- **Decisiones:** no se agregaron encabezados, pies ni contenido adicional al documento fuente.
+- **Validacion:** coincidencia de 63 bloques entre Markdown y DOCX; OpenXML valido.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Codex - Word generado desde documentacion de filtros QA02
+
+- **Objetivo:** crear un DOCX a partir de `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.md`.
+- **Hecho:** generado `DOCUMENTACION_FILTROS_CANDIDATOS_QA02_DESDE_MD.docx` con titulos, listas, tablas y bloque SQL formateados.
+- **Decisiones:** se creo un archivo nuevo para no sobrescribir el DOCX existente modificado por el usuario.
+- **Pendientes:** ninguno.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DOCUMENTACION_FILTROS_CANDIDATOS_QA02_DESDE_MD.docx`, `docs/memoria/BITACORA.md`.
+
 ## 2026-06-05 - Codex - Ajuste lenguaje revision lote precalifica QA02
 
 - **Objetivo:** quitar jerga tecnica como "post cursor" del desglose para que sea mas claro para lectores funcionales.

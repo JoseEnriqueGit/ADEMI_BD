@@ -1,11 +1,5 @@
 # Desglose simple de filtros de precalificacion - QA02
 
-Fecha de referencia: 2026-06-05.
-Ambiente: QA02.
-Objeto relacionado: `PR.PR_PKG_REPRESTAMOS`.
-
-Este documento explica, en lenguaje simple, como se mueve un candidato en una campaña real de precalificacion: desde la limpieza inicial, pasando por los cinco flujos de carga, hasta la creacion de la solicitud y el estado final.
-
 ## Como leerlo
 
 - **Pasa:** el credito sigue al proximo filtro.
@@ -13,16 +7,6 @@ Este documento explica, en lenguaje simple, como se mueve un candidato en una ca
 - **Lista inicial:** primeros filtros que arman el grupo de candidatos de cada flujo.
 - **Revision adicional del lote:** filtros que se aplican despues de armar la lista inicial de candidatos.
 - **Candidato `RE`:** registro que sigue vivo para validaciones, score y solicitud.
-
-## Scripts usados
-
-- `01_PRECALIFICA_REPRESTAMO_POST_CURSOR_FAST_QA02.sql`: `Precalifica_Represtamo`.
-- `02_PRECALIFICA_REPRE_CANCELADO_CURSOR_QA02.sql`: `Precalifica_Repre_Cancelado`.
-- `03_PRECALIFICA_REPRE_CANCELADO_HI_CURSOR_QA02.sql`: `Precalifica_Repre_Cancelado_hi`.
-- `04_PRECALIFICA_REPRESTAMO_FIADORES_CURSOR_QA02.sql`: `Precalifica_Represtamo_fiadores`.
-- `05_PRECALIFICA_REPRESTAMO_FIADORES_HI_CURSOR_QA02.sql`: `Precalifica_Represtamo_fiadores_hi`.
-
-Nota: los scripts estan numerados para analisis. El job de la campaña llama los flujos en este orden: activos, fiadores, fiadores historico, cancelados y cancelados historico.
 
 ## Vista cronologica de la campaña
 
