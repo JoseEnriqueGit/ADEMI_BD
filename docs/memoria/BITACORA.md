@@ -9,6 +9,22 @@
 
 ---
 
+## 2026-06-08 - Codex - Cierre restauracion y renombre DOCX QA02
+
+- **Objetivo:** registrar la recuperacion del Word editado por el usuario y el nombre final del desglose.
+- **Hecho:** confirmado `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx` con 3 imagenes y renombrado el desglose a `DESGLOSE FILTROS PRECALIFICA.docx`.
+- **Decisiones:** conservar la version del usuario recuperada desde Git y registrar el renombre sin alterar el contenido.
+- **Pendientes:** ninguno.
+- **Archivos tocados:** `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx`, `DESGLOSE FILTROS PRECALIFICA.docx`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Codex - Restauracion DOCX con imagenes QA02
+
+- **Objetivo:** recuperar `DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx` como estaba antes de ser sobrescrito desde Markdown.
+- **Hecho:** restaurado el DOCX desde un blob recuperable de Git (`b8f7ccef...`) con 671,549 bytes, 3 tablas y 3 imagenes internas.
+- **Decisiones:** se reemplazo el DOCX generado desde Markdown por la version editada previamente por el usuario.
+- **Pendientes:** decidir si se desea commit de esta restauracion.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/DOCUMENTACION_FILTROS_CANDIDATOS_QA02.docx`, `docs/memoria/BITACORA.md`.
+
 ## 2026-06-08 - Codex - DOCX generado desde desglose simple QA02
 
 - **Objetivo:** convertir `DESGLOSE_SIMPLE_FILTROS_PRECALIFICA_QA02.md` al DOCX del mismo nombre base.
