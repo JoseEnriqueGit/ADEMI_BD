@@ -9,6 +9,17 @@
 
 ---
 
+## 2026-06-09 - Claude - Incremento B tracking integral precalifica QA02 (implementado Y PROBADO)
+
+- **Objetivo:** implementar en el repo el Incremento B (cohorte individual del cierre en `PR.PR_JOB_PRECALIFICA_CANDIDATO_TRACK`) sin tocar la logica funcional ni la `spec.sql`, y probarlo en QA02.
+- **PROBADO en QA02 (mismo dia):** secuencia ALTER 04 -> validar estructuras -> compilar body -> script 05 (BODY `VALID`, spec intacta, 0 errores) -> job -> conciliacion. Ejecucion `53D8BBE0BA0E44D9E063140311AC6BC6` (lote reducido a 1300 para la prueba): Capa C `1302/1302 == FINAL_*` (949 NP + 201 CP + 152 RXT + 0 AN + 0 OTRO), 0 nulos, 0 duplicados, todo `FLUJO='CIERRE'`, Capa B en 31/31. Costo del MERGE por candidato: `0.0011` vs `0.0009` s/cand del baseline A -> ~0.2 ms/candidato; NO se requiere variante bulk. Incidencias: `;` en PROMPT del script 05 (ORA-00900 en Toad, corregido) y Script Output sin volcar SELECTs -> se agrego `03_VALIDACION/07_RESUMEN_INCREMENTO_B_UNA_FILA_QA02.sql` (resumen en una fila, F9). **Pendiente operativo: restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000`.**
+- **Hecho:** snapshot del body A probado (`02_PACKAGE/body_QA02_INCREMENTO_A_PROBADO_20260609.sql`, hash `D12032AD...` verificado contra el canonico); helper autonomo `track_candidato` (MERGE idempotente, guard por `TRACK_PRECALIFICA_ACTIVO`, `COMMIT` propio, `ROLLBACK; NULL;` en handler) declarado junto a `track_filtro`; captura en el bloque de tracking por ID del cierre extendiendo el `SELECT` validado del A a `(ESTADO, NO_CREDITO, CODIGO_CLIENTE)` y llamando `track_candidato('CIERRE', id, no_credito, codigo_cliente, estado_observado)`. El `IF` funcional del cierre quedo intacto.
+- **Decisiones:** `RESULTADO_ULTIMO` = estado **observado** en `PR_REPRESTAMOS` tras el cierre (no re-derivado): `P_Generar_Bitacora`/`P_Validar_Cambio_Estado` solo aplican el estado si `IND_CAMBIA_ESTADO_REPRE='S'` y tragan errores, asi que lo observado es la realidad; el decidido vive en `PR_BITACORA_REPRESTAMO` (DIAGNOSTICA). La tabla Capa C se extiende por `ALTER` (no se recrea) con `NO_CREDITO NUMBER(7)` y `CODIGO_CLIENTE NUMBER(7)` nullable. MERGE fila a fila aceptado (~5.2k candidatos en la corrida A); alternativa bulk documentada si la medicion muestra sobrecosto.
+- **Scripts nuevos:** `01_DDL/04_ALTER_PR_JOB_PRECALIFICA_CANDIDATO_TRACK_QA02.sql` (idempotente), `03_VALIDACION/04..06_*_INCREMENTO_B_QA02.sql` (estructuras, compilacion, conciliacion Capa C vs `FINAL_*`), `04_ROLLBACK/04_ROLLBACK_ALTER_*` y `04_ROLLBACK/ROLLBACK_INCREMENTO_B_BODY_QA02.sql` (= body A probado).
+- **Hash body con Incremento B (sin probar):** `0C07E500BB10F564B7495B79AE9B41921B2F21692083988D9D073FD88BA499CD`. La `spec.sql` no cambio.
+- **Pendientes:** restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000` en QA02; Incremento C y capa DIAGNOSTICA (propuestas separadas). No se ejecuto Oracle desde el repo (todo en Toad por el usuario); nada se promovio a PROD; `body copy.sql` intacto.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`, `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/{01_DDL,02_PACKAGE,03_VALIDACION,04_ROLLBACK,05_RESULTADOS,06_HANDOFF}/`, `ESTADO.md`, `OBJETOS_AFECTADOS.md`, `docs/memoria/CONTEXTO_ACTUAL.md`, `docs/memoria/BITACORA.md`.
+
 ## 2026-06-09 - Codex - Prueba QA02 y cierre documental del Incremento A
 
 - **Objetivo:** registrar la ejecucion real del tracking integral, cerrar la evidencia QA02 y preparar un commit atomico.

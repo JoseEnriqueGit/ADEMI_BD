@@ -28,9 +28,12 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
 
 ## Abierto ahora
 
-- 🟡 **Tracking integral precalifica QA02:** Incremento A aplicado y probado el 2026-06-09 en
-  `PR.PR_PKG_REPRESTAMOS`; ejecución `53D427AF4F597DB0E063140311AC14C5` con 31/31 métricas y
-  conciliaciones correctas. Pendientes Incrementos B/C y capa DIAGNOSTICA.
+- 🟡 **Tracking integral precalifica QA02:** Incrementos A y B aplicados y PROBADOS el
+  2026-06-09 en `PR.PR_PKG_REPRESTAMOS` (A: `53D427AF4F597DB0E063140311AC14C5`, 31/31
+  métricas; B: `53D8BBE0BA0E44D9E063140311AC6BC6`, cohorte individual del cierre en
+  `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` conciliada 1302/1302, costo MERGE ~0.2 ms/candidato).
+  ⚠️ **Pendiente operativo: restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000` en QA02** (quedó
+  en 1300 por la prueba). Pendientes Incremento C y capa DIAGNOSTICA.
   Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:
