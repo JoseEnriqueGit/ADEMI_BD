@@ -8082,8 +8082,6 @@ END P_Registra_Solicitud_Campana;
          v_final_cp            NUMBER := 0;
          v_final_rxt           NUMBER := 0;
          v_final_an            NUMBER := 0;
-         v_no_credito_cierre   NUMBER;
-         v_cod_cliente_cierre  NUMBER;
 
          PROCEDURE track_filtro(
              p_flujo         IN VARCHAR2,
@@ -8126,47 +8124,6 @@ END P_Registra_Solicitud_Campana;
                  ROLLBACK;
                  NULL;
          END track_filtro;
-
-         PROCEDURE track_candidato(
-             p_flujo          IN VARCHAR2,
-             p_id_represtamo  IN NUMBER,
-             p_no_credito     IN NUMBER,
-             p_codigo_cliente IN NUMBER,
-             p_resultado      IN VARCHAR2
-         ) IS
-             PRAGMA AUTONOMOUS_TRANSACTION;
-         BEGIN
-             IF NVL(v_track_activo, 'N') <> 'S' THEN
-                 RETURN;
-             END IF;
-
-             MERGE INTO PR.PR_JOB_PRECALIFICA_CANDIDATO_TRACK T
-             USING (SELECT v_id_ejecucion_track AS ID_EJECUCION,
-                           p_flujo              AS FLUJO,
-                           p_id_represtamo      AS ID_REPRESTAMO
-                      FROM DUAL) S
-                ON (T.ID_EJECUCION = S.ID_EJECUCION
-                    AND T.FLUJO = S.FLUJO
-                    AND T.ID_REPRESTAMO = S.ID_REPRESTAMO)
-              WHEN MATCHED THEN
-                  UPDATE SET T.NO_CREDITO = p_no_credito,
-                             T.CODIGO_CLIENTE = p_codigo_cliente,
-                             T.RESULTADO_ULTIMO = p_resultado,
-                             T.FECHA_REGISTRO = SYSTIMESTAMP
-              WHEN NOT MATCHED THEN
-                  INSERT (ID_EJECUCION, FLUJO, ID_REPRESTAMO,
-                          NO_CREDITO, CODIGO_CLIENTE,
-                          RESULTADO_ULTIMO, FECHA_REGISTRO)
-                  VALUES (S.ID_EJECUCION, S.FLUJO, S.ID_REPRESTAMO,
-                          p_no_credito, p_codigo_cliente,
-                          p_resultado, SYSTIMESTAMP);
-
-             COMMIT;
-         EXCEPTION
-             WHEN OTHERS THEN
-                 ROLLBACK;
-                 NULL;
-         END track_candidato;
 
          PROCEDURE track_insert_inicio(
              p_id_ejecucion IN VARCHAR2,
@@ -8780,10 +8737,8 @@ END P_Registra_Solicitud_Campana;
 
                        IF v_track_activo = 'S' THEN
                            BEGIN
-                               SELECT ESTADO, NO_CREDITO, CODIGO_CLIENTE
-                                 INTO v_estado_cierre,
-                                      v_no_credito_cierre,
-                                      v_cod_cliente_cierre
+                               SELECT ESTADO
+                                 INTO v_estado_cierre
                                  FROM PR.PR_REPRESTAMOS
                                 WHERE ID_REPRESTAMO = V_IDS_REPRESTAMO_FINAL(I);
 
@@ -8794,13 +8749,6 @@ END P_Registra_Solicitud_Campana;
                                    WHEN 'AN'  THEN v_final_an  := v_final_an + 1;
                                    ELSE NULL;
                                END CASE;
-
-                               track_candidato(
-                                   'CIERRE',
-                                   V_IDS_REPRESTAMO_FINAL(I),
-                                   v_no_credito_cierre,
-                                   v_cod_cliente_cierre,
-                                   v_estado_cierre);
                            EXCEPTION
                                WHEN OTHERS THEN
                                    NULL;
