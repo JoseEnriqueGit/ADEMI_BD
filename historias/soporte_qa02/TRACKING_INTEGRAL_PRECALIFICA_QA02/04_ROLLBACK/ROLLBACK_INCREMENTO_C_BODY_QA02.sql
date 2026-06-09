@@ -1,46 +1,6 @@
 CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
 
-   -- Tracking integral precalifica (Incremento C): estado package-private
-   -- compartido entre la orquestacion del job y las 5 procedures de flujo.
-   -- Solo lo activa P_Carga_Precalifica_Cancelado; en cualquier otro
-   -- contexto el flag queda en 'N' y el helper retorna sin escribir.
-   g_track_cand_activo   VARCHAR2(1) := 'N';
-   g_track_id_ejecucion  VARCHAR2(32);
-
-   TYPE t_track_ids IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
-
-   PROCEDURE track_candidatos_flujo(
-       p_flujo IN VARCHAR2,
-       p_ids   IN t_track_ids,
-       p_creds IN t_track_ids,
-       p_clis  IN t_track_ids
-   ) IS
-       PRAGMA AUTONOMOUS_TRANSACTION;
-   BEGIN
-       IF NVL(g_track_cand_activo, 'N') <> 'S'
-          OR g_track_id_ejecucion IS NULL
-          OR p_ids.COUNT = 0 THEN
-           RETURN;
-       END IF;
-
-       FORALL i IN 1 .. p_ids.COUNT
-           INSERT INTO PR.PR_JOB_PRECALIFICA_CANDIDATO_TRACK
-               (ID_EJECUCION, FLUJO, ID_REPRESTAMO,
-                NO_CREDITO, CODIGO_CLIENTE,
-                RESULTADO_ULTIMO, FECHA_REGISTRO)
-           VALUES
-               (g_track_id_ejecucion, p_flujo, p_ids(i),
-                p_creds(i), p_clis(i),
-                'RE', SYSTIMESTAMP);
-
-       COMMIT;
-   EXCEPTION
-       WHEN OTHERS THEN
-           ROLLBACK;
-           NULL;
-   END track_candidatos_flujo;
-
-   PROCEDURE Precalifica_Represtamo  IS
+   PROCEDURE Precalifica_Represtamo  IS 
        
        --- => Condicones a tomar en cuenta para la Precalificaci¿n de Cr¿ditos
        -- 1 - Microcreditos Monto Tope RD$ 772,280;       
@@ -270,24 +230,6 @@ CREATE OR REPLACE PACKAGE BODY PR.PR_PKG_REPRESTAMOS IS
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
-          IF g_track_cand_activo = 'S' THEN
-              DECLARE
-                  v_trk_ids   t_track_ids;
-                  v_trk_creds t_track_ids;
-                  v_trk_clis  t_track_ids;
-              BEGIN
-                  FOR t IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
-                      v_trk_ids(t)   := VCREDITOS_PROCESAR(t).ID_REPRESTAMO;
-                      v_trk_creds(t) := VCREDITOS_PROCESAR(t).NO_CREDITO;
-                      v_trk_clis(t)  := VCREDITOS_PROCESAR(t).CODIGO_CLIENTE;
-                  END LOOP;
-                  track_candidatos_flujo('Precalifica_Represtamo',
-                                         v_trk_ids, v_trk_creds, v_trk_clis);
-              EXCEPTION
-                  WHEN OTHERS THEN
-                      NULL;
-              END;
-          END IF;
 
          
 
@@ -661,24 +603,6 @@ PROCEDURE Precalifica_Repre_Cancelado IS
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
-          IF g_track_cand_activo = 'S' THEN
-              DECLARE
-                  v_trk_ids   t_track_ids;
-                  v_trk_creds t_track_ids;
-                  v_trk_clis  t_track_ids;
-              BEGIN
-                  FOR t IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
-                      v_trk_ids(t)   := VCREDITOS_PROCESAR(t).ID_REPRESTAMO;
-                      v_trk_creds(t) := VCREDITOS_PROCESAR(t).NO_CREDITO;
-                      v_trk_clis(t)  := VCREDITOS_PROCESAR(t).CODIGO_CLIENTE;
-                  END LOOP;
-                  track_candidatos_flujo('Precalifica_Repre_Cancelado',
-                                         v_trk_ids, v_trk_creds, v_trk_clis);
-              EXCEPTION
-                  WHEN OTHERS THEN
-                      NULL;
-              END;
-          END IF;
 
             
             --Cambio el estado del detalle de la bitacora
@@ -1043,24 +967,6 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
-          IF g_track_cand_activo = 'S' THEN
-              DECLARE
-                  v_trk_ids   t_track_ids;
-                  v_trk_creds t_track_ids;
-                  v_trk_clis  t_track_ids;
-              BEGIN
-                  FOR t IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
-                      v_trk_ids(t)   := VCREDITOS_PROCESAR(t).ID_REPRESTAMO;
-                      v_trk_creds(t) := VCREDITOS_PROCESAR(t).NO_CREDITO;
-                      v_trk_clis(t)  := VCREDITOS_PROCESAR(t).CODIGO_CLIENTE;
-                  END LOOP;
-                  track_candidatos_flujo('Precalifica_Repre_Cancelado_hi',
-                                         v_trk_ids, v_trk_creds, v_trk_clis);
-              EXCEPTION
-                  WHEN OTHERS THEN
-                      NULL;
-              END;
-          END IF;
 
             --Cambio el estado del detalle de la bitacora
             --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
@@ -1437,24 +1343,6 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
-          IF g_track_cand_activo = 'S' THEN
-              DECLARE
-                  v_trk_ids   t_track_ids;
-                  v_trk_creds t_track_ids;
-                  v_trk_clis  t_track_ids;
-              BEGIN
-                  FOR t IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
-                      v_trk_ids(t)   := VCREDITOS_PROCESAR(t).ID_REPRESTAMO;
-                      v_trk_creds(t) := VCREDITOS_PROCESAR(t).NO_CREDITO;
-                      v_trk_clis(t)  := VCREDITOS_PROCESAR(t).CODIGO_CLIENTE;
-                  END LOOP;
-                  track_candidatos_flujo('Precalifica_Represtamo_fiadores',
-                                         v_trk_ids, v_trk_creds, v_trk_clis);
-              EXCEPTION
-                  WHEN OTHERS THEN
-                      NULL;
-              END;
-          END IF;
 
          
 
@@ -1811,24 +1699,6 @@ PROCEDURE Precalifica_Repre_Cancelado_hi IS
           FETCH CREDITOS_PROCESAR BULK COLLECT INTO VCREDITOS_PROCESAR LIMIT 100;
           -- Inserta los Precalificados
           FORALL i IN 1 .. VCREDITOS_PROCESAR.COUNT INSERT INTO PR.PR_REPRESTAMOS VALUES VCREDITOS_PROCESAR (i);
-          IF g_track_cand_activo = 'S' THEN
-              DECLARE
-                  v_trk_ids   t_track_ids;
-                  v_trk_creds t_track_ids;
-                  v_trk_clis  t_track_ids;
-              BEGIN
-                  FOR t IN 1 .. VCREDITOS_PROCESAR.COUNT LOOP
-                      v_trk_ids(t)   := VCREDITOS_PROCESAR(t).ID_REPRESTAMO;
-                      v_trk_creds(t) := VCREDITOS_PROCESAR(t).NO_CREDITO;
-                      v_trk_clis(t)  := VCREDITOS_PROCESAR(t).CODIGO_CLIENTE;
-                  END LOOP;
-                  track_candidatos_flujo('Precalifica_Represtamo_fiadores_hi',
-                                         v_trk_ids, v_trk_creds, v_trk_clis);
-              EXCEPTION
-                  WHEN OTHERS THEN
-                      NULL;
-              END;
-          END IF;
 
             --Cambio el estado del detalle de la bitacora
             --PR.PR_PKG_TRAZABILIDAD.PR_ACTUALIZAR_BITACORA_DET (pIDAPLICACION, 'ENPROCESO', 30, 'EN PROCESO', pMensaje );
@@ -8485,9 +8355,6 @@ END P_Registra_Solicitud_Campana;
                               v_track_fcorte := NULL;
                       END;
 
-                      g_track_cand_activo  := v_track_activo;
-                      g_track_id_ejecucion := v_id_ejecucion_track;
-
                       track_inicio(1, 'P_Actualizar_Anular_Represtamo');
                       IF v_track_activo = 'S' THEN
                           SELECT COUNT(*)
@@ -8983,14 +8850,9 @@ END P_Registra_Solicitud_Campana;
                 COMMIT;
                 track_fin(14);
 
-       g_track_cand_activo  := 'N';
-       g_track_id_ejecucion := NULL;
-
        track_fin(0, p_registros_re => v_conteo);
        COMMIT;
       EXCEPTION WHEN OTHERS THEN
-          g_track_cand_activo  := 'N';
-          g_track_id_ejecucion := NULL;
           track_error(v_paso_actual_track, v_proceso_track, SQLCODE, SQLERRM || CHR(10) || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
           track_error(0, 'TOTAL_JOB', SQLCODE, SQLERRM || CHR(10) || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
 
