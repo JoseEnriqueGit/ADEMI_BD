@@ -146,7 +146,10 @@ Conciliacion manual confirmada:
   cambios, 0 errores, 3 lineas con `track_candidato`) -> job -> conciliacion.
 - **Para acortar la prueba se redujo `LOTE_DE_CARAGA_REPRESTAMO` de `130000` a
   `1300`** (queda autodocumentado en `VALOR_LOTE` de la Capa B).
-  **PENDIENTE: restaurar a `130000`.**
+  **DECISION 2026-06-09: el lote QUEDA en `1300` en QA02 a proposito**, para que
+  las corridas de prueba duren menos. Subirlo a `130000` solo si se necesita una
+  corrida representativa o comparable con PROD (cada corrida registra su lote en
+  `VALOR_LOTE`, asi que el valor vigente siempre es auditable).
 - ID de ejecucion: `53D8BBE0BA0E44D9E063140311AC6BC6`.
 - Duracion total del job: `1665.743 s` (27.762 min); `REGISTROS_RE = 1633`.
 - Capa B (31/31 metricas): flujos netos `1167 + 321 + 0 + 100 + 45 = 1633` RE;
@@ -176,8 +179,9 @@ Conciliacion manual confirmada:
 - **Incremento C:** pendiente; pertenencia individual a cada flujo.
 - **DIAGNOSTICA:** pendiente; desglose de filtros internos comparable con
   `trackers_precalifica_cursor`.
-- **Pendiente operativo:** restaurar `LOTE_DE_CARAGA_REPRESTAMO = 130000`
-  (se dejo en `1300` para la prueba del B).
+- **Decision operativa (2026-06-09):** `LOTE_DE_CARAGA_REPRESTAMO` queda en
+  `1300` en QA02 a proposito (corridas de prueba mas cortas). Subirlo a
+  `130000` solo para corridas representativas o comparables con PROD.
 
 ## Rollback
 

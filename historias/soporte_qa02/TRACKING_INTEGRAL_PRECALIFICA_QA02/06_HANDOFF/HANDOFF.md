@@ -16,8 +16,9 @@ Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (
 - Snapshots antes/despues disponibles en `02_PACKAGE/` (el body A probado quedo en
   `body_QA02_INCREMENTO_A_PROBADO_20260609.sql`, hash `D12032AD...`; el canonico con B
   tiene hash `0C07E500...`).
-- **Pendiente operativo: restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000`** (quedo en `1300`
-  para acortar la prueba del B).
+- **Decision operativa: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (a proposito,
+  para corridas de prueba cortas). Subirlo a `130000` solo para corridas representativas o
+  comparables con PROD; cada corrida registra su lote en `VALOR_LOTE`.
 - Pendiente: Incremento C y capa DIAGNOSTICA.
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
@@ -74,23 +75,21 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. **Restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000`** en `PA_PARAMETROS_MVP` (empresa 1);
-   quedo en `1300` para la prueba del B.
-2. Implementar Incremento C si se aprueba capturar pertenencia por flujo.
-3. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
+1. Implementar Incremento C si se aprueba capturar pertenencia por flujo.
+2. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
    `trackers_precalifica_cursor`.
-4. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
+3. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 
 > Resueltas: la prueba del B concilio al 100% y el costo del `MERGE` por candidato
 > (~0.2 ms) se midio contra la corrida A -> NO se requiere la variante bulk.
+> El lote queda en `1300` por decision (corridas cortas en QA02).
 
 ## Proximos pasos (orden sugerido)
 
-1. Restaurar el lote a `130000` y dejarlo anotado en `05_RESULTADOS/`.
-2. Decidir alcance y volumen aceptable para el Incremento C.
-3. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
-4. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
+1. Decidir alcance y volumen aceptable para el Incremento C.
+2. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
+3. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
 
 ## Reglas duras (no negociables)
 
