@@ -26,8 +26,17 @@ Validacion QA02 (2026-06-08) completa: Oracle 19c (nombres largos validos), `PR_
 `ID_REPRESTAMO` = `NUMBER(14)`, y `PA_PARAMETROS_MVP` exige `DES_PARAMETRO`/`ADICIONADO_POR`/`FECHA_ADICION`
 (ya incluidas en el script 03). Ver detalle en `01_DDL/README.md`.
 
+## DDL aplicado en QA02 (Incremento B, 2026-06-09)
+
+| Objeto | Tipo | Cambio | Script |
+|---|---|---|---|
+| `PR.PR_JOB_PRECALIFICA_CANDIDATO_TRACK` | Tabla existente | `ALTER ADD` columnas `NO_CREDITO NUMBER(7)` y `CODIGO_CLIENTE NUMBER(7)` (nullable). | `01_DDL/04_ALTER_PR_JOB_PRECALIFICA_CANDIDATO_TRACK_QA02.sql` |
+
 ## Package body aplicado
 
-El Incremento A del body fue compilado y probado en QA02 el 2026-06-09.
-La `spec.sql` no cambio. La ejecucion controlada genero 31 metricas en
-`PR.PR_JOB_PRECALIFICA_FILTRO_TRACK`.
+- **Incremento A** (2026-06-09 AM): 31 metricas en `PR_JOB_PRECALIFICA_FILTRO_TRACK`.
+  Ejecucion `53D427AF4F597DB0E063140311AC14C5`.
+- **Incremento B** (2026-06-09 PM): helper `track_candidato` + cohorte individual del
+  cierre en `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` (`FLUJO='CIERRE'`). Ejecucion
+  `53D8BBE0BA0E44D9E063140311AC6BC6`, 1302/1302 conciliado.
+- La `spec.sql` no cambio en ningun incremento.

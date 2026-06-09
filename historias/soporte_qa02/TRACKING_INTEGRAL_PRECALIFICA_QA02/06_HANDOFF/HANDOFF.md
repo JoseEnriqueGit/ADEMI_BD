@@ -1,17 +1,24 @@
 # Handoff - Tracking integral precalifica QA02
 
-Ultima actualizacion: 2026-06-09 (Codex). Entorno: **QA02 = Oracle 19c** (`AJEREZ@QADEMI02_19C`).
+Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (`AJEREZ@QADEMI02_19C`).
 
 ## Estado actual
 
-- **DDL auxiliar (Capas B y C): CREADO en QA02.** Tablas, secuencia, indices y parametros ya existen.
-- **Incremento A implementado en el body canonico del repo.**
-- Helpers privados y 31 metricas Capa B agregados en `P_Carga_Precalifica_Cancelado`.
-- **Incremento A aplicado y probado en QA02 el 2026-06-09.**
-- Ejecucion validada: `53D427AF4F597DB0E063140311AC14C5`, 31/31 metricas.
-- **La `spec.sql` no cambio.** Oracle se ejecuto manualmente desde Toad.
-- Snapshots antes/despues disponibles en `02_PACKAGE/`.
-- Pendiente: Incrementos B/C y capa DIAGNOSTICA.
+- **DDL auxiliar (Capas B y C): CREADO en QA02.** Tablas, secuencia, indices, parametros
+  y columnas `NO_CREDITO`/`CODIGO_CLIENTE` del B ya existen.
+- **Incremento A aplicado y PROBADO el 2026-06-09 AM:** `53D427AF4F597DB0E063140311AC14C5`,
+  31/31 metricas.
+- **Incremento B aplicado y PROBADO el 2026-06-09 PM:** `53D8BBE0BA0E44D9E063140311AC6BC6`,
+  Capa C `1302/1302 == FINAL_*` (949 NP + 201 CP + 152 RXT + 0 AN), 0 nulos/duplicados,
+  costo del MERGE ~0.2 ms/candidato (1.456 s el paso 13 completo). Evidencia en
+  `05_RESULTADOS/RESULTADOS_QA02.md`.
+- **La `spec.sql` no cambio.** Oracle se ejecuta manualmente desde Toad.
+- Snapshots antes/despues disponibles en `02_PACKAGE/` (el body A probado quedo en
+  `body_QA02_INCREMENTO_A_PROBADO_20260609.sql`, hash `D12032AD...`; el canonico con B
+  tiene hash `0C07E500...`).
+- **Pendiente operativo: restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000`** (quedo en `1300`
+  para acortar la prueba del B).
+- Pendiente: Incremento C y capa DIAGNOSTICA.
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
 
@@ -40,10 +47,15 @@ Disenado contra el **codigo real** del body (no solo la propuesta). Todo vive en
 - Helper autonomo implementado: `track_filtro` (Capa B, usa `SEQ.NEXTVAL`,
   `ROLLBACK` en handler). Guardado por `TRACK_PRECALIFICA_ACTIVO='S'`.
   Los conteos se calculan en la transaccion principal y se pasan como numeros.
-- `track_candidato` pertenece al diseno de Incrementos B/C y aun no esta
-  implementado en el body.
+- Helper autonomo `track_candidato` (Incremento B) **ya codificado** junto a `track_filtro`:
+  `MERGE` idempotente a `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` con
+  `(p_flujo, p_id_represtamo, p_no_credito, p_codigo_cliente, p_resultado)`, guard por flag,
+  `COMMIT` propio y `ROLLBACK; NULL;` en el handler. Se invoca en el bloque de tracking por ID
+  del cierre (el del `SELECT` de estado observado, extendido a `ESTADO, NO_CREDITO,
+  CODIGO_CLIENTE`), con `FLUJO='CIERRE'`. El `IF` funcional del cierre NO se toco.
 - Incrementos: **A** = conteos REALES de orquestacion (arranque, 5 flujos neto, RE consolidado,
-  precalificacion, XCORE, solicitud, cierre). **B** = cohorte final + `RESULTADO_ULTIMO`. **C** (diferido) =
+  precalificacion, XCORE, solicitud, cierre) — PROBADO. **B** = cohorte final individual +
+  `RESULTADO_ULTIMO` (estado observado) — PROBADO. **C** (diferido) =
   pertenencia por flujo en el `FETCH` (toca las 5 procedures, propuesta separada). + DIAGNOSTICA (5 scripts externos).
 
 ### Correcciones de la revision adversarial ya incorporadas (importantes)
@@ -62,17 +74,21 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. Implementar Incremento B si se aprueba el detalle individual del cierre.
+1. **Restaurar `LOTE_DE_CARAGA_REPRESTAMO=130000`** en `PA_PARAMETROS_MVP` (empresa 1);
+   quedo en `1300` para la prueba del B.
 2. Implementar Incremento C si se aprueba capturar pertenencia por flujo.
 3. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
    `trackers_precalifica_cursor`.
 4. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 
+> Resueltas: la prueba del B concilio al 100% y el costo del `MERGE` por candidato
+> (~0.2 ms) se midio contra la corrida A -> NO se requiere la variante bulk.
+
 ## Proximos pasos (orden sugerido)
 
-1. Conservar la evidencia del Incremento A.
-2. Decidir alcance y volumen aceptable para Incrementos B/C.
+1. Restaurar el lote a `130000` y dejarlo anotado en `05_RESULTADOS/`.
+2. Decidir alcance y volumen aceptable para el Incremento C.
 3. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
 4. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
 
@@ -88,5 +104,7 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 - Propuesta de diseno: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`
 - Diseno e historial: `02_PACKAGE/PROPUESTA_INSTRUMENTACION_BODY_QA02.md`
 - Body canonico instrumentado: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`
-- DDL creado: `01_DDL/00..03`  ·  Rollbacks: `04_ROLLBACK/01..03` + body baseline
+- DDL creado: `01_DDL/00..03` (aplicados) + `01_DDL/04_ALTER_*` (Incremento B, pendiente)
+- Rollbacks: `04_ROLLBACK/01..04` + body baseline + `ROLLBACK_INCREMENTO_B_BODY_QA02.sql` (B -> A probado)
+- Validacion B: `03_VALIDACION/04..06_*_INCREMENTO_B_QA02.sql`
 - Baseline body/spec: `00_ANTES/`  ·  Evidencia: `05_RESULTADOS/RESULTADOS_QA02.md`  ·  Estado: `ESTADO.md`

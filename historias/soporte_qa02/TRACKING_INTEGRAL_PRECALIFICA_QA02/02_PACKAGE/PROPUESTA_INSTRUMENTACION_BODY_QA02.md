@@ -1,6 +1,6 @@
 # Propuesta de instrumentacion del body - Tracking integral QA02
 
-Fecha: 2026-06-08 · Estado: **INCREMENTO A IMPLEMENTADO Y PROBADO EN QA02 EL 2026-06-09.**
+Fecha: 2026-06-08 · Estado: **INCREMENTOS A Y B PROBADOS EN QA02 EL 2026-06-09** (B: ver seccion 4.8; evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`).
 Revision adversarial multiagente aplicada (14 hallazgos confirmados incorporados): gating de COUNTs por flag,
 `FECHA_CORTE` poblada, desglose REAL de precalificacion (RSB/CLS/RCS/borrados), `FLUJO_RE_NETO` reetiquetado,
 bloque de cierre concreto, y notas de `ORDEN_FILTRO` y paso 14.
@@ -316,6 +316,37 @@ track_filtro('TOTAL','CIERRE','FINAL_NP','Notificacion pendiente','REAL', p_pasa
 > **Paso 14 (ACTUALIZA_PARAMETRO_EJECUCIONES, body 8316-8320):** NO genera fila en `FILTRO_TRACK`; es
 > bookkeeping del job (JSON de corrida en `PA_PARAMETROS_MVP`), no un estado de represtamos. Su duracion ya
 > queda en el `track_inicio(14)/track_fin(14)` existente. **Omision deliberada**, no accidental.
+
+## 4.8 Incremento B tal como se implemento (2026-06-09, PROBADO: `53D8BBE0BA0E44D9E063140311AC6BC6`)
+
+El Incremento B quedo codificado en el body canonico con estas decisiones, que ajustan
+los borradores 3.4 y 4.7 al codigo REAL probado del Incremento A:
+
+1. **No se reescribio el `IF` funcional del cierre a `ELSIF`.** Se conservo el patron ya
+   probado del Incremento A: el `IF` anidado original queda intacto y, con tracking activo,
+   se consulta el estado **observado** en `PR_REPRESTAMOS` despues de la decision funcional.
+   `RESULTADO_ULTIMO` guarda ese estado observado (mismo dato que alimenta `FINAL_*`).
+   Justificacion: `P_Generar_Bitacora` delega en `P_Validar_Cambio_Estado`, que solo aplica
+   el estado si `PR_ESTADOS_REPRESTAMO.IND_CAMBIA_ESTADO_REPRE='S'` y traga errores (ambas
+   son autonomas con handler propio). El estado observado es la realidad post-cierre; el
+   estado "decidido" queda en `PR_BITACORA_REPRESTAMO` y se cruza por DIAGNOSTICA.
+2. **La cohorte se captura en el bloque de tracking por ID ya existente** (el que computa
+   `v_final_np/cp/rxt/an`): el `SELECT` se extendio a `(ESTADO, NO_CREDITO, CODIGO_CLIENTE)`
+   y, dentro del mismo `BEGIN/EXCEPTION`, se llama `track_candidato('CIERRE', id, ...)`.
+   Si el `SELECT` falla para un ID, ni se cuenta ni se inserta (comportamiento identico al A).
+3. **`track_candidato` se extendio** respecto del borrador 3.4 con `p_no_credito` y
+   `p_codigo_cliente` (requerimiento: cohorte identificable por credito y cliente). El `MERGE`
+   sigue siendo autonomo, con guard por flag, `COMMIT` propio y `ROLLBACK; NULL;` en el handler.
+4. **La tabla Capa C se extendio por `ALTER`** (no se recreo): columnas `NO_CREDITO NUMBER(7)`
+   y `CODIGO_CLIENTE NUMBER(7)` nullable, script idempotente `01_DDL/04_ALTER_...` con reversa
+   `04_ROLLBACK/04_ROLLBACK_ALTER_...`.
+5. **Volumen (decision abierta de la seccion 7, resuelta y MEDIDA):** `MERGE` autonomo +
+   `COMMIT` por candidato, fila a fila (consistente con 3.4). Medicion real del paso 13:
+   corrida B `1.456 s / 1302 cand = 0.0011 s/cand` vs corrida A (sin track_candidato)
+   `4.757 s / 5169 cand = 0.0009 s/cand` -> sobrecosto ~`0.2 ms`/candidato (~1 s en una
+   corrida full). **No se requiere la variante bulk.**
+6. **El Incremento B no agrega filas a la Capa B**: la corrida debe seguir produciendo
+   31 metricas en `PR_JOB_PRECALIFICA_FILTRO_TRACK`.
 
 ## 5. DIAGNOSTICA y Capa C completa (fases siguientes)
 
