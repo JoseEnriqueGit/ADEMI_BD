@@ -4,7 +4,7 @@
 > web, Codex, editor local), **lee este archivo primero**. Es la "memoria de trabajo": un snapshot
 > vivo que se sobrescribe. El detalle cronológico vive en `docs/memoria/BITACORA.md`.
 >
-> Última actualización: 2026-06-05 · Mantener al día con cada cambio de estado relevante.
+> Última actualización: 2026-06-09 · Mantener al día con cada cambio de estado relevante.
 
 ---
 
@@ -28,6 +28,10 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
 
 ## Abierto ahora
 
+- 🟡 **Tracking integral precalifica QA02:** Incremento A aplicado y probado el 2026-06-09 en
+  `PR.PR_PKG_REPRESTAMOS`; ejecución `53D427AF4F597DB0E063140311AC14C5` con 31/31 métricas y
+  conciliaciones correctas. Pendientes Incrementos B/C y capa DIAGNOSTICA.
+  Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:
   OPT-017/018 (bulk collect) en DESARROLLO, pendiente de compilar en QA y monitorear en PROD.

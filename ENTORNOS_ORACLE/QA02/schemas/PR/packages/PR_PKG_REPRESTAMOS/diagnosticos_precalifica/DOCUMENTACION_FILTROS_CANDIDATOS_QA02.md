@@ -89,3 +89,10 @@ Conclusion de este filtro: el candidato no basta con que exista en `PR_CREDITOS`
 3. Los flujos con fiadores son subconjuntos mas estrictos: primero pasan el filtro base del flujo activo/cancelado, luego exigen aval distinto al cliente y dos creditos cancelados.
 4. Los flujos HI quedaron sin candidatos en esta corrida; si negocio espera candidatos ahi, el primer punto a revisar es `DIAS_CANCELACION` contra `F_CANCELACION` historica.
 5. Los numeros son evidencia QA02 de una corrida puntual. Si se reejecutan, pueden variar por nuevos creditos, nuevos cortes DE08 o cambios de parametros.
+
+## Propuesta de tracking integral
+
+La propuesta para convertir este diagnostico en evidencia asociada a una
+ejecucion real, y extenderlo hasta precalificacion, XCORE, solicitud, canal y
+estado final, se encuentra en
+`PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`.

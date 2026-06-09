@@ -8067,63 +8067,6 @@ END P_Registra_Solicitud_Campana;
          v_id_ejecucion_track  VARCHAR2(32) := RAWTOHEX(SYS_GUID());
          v_paso_actual_track   NUMBER := 0;
          v_proceso_track       VARCHAR2(120) := 'TOTAL_JOB';
-         v_track_activo        VARCHAR2(1) := 'N';
-         v_track_lote          NUMBER;
-         v_track_fcorte        DATE;
-         v_track_orden         NUMBER := 0;
-         v_re_a                NUMBER;
-         v_re_b                NUMBER;
-         v_aux1                NUMBER;
-         v_aux2                NUMBER;
-         v_aux3                NUMBER;
-         v_aux4                NUMBER;
-         v_estado_cierre       VARCHAR2(8);
-         v_final_np            NUMBER := 0;
-         v_final_cp            NUMBER := 0;
-         v_final_rxt           NUMBER := 0;
-         v_final_an            NUMBER := 0;
-
-         PROCEDURE track_filtro(
-             p_flujo         IN VARCHAR2,
-             p_fase          IN VARCHAR2,
-             p_codigo_filtro IN VARCHAR2,
-             p_descripcion   IN VARCHAR2,
-             p_tipo_medicion IN VARCHAR2 DEFAULT 'REAL',
-             p_antes         IN NUMBER   DEFAULT NULL,
-             p_pasan         IN NUMBER   DEFAULT NULL,
-             p_descartados   IN NUMBER   DEFAULT NULL,
-             p_creditos_desc IN NUMBER   DEFAULT NULL,
-             p_clientes_desc IN NUMBER   DEFAULT NULL,
-             p_parametros    IN VARCHAR2 DEFAULT NULL
-         ) IS
-             PRAGMA AUTONOMOUS_TRANSACTION;
-         BEGIN
-             IF NVL(v_track_activo, 'N') <> 'S' THEN
-                 RETURN;
-             END IF;
-
-             v_track_orden := v_track_orden + 1;
-
-             INSERT INTO PR.PR_JOB_PRECALIFICA_FILTRO_TRACK
-                 (ID_EJECUCION, ID_DETALLE, FLUJO, FASE, ORDEN_FILTRO,
-                  CODIGO_FILTRO, DESCRIPCION, TIPO_MEDICION,
-                  CANDIDATOS_ANTES, CANDIDATOS_PASAN,
-                  CANDIDATOS_DESCARTADOS, CREDITOS_DESCARTADOS,
-                  CLIENTES_DESCARTADOS, VALOR_LOTE, FECHA_CORTE,
-                  PARAMETROS, FECHA_REGISTRO)
-             VALUES
-                 (v_id_ejecucion_track, PR.SEQ_PR_JOB_PRECAL_FILTRO.NEXTVAL,
-                  p_flujo, p_fase, v_track_orden, p_codigo_filtro,
-                  p_descripcion, p_tipo_medicion, p_antes, p_pasan,
-                  p_descartados, p_creditos_desc, p_clientes_desc,
-                  v_track_lote, v_track_fcorte, p_parametros, SYSTIMESTAMP);
-
-             COMMIT;
-         EXCEPTION
-             WHEN OTHERS THEN
-                 ROLLBACK;
-                 NULL;
-         END track_filtro;
 
          PROCEDURE track_insert_inicio(
              p_id_ejecucion IN VARCHAR2,
@@ -8290,415 +8233,46 @@ END P_Registra_Solicitud_Campana;
                       -- Inicio del proceso de trazabilidad
                       track_inicio(0, 'TOTAL_JOB');
 
-                      BEGIN
-                          v_track_activo :=
-                              NVL(PR.PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo(
-                                      'TRACK_PRECALIFICA_ACTIVO'), 'N');
-
-                          IF v_track_activo = 'S' THEN
-                              v_track_lote :=
-                                  TO_NUMBER(PR.PR_PKG_REPRESTAMOS.F_Obt_Parametro_Represtamo(
-                                                'LOTE_DE_CARAGA_REPRESTAMO'));
-
-                              SELECT MAX(P.FECHA_CORTE)
-                                INTO v_track_fcorte
-                                FROM PA_DETALLADO_DE08 P
-                               WHERE P.FUENTE = 'PR';
-                          END IF;
-                      EXCEPTION
-                          WHEN OTHERS THEN
-                              v_track_activo := 'N';
-                              v_track_lote := NULL;
-                              v_track_fcorte := NULL;
-                      END;
-
                       track_inicio(1, 'P_Actualizar_Anular_Represtamo');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.P_Actualizar_Anular_Represtamo(pMensaje);
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'TOTAL', 'ARRANQUE', 'INI_RE_ANTES',
-                              'RE abiertos antes de anular', 'REAL',
-                              p_antes => v_re_a,
-                              p_pasan => v_re_a);
-                          track_filtro(
-                              'TOTAL', 'ARRANQUE', 'INI_RE_DESPUES',
-                              'RE tras anular (linea base)', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => v_re_a - v_re_b);
-                      END IF;
                       track_fin(1);
 
                       track_inicio(2, 'Precalifica_Represtamo');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'Precalifica_Represtamo', 'LOTE', 'LOTE_VALOR',
-                              'Tope ROWNUM del cursor', 'REAL',
-                              p_parametros => 'LOTE=' || TO_CHAR(v_track_lote));
-                          track_filtro(
-                              'Precalifica_Represtamo', 'SALIDA',
-                              'RE_ACUMULADO_TRAS_FLUJO',
-                              'RE global acumulado tras el flujo', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => CASE
-                                                   WHEN v_re_b < v_re_a
-                                                   THEN v_re_a - v_re_b
-                                               END,
-                              p_parametros  => 'NETO=' || TO_CHAR(v_re_b - v_re_a));
-                      END IF;
                       track_fin(2);
 
                       track_inicio(3, 'Precalifica_Represtamo_fiadores');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'Precalifica_Represtamo_fiadores', 'LOTE',
-                              'LOTE_VALOR', 'Tope ROWNUM del cursor', 'REAL',
-                              p_parametros => 'LOTE=' || TO_CHAR(v_track_lote));
-                          track_filtro(
-                              'Precalifica_Represtamo_fiadores', 'SALIDA',
-                              'RE_ACUMULADO_TRAS_FLUJO',
-                              'RE global acumulado tras el flujo', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => CASE
-                                                   WHEN v_re_b < v_re_a
-                                                   THEN v_re_a - v_re_b
-                                               END,
-                              p_parametros  => 'NETO=' || TO_CHAR(v_re_b - v_re_a));
-                      END IF;
                       track_fin(3);
 
                       track_inicio(4, 'Precalifica_Represtamo_fiadores_hi');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Precalifica_Represtamo_fiadores_hi();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'Precalifica_Represtamo_fiadores_hi', 'LOTE',
-                              'LOTE_VALOR', 'Tope ROWNUM del cursor', 'REAL',
-                              p_parametros => 'LOTE=' || TO_CHAR(v_track_lote));
-                          track_filtro(
-                              'Precalifica_Represtamo_fiadores_hi', 'SALIDA',
-                              'RE_ACUMULADO_TRAS_FLUJO',
-                              'RE global acumulado tras el flujo', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => CASE
-                                                   WHEN v_re_b < v_re_a
-                                                   THEN v_re_a - v_re_b
-                                               END,
-                              p_parametros  => 'NETO=' || TO_CHAR(v_re_b - v_re_a));
-                      END IF;
                       track_fin(4);
 
                       track_inicio(5, 'Precalifica_Repre_Cancelado');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'Precalifica_Repre_Cancelado', 'LOTE',
-                              'LOTE_VALOR', 'Tope ROWNUM del cursor', 'REAL',
-                              p_parametros => 'LOTE=' || TO_CHAR(v_track_lote));
-                          track_filtro(
-                              'Precalifica_Repre_Cancelado', 'SALIDA',
-                              'RE_ACUMULADO_TRAS_FLUJO',
-                              'RE global acumulado tras el flujo', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => CASE
-                                                   WHEN v_re_b < v_re_a
-                                                   THEN v_re_a - v_re_b
-                                               END,
-                              p_parametros  => 'NETO=' || TO_CHAR(v_re_b - v_re_a));
-                      END IF;
                       track_fin(5);
 
                       track_inicio(6, 'Precalifica_Repre_Cancelado_hi');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Precalifica_Repre_Cancelado_hi();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'Precalifica_Repre_Cancelado_hi', 'LOTE',
-                              'LOTE_VALOR', 'Tope ROWNUM del cursor', 'REAL',
-                              p_parametros => 'LOTE=' || TO_CHAR(v_track_lote));
-                          track_filtro(
-                              'Precalifica_Repre_Cancelado_hi', 'SALIDA',
-                              'RE_ACUMULADO_TRAS_FLUJO',
-                              'RE global acumulado tras el flujo', 'REAL',
-                              p_antes       => v_re_a,
-                              p_pasan       => v_re_b,
-                              p_descartados => CASE
-                                                   WHEN v_re_b < v_re_a
-                                                   THEN v_re_a - v_re_b
-                                               END,
-                              p_parametros  => 'NETO=' || TO_CHAR(v_re_b - v_re_a));
-                      END IF;
                       track_fin(6);
 
                       track_inicio(7, 'COUNT_RE');
                       BEGIN
                         SELECT COUNT(*) INTO v_conteo  FROM PR.PR_REPRESTAMOS R  WHERE ESTADO = 'RE';
                       END;
-                      IF v_track_activo = 'S' THEN
-                          track_filtro(
-                              'TOTAL', 'POST_CURSOR', 'RE_CONSOLIDADO',
-                              'RE tras los 5 flujos', 'REAL',
-                              p_pasan => v_conteo);
-                      END IF;
                       track_fin(7, p_registros_re => v_conteo);
 
                       track_inicio(8, 'Actualiza_Precalificacion');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          SELECT COUNT(*)
-                            INTO v_aux1
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RSB';
-
-                          SELECT COUNT(*)
-                            INTO v_aux2
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO IN ('CLS', 'RCS');
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Actualiza_Precalificacion();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          SELECT COUNT(*)
-                            INTO v_aux3
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RSB';
-
-                          SELECT COUNT(*)
-                            INTO v_aux4
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO IN ('CLS', 'RCS');
-
-                          track_filtro(
-                              'TOTAL', 'PRECALIFICACION', 'PRE_RE_ENTRADA',
-                              'RE recibidos', 'REAL',
-                              p_antes => v_re_a,
-                              p_pasan => v_re_a);
-                          track_filtro(
-                              'TOTAL', 'PRECALIFICACION', 'PRE_RSB',
-                              'Rechazados clasificacion/fiador (RSB)', 'REAL',
-                              p_descartados => v_aux3 - v_aux1);
-                          track_filtro(
-                              'TOTAL', 'PRECALIFICACION', 'PRE_CLS_RCS',
-                              'Clasificados SIB / castigo (CLS+RCS)', 'REAL',
-                              p_descartados => v_aux4 - v_aux2);
-                          track_filtro(
-                              'TOTAL', 'PRECALIFICACION', 'PRE_BORRADOS',
-                              'Borrados sin codigo / OFAC (derivado)', 'REAL',
-                              p_descartados => (v_re_a - v_re_b)
-                                                - (v_aux3 - v_aux1)
-                                                - (v_aux4 - v_aux2));
-                          track_filtro(
-                              'TOTAL', 'PRECALIFICACION', 'PRE_RE_SALIDA',
-                              'RE que continuan con codigo', 'REAL',
-                              p_pasan => v_re_b);
-                      END IF;
                       track_fin(8);
 
                       track_inicio(9, 'Actualiza_XCORE_CUSTOM');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_aux1
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE'
-                             AND XCORE_GLOBAL IS NULL;
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.Actualiza_XCORE_CUSTOM();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_aux2
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE'
-                             AND XCORE_GLOBAL IS NULL;
-
-                          SELECT COUNT(*)
-                            INTO v_re_b
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          track_filtro(
-                              'TOTAL', 'XCORE', 'XCORE_ENTRADA',
-                              'RE pendientes de XCORE', 'REAL',
-                              p_antes => v_aux1,
-                              p_pasan => v_aux1);
-                          track_filtro(
-                              'TOTAL', 'XCORE', 'XCORE_PROCESADOS',
-                              'RE actualizados con XCORE', 'REAL',
-                              p_pasan => v_aux1 - v_aux2);
-                          track_filtro(
-                              'TOTAL', 'XCORE', 'XCORE_RECHAZADOS',
-                              'PVALIDA_XCORE comentado en QA02',
-                              'DIAGNOSTICA',
-                              p_parametros => 'NO_EJECUTADO');
-                          track_filtro(
-                              'TOTAL', 'XCORE', 'XCORE_SALIDA',
-                              'RE que continuan', 'REAL',
-                              p_pasan => v_re_b);
-                      END IF;
                       track_fin(9);
 
                       track_inicio(10, 'P_REGISTRO_SOLICITUD');
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_re_a
-                            FROM PR.PR_REPRESTAMOS
-                           WHERE ESTADO = 'RE';
-
-                          SELECT COUNT(*)
-                            INTO v_aux1
-                            FROM PR.PR_SOLICITUD_REPRESTAMO S
-                           WHERE EXISTS (
-                                 SELECT 1
-                                   FROM PR.PR_REPRESTAMOS R
-                                  WHERE R.CODIGO_EMPRESA = S.CODIGO_EMPRESA
-                                    AND R.ID_REPRESTAMO = S.ID_REPRESTAMO
-                                    AND R.ESTADO = 'RE'
-                                 );
-
-                          SELECT COUNT(*)
-                            INTO v_aux2
-                            FROM PR.PR_CANALES_REPRESTAMO C
-                           WHERE EXISTS (
-                                 SELECT 1
-                                   FROM PR.PR_REPRESTAMOS R
-                                  WHERE R.CODIGO_EMPRESA = C.CODIGO_EMPRESA
-                                    AND R.ID_REPRESTAMO = C.ID_REPRESTAMO
-                                    AND R.ESTADO = 'RE'
-                                 );
-                      END IF;
-
                       PR.PR_PKG_REPRESTAMOS.P_REGISTRO_SOLICITUD();
-
-                      IF v_track_activo = 'S' THEN
-                          SELECT COUNT(*)
-                            INTO v_aux3
-                            FROM PR.PR_SOLICITUD_REPRESTAMO S
-                           WHERE EXISTS (
-                                 SELECT 1
-                                   FROM PR.PR_REPRESTAMOS R
-                                  WHERE R.CODIGO_EMPRESA = S.CODIGO_EMPRESA
-                                    AND R.ID_REPRESTAMO = S.ID_REPRESTAMO
-                                    AND R.ESTADO = 'RE'
-                                 );
-
-                          SELECT COUNT(*)
-                            INTO v_aux4
-                            FROM PR.PR_CANALES_REPRESTAMO C
-                           WHERE EXISTS (
-                                 SELECT 1
-                                   FROM PR.PR_REPRESTAMOS R
-                                  WHERE R.CODIGO_EMPRESA = C.CODIGO_EMPRESA
-                                    AND R.ID_REPRESTAMO = C.ID_REPRESTAMO
-                                    AND R.ESTADO = 'RE'
-                                 );
-
-                          track_filtro(
-                              'TOTAL', 'SOLICITUD', 'SOL_ENTRADA',
-                              'RE recibidos', 'REAL',
-                              p_antes => v_re_a,
-                              p_pasan => v_re_a);
-                          track_filtro(
-                              'TOTAL', 'SOLICITUD', 'SOL_CREADA',
-                              'Solicitudes nuevas en la corrida', 'REAL',
-                              p_pasan => v_aux3 - v_aux1);
-                          track_filtro(
-                              'TOTAL', 'SOLICITUD', 'CANAL_CREADO',
-                              'Canales nuevos en la corrida', 'REAL',
-                              p_pasan => v_aux4 - v_aux2);
-                      END IF;
                       track_fin(10);
 
                       --track_inicio(11, 'PVALIDA_WORLD_COMPLIANCE');
@@ -8735,60 +8309,7 @@ END P_Registra_Solicitud_Campana;
 
                        END IF;
 
-                       IF v_track_activo = 'S' THEN
-                           BEGIN
-                               SELECT ESTADO
-                                 INTO v_estado_cierre
-                                 FROM PR.PR_REPRESTAMOS
-                                WHERE ID_REPRESTAMO = V_IDS_REPRESTAMO_FINAL(I);
-
-                               CASE v_estado_cierre
-                                   WHEN 'NP'  THEN v_final_np  := v_final_np + 1;
-                                   WHEN 'CP'  THEN v_final_cp  := v_final_cp + 1;
-                                   WHEN 'RXT' THEN v_final_rxt := v_final_rxt + 1;
-                                   WHEN 'AN'  THEN v_final_an  := v_final_an + 1;
-                                   ELSE NULL;
-                               END CASE;
-                           EXCEPTION
-                               WHEN OTHERS THEN
-                                   NULL;
-                           END;
-                       END IF;
-
                       END LOOP;
-                      END IF;
-                      IF v_track_activo = 'S' THEN
-                          v_aux1 := V_IDS_REPRESTAMO_FINAL.COUNT
-                                    - v_final_np
-                                    - v_final_cp
-                                    - v_final_rxt
-                                    - v_final_an;
-
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_TOTAL',
-                              'RE evaluados en el cierre', 'REAL',
-                              p_antes => V_IDS_REPRESTAMO_FINAL.COUNT,
-                              p_pasan => V_IDS_REPRESTAMO_FINAL.COUNT);
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_NP',
-                              'Notificacion pendiente', 'REAL',
-                              p_pasan => v_final_np);
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_CP',
-                              'Solicitud pendiente de canal', 'REAL',
-                              p_pasan => v_final_cp);
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_RXT',
-                              'Rechazados por tipo de credito', 'REAL',
-                              p_descartados => v_final_rxt);
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_AN',
-                              'Anulados por solicitudes/opciones', 'REAL',
-                              p_descartados => v_final_an);
-                          track_filtro(
-                              'TOTAL', 'CIERRE', 'FINAL_OTRO',
-                              'Sin clasificacion de cierre', 'REAL',
-                              p_descartados => v_aux1);
                       END IF;
                       track_fin(13);
 

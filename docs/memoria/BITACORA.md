@@ -9,6 +9,53 @@
 
 ---
 
+## 2026-06-09 - Codex - Prueba QA02 y cierre documental del Incremento A
+
+- **Objetivo:** registrar la ejecucion real del tracking integral, cerrar la evidencia QA02 y preparar un commit atomico.
+- **Hecho:** body compilado y job `PR.JOB_CARGA_PRECALIFICA_RD` ejecutado en QA02; ejecucion `53D427AF4F597DB0E063140311AC14C5` genero 31/31 metricas con orden `1..31` sin duplicados.
+- **Resultados:** cinco flujos consolidaron `6654` RE; precalificacion concilio `88 RSB + 232 CLS/RCS + 1165 borrados + 5169 salida`; cierre concilio `3481 NP + 1455 CP + 233 RXT = 5169`.
+- **Decisiones:** Incremento A queda probado en QA02; la historia permanece `QA02_EN_PRUEBAS` porque Incrementos B/C y la capa DIAGNOSTICA siguen pendientes. La `spec.sql` no cambio y no se promovio nada a PROD.
+- **Rollback:** body baseline y reversas de DDL/parametros permanecen en `04_ROLLBACK/`; no fue necesario ejecutarlos.
+- **Archivos:** evidencia y estado en `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`; body canonico en `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`.
+
+## 2026-06-09 - Codex - Incremento A tracking integral precalifica QA02
+
+- **Objetivo:** instrumentar `PR.PR_PKG_REPRESTAMOS` para iniciar las pruebas del tracking integral en QA02.
+- **Hecho:** modificado unicamente el `body.sql` canonico dentro de `P_Carga_Precalifica_Cancelado`; agregado helper privado autonomo `track_filtro`, gating por `TRACK_PRECALIFICA_ACTIVO` y 31 metricas Capa B para arranque, cinco flujos, consolidado RE, precalificacion, XCORE, solicitud/canal y cierre.
+- **Precision de medicion:** `RSB/CLS/RCS` se calculan por delta antes/despues para no sumar historicos; el cierre cuenta el estado real de cada ID de la cohorte procesada. La logica funcional y la `spec.sql` no cambiaron.
+- **Validacion local:** `git diff --check` OK; hash del body instrumentado `F3169B1B4B396A606AC95754DDFAD3F9152DBCA66A4AB2670B80B685A1B9DE44`; snapshot previo `EFD9F8588E9D23FD0B2D685B7A777320EDC86187724BE87557E7780939C748E3`; spec identica al baseline.
+- **Pruebas preparadas:** scripts Toad para validar estructuras, compilacion y conciliacion de la ultima ejecucion (31 metricas esperadas).
+- **Pendientes:** ejecutar el body y las pruebas en Toad/QA02, registrar evidencia y decidir Incremento B/C. No se ejecuto Oracle desde el repo ni se creo commit antes de validar en base.
+- **Archivos tocados:** `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`, `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/02_PACKAGE/`, `03_VALIDACION/`, `05_RESULTADOS/`, `06_HANDOFF/`, `ESTADO.md`, `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Claude - DDL y rollbacks tracking integral QA02 + revision adversarial
+
+- **Objetivo:** preparar el DDL auxiliar (Capas B y C) y sus rollbacks del tracking integral, sin ejecutar Oracle, dejandolos revisados.
+- **Hecho:** 4 scripts en `01_DDL/` (validacion de existencia, `FILTRO_TRACK`, `CANDIDATO_TRACK`, parametros `TRACK_PRECALIFICA_*`) y 3 reversas en `04_ROLLBACK/`, siguiendo el patron de `PR_JOB_PRECALIFICA_TRACK`. Revision adversarial multiagente (6 dimensiones + verificacion): 11 hallazgos confirmados, 5 refutados.
+- **Correcciones aplicadas:** parametros con `CODIGO_EMPRESA=1` explicito (constante `vCodigoEmpresa`, spec.sql:3) -> INSERT de exactamente 3 filas y DELETE de rollback simetrico; `TIPO_MEDICION NOT NULL`; indice `IX_PRECAL_FILTRO_FECHA` (simetria + purga); `ID_REPRESTAMO NUMBER(14)` confirmado en `PR_REPRESTAMOS.sql:6`; secuencia `CACHE 20 NOORDER`; comentarios FLASHBACK condicionados a `RECYCLEBIN=ON`; script 00 valida tambien constraints nombrados (incluye el CHECK).
+- **Decisiones:** se conservaron los nombres largos de la propuesta (`PR_JOB_PRECALIFICA_FILTRO_TRACK` 31 bytes, `_CANDIDATO_TRACK` 34 bytes); requieren Oracle 12.2+ y hay alias cortos documentados para 11g. No se ejecuto Oracle ni se hizo commit.
+- **Validacion QA02 (2026-06-08):** Oracle 19c (nombres largos validos); `PR_IDX` existe (286 indices); `PA_PARAMETROS_MVP` exige `DES_PARAMETRO`/`ADICIONADO_POR`/`FECHA_ADICION` (NOT NULL sin default) -> script 03 ajustado para cargarlas; `LOTE_DE_CARAGA_REPRESTAMO` en empresa 1 y sin `TRACK_*` previos. Corregido `;` dentro del PROMPT 3b que rompia el script en Toad.
+- **Aplicado QA02 (2026-06-08):** scripts `01`/`02`/`03` ejecutados OK (`AJEREZ@QADEMI02_19C`): tablas Capa B/C, secuencia, 3 indices y 3 parametros `TRACK_*` creados (`3 rows created`).
+- **Borrador de instrumentacion (2026-06-08):** mapeo del codigo real de las 6 fases + `02_PACKAGE/PROPUESTA_INSTRUMENTACION_BODY_QA02.md` (helpers `track_filtro`/`track_candidato`, instrumentacion por fase con COUNTs reales, por incrementos A/B/C). Revision adversarial multiagente: 14 hallazgos confirmados incorporados (gating de COUNTs por flag, `FECHA_CORTE` poblada, desglose REAL de precalificacion RSB/CLS/RCS/borrados, `FLUJO_RE_NETO` reetiquetado, bloque de cierre concreto). `body.sql` NO modificado.
+- **Pendientes:** decision del usuario para codificar el Incremento A en el body; confirmar columnas de `PR_SOLICITUD_REPRESTAMO`/`PR_CANALES_REPRESTAMO` y la fuente de `RSB/CLS/RCS` (estado vs bitacora).
+- **Archivos tocados:** `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/01_DDL/*`, `.../04_ROLLBACK/*`, `ESTADO.md`, `OBJETOS_AFECTADOS.md`, READMEs, `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Codex - Estructura implementacion tracking integral QA02
+
+- **Objetivo:** preparar la implementacion del tracking integral sobre el body canonico QA02 con reversa verificable.
+- **Hecho:** creada historia de soporte con carpetas de baseline, DDL, package, validacion, rollback, resultados y handoff; copiados body y spec actuales; creado body ejecutable de rollback.
+- **Decisiones:** modificar solo el `body.sql` canonico; no tocar `body copy.sql` ni `spec.sql`; ejecutar Oracle exclusivamente desde Toad/QA02.
+- **Pendientes:** ejecutar validacion base, preparar DDL y comenzar instrumentacion por fases.
+- **Archivos tocados:** `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`, `historias/INVENTARIO.md`, propuesta relacionada y `docs/memoria/BITACORA.md`.
+
+## 2026-06-08 - Codex - Propuesta integral tracking precalifica QA02
+
+- **Objetivo:** ampliar la propuesta de tracking para cubrir el recorrido completo documentado de precalificacion.
+- **Hecho:** creada propuesta con tracking real y diagnostico, modelo de datos, puntos de captura, correcciones pendientes de trackers, validacion QA02 y rollback.
+- **Decisiones:** mantener `PR_JOB_PRECALIFICA_TRACK` para tiempos; proponer tablas complementarias para filtros y pertenencia al lote; no modificar package ni ejecutar Oracle.
+- **Pendientes:** aprobar alcance antes de preparar DDL, parche de body, validacion y rollback ejecutables.
+- **Archivos tocados:** `PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`, documentos diagnosticos relacionados y `docs/memoria/BITACORA.md`.
+
 ## 2026-06-08 - Codex - Cierre restauracion y renombre DOCX QA02
 
 - **Objetivo:** registrar la recuperacion del Word editado por el usuario y el nombre final del desglose.

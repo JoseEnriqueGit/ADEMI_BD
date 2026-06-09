@@ -266,3 +266,10 @@ Lectura corta: este es el cierre de la campaña. El candidato queda listo para n
 6. El proceso comun calcula precalificacion, revisa SIB/castigos y obtiene XCORE.
 7. Si sigue vivo, crea solicitud y canal.
 8. Al final queda como `NP`, `CP`, `RXT` o `AN`.
+
+## Propuesta de tracking relacionada
+
+La ampliacion para medir este recorrido completo por ejecucion esta documentada
+en `PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`. La propuesta separa los
+conteos reales capturados durante el job de los conteos diagnosticos
+reconstruidos por los cinco trackers SQL.
