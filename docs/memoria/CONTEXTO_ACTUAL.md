@@ -34,7 +34,9 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` conciliada 1302/1302, costo MERGE ~0.2 ms/candidato).
   📌 **Decisión: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (corridas de prueba
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
-  Pendientes Incremento C y capa DIAGNOSTICA.
+  **Incremento C codificado en el repo (variante procedures: bruto por flujo tras el
+  `FORALL INSERT`, helper package-private `track_candidatos_flujo`), PENDIENTE de probar
+  en QA02** — pasos en `05_RESULTADOS/RESULTADOS_QA02.md`. Pendiente capa DIAGNOSTICA.
   Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:

@@ -1,6 +1,6 @@
 # Propuesta de instrumentacion del body - Tracking integral QA02
 
-Fecha: 2026-06-08 · Estado: **INCREMENTOS A Y B PROBADOS EN QA02 EL 2026-06-09** (B: ver seccion 4.8; evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`).
+Fecha: 2026-06-08 · Estado: **INCREMENTOS A Y B PROBADOS EN QA02 EL 2026-06-09** (B: ver seccion 4.8). **INCREMENTO C CODIFICADO EN EL REPO EL 2026-06-09, PENDIENTE DE COMPILAR Y PROBAR EN QA02** (ver seccion 4.9). Evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`.
 Revision adversarial multiagente aplicada (14 hallazgos confirmados incorporados): gating de COUNTs por flag,
 `FECHA_CORTE` poblada, desglose REAL de precalificacion (RSB/CLS/RCS/borrados), `FLUJO_RE_NETO` reetiquetado,
 bloque de cierre concreto, y notas de `ORDEN_FILTRO` y paso 14.
@@ -347,6 +347,40 @@ los borradores 3.4 y 4.7 al codigo REAL probado del Incremento A:
    corrida full). **No se requiere la variante bulk.**
 6. **El Incremento B no agrega filas a la Capa B**: la corrida debe seguir produciendo
    31 metricas en `PR_JOB_PRECALIFICA_FILTRO_TRACK`.
+
+## 4.9 Incremento C tal como se implemento (2026-06-09, pendiente de prueba)
+
+Variante elegida por el usuario: **procedures (diseno original de la seccion 5)** —
+capturar el BRUTO insertado por cada flujo en el momento del `FORALL INSERT`, no solo
+los sobrevivientes netos.
+
+1. **Estado package-private** (tope del body, sin cambios en la spec):
+   `g_track_cand_activo VARCHAR2(1) := 'N'` y `g_track_id_ejecucion VARCHAR2(32)`,
+   mas el tipo `t_track_ids` (tabla de NUMBER). Solo los setea
+   `P_Carga_Precalifica_Cancelado`; en cualquier otro contexto (carga manual,
+   dirigida, campana, llamadas directas) el flag queda en `'N'` y el tracking es no-op.
+2. **Helper package-private `track_candidatos_flujo`** (tope del body): transaccion
+   autonoma, guard por flag + id nulo + batch vacio, `FORALL INSERT` a
+   `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` con `RESULTADO_ULTIMO='RE'` (estado con el que
+   nace el candidato), `COMMIT` propio y `ROLLBACK; NULL;` en el handler.
+3. **Llamada en las 5 procedures de flujo**, inmediatamente despues del
+   `FORALL i .. INSERT INTO PR.PR_REPRESTAMOS`: bloque guardado por
+   `IF g_track_cand_activo = 'S'` que copia `ID_REPRESTAMO/NO_CREDITO/CODIGO_CLIENTE`
+   del batch (limite 100) a arreglos y llama al helper con el nombre del flujo
+   (identico al usado en la Capa B). Manejador `WHEN OTHERS THEN NULL` propio:
+   un fallo del tracking jamas toca el flujo funcional.
+   **Carga_Dirigida y Campana_Especiales NO se instrumentan** (otros jobs, fuera de alcance).
+4. **Ciclo de vida del estado en el job:** se setea tras leer los flags
+   (`g_track_cand_activo := v_track_activo`), se limpia a `'N'/NULL` antes de
+   `track_fin(0)` y tambien en el `WHEN OTHERS` interno antes del `RAISE`, para no
+   filtrar estado a otros jobs de la misma sesion.
+5. **Semantica de filas:** por candidato quedan hasta 2 filas en la Capa C:
+   `(FLUJO=<flujo origen>, RESULTADO_ULTIMO='RE')` al nacer y `(FLUJO='CIERRE',
+   RESULTADO_ULTIMO=estado observado)` del Incremento B. Un candidato SIN fila de
+   cierre fue descartado antes (X1/X2/X3/mancomunado/edad/precalificacion/OFAC) —
+   el bruto - neto por flujo queda visible por primera vez a nivel REAL.
+6. **Sin DDL nuevo**: la tabla ya tiene todas las columnas (PK incluye FLUJO, asi
+   que pertenencia y cierre no chocan). La Capa B sigue en 31 metricas.
 
 ## 5. DIAGNOSTICA y Capa C completa (fases siguientes)
 

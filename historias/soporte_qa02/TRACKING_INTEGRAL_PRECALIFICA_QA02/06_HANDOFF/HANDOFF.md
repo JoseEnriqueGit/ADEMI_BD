@@ -19,7 +19,13 @@ Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (
 - **Decision operativa: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (a proposito,
   para corridas de prueba cortas). Subirlo a `130000` solo para corridas representativas o
   comparables con PROD; cada corrida registra su lote en `VALOR_LOTE`.
-- Pendiente: Incremento C y capa DIAGNOSTICA.
+- **Incremento C codificado en el body del repo el 2026-06-09 (variante procedures,
+  elegida por el usuario) — PENDIENTE de compilar, ejecutar y conciliar en QA02.**
+  Sin DDL nuevo. Estado package-private `g_track_*` + helper `track_candidatos_flujo`
+  + captura del bruto en las 5 procedures de flujo. Pasos de prueba en
+  `05_RESULTADOS/RESULTADOS_QA02.md`; validaciones `03_VALIDACION/08..09`;
+  reversa `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (vuelve al B probado).
+- Pendiente: prueba del C y capa DIAGNOSTICA.
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
 
@@ -56,8 +62,9 @@ Disenado contra el **codigo real** del body (no solo la propuesta). Todo vive en
   CODIGO_CLIENTE`), con `FLUJO='CIERRE'`. El `IF` funcional del cierre NO se toco.
 - Incrementos: **A** = conteos REALES de orquestacion (arranque, 5 flujos neto, RE consolidado,
   precalificacion, XCORE, solicitud, cierre) — PROBADO. **B** = cohorte final individual +
-  `RESULTADO_ULTIMO` (estado observado) — PROBADO. **C** (diferido) =
-  pertenencia por flujo en el `FETCH` (toca las 5 procedures, propuesta separada). + DIAGNOSTICA (5 scripts externos).
+  `RESULTADO_ULTIMO` (estado observado) — PROBADO. **C** = pertenencia por flujo capturada
+  tras el `FORALL INSERT` de las 5 procedures (helper package-private `track_candidatos_flujo`,
+  seccion 4.9) — codificado, pendiente de prueba. + DIAGNOSTICA (5 scripts externos).
 
 ### Correcciones de la revision adversarial ya incorporadas (importantes)
 
@@ -75,21 +82,23 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. Implementar Incremento C si se aprueba capturar pertenencia por flujo.
+1. **Probar el Incremento C en QA02** (body -> script 08 -> job -> script 09);
+   no marcarlo como probado hasta tener los resultados reales.
 2. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
    `trackers_precalifica_cursor`.
 3. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 
-> Resueltas: la prueba del B concilio al 100% y el costo del `MERGE` por candidato
-> (~0.2 ms) se midio contra la corrida A -> NO se requiere la variante bulk.
-> El lote queda en `1300` por decision (corridas cortas en QA02).
+> Resueltas: B concilio al 100% (costo MERGE ~0.2 ms/candidato, sin variante bulk).
+> El lote queda en `1300` por decision (corridas cortas en QA02). El alcance del C
+> se decidio: variante procedures (bruto por flujo), elegida por el usuario.
 
 ## Proximos pasos (orden sugerido)
 
-1. Decidir alcance y volumen aceptable para el Incremento C.
-2. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
-3. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
+1. Ejecutar en Toad los pasos del Incremento C (detalle en `05_RESULTADOS/RESULTADOS_QA02.md`).
+2. Registrar evidencia y conciliacion del C en `05_RESULTADOS/` y actualizar `ESTADO.md`.
+3. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
+4. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
 
 ## Reglas duras (no negociables)
 
@@ -103,7 +112,8 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 - Propuesta de diseno: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`
 - Diseno e historial: `02_PACKAGE/PROPUESTA_INSTRUMENTACION_BODY_QA02.md`
 - Body canonico instrumentado: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`
-- DDL creado: `01_DDL/00..03` (aplicados) + `01_DDL/04_ALTER_*` (Incremento B, pendiente)
-- Rollbacks: `04_ROLLBACK/01..04` + body baseline + `ROLLBACK_INCREMENTO_B_BODY_QA02.sql` (B -> A probado)
-- Validacion B: `03_VALIDACION/04..06_*_INCREMENTO_B_QA02.sql`
+- DDL creado: `01_DDL/00..04` (todos aplicados; el C no requiere DDL)
+- Rollbacks de body: `ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (C -> B probado),
+  `ROLLBACK_INCREMENTO_B_BODY_QA02.sql` (-> A probado), body baseline. DDL: `01..04_ROLLBACK_*`
+- Validacion B: `03_VALIDACION/04..07`  ·  Validacion C: `03_VALIDACION/08..09`
 - Baseline body/spec: `00_ANTES/`  ·  Evidencia: `05_RESULTADOS/RESULTADOS_QA02.md`  ·  Estado: `ESTADO.md`

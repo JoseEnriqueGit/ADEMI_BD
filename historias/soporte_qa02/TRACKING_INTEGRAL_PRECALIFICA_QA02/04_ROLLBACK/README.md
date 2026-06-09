@@ -2,12 +2,13 @@
 
 ## Package body
 
-Hay dos reversas de body, segun el punto al que se quiera volver:
+Hay tres reversas de body, segun el punto al que se quiera volver:
 
 | Archivo | Restaura | SHA-256 |
 |---|---|---|
-| `ROLLBACK_INCREMENTO_B_BODY_QA02.sql` | Body **Incremento A probado** (deshace solo el B) | `D12032ADE3845CDC1F64C3121665878B0B8679A7988CD1699D1E176796A78397` |
-| `ROLLBACK_PR_PKG_REPRESTAMOS_BODY_QA02.sql` | Body **baseline sin instrumentar** (deshace A y B) | `EFD9F8588E9D23FD0B2D685B7A777320EDC86187724BE87557E7780939C748E3` |
+| `ROLLBACK_INCREMENTO_C_BODY_QA02.sql` | Body **Incremento B probado** (deshace solo el C) | `0C07E500BB10F564B7495B79AE9B41921B2F21692083988D9D073FD88BA499CD` |
+| `ROLLBACK_INCREMENTO_B_BODY_QA02.sql` | Body **Incremento A probado** (deshace B y C) | `D12032ADE3845CDC1F64C3121665878B0B8679A7988CD1699D1E176796A78397` |
+| `ROLLBACK_PR_PKG_REPRESTAMOS_BODY_QA02.sql` | Body **baseline sin instrumentar** (deshace A, B y C) | `EFD9F8588E9D23FD0B2D685B7A777320EDC86187724BE87557E7780939C748E3` |
 
 > La reversa del Incremento B normalmente es solo el body (volver al A probado).
 > Las columnas `NO_CREDITO`/`CODIGO_CLIENTE` pueden quedarse: el body del A no las

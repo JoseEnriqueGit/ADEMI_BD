@@ -33,6 +33,21 @@ Los scripts de esta carpeta deben ejecutarse manualmente en Toad/QA02.
 > Nota Toad: no poner `;` dentro del texto de un `PROMPT` (rompe "execute as
 > script" con ORA-00900; incidencia vista en los scripts 00 y 05).
 
+## Incremento C (pendiente de ejecutar)
+
+No requiere DDL nuevo. Orden:
+
+1. Ejecutar como script el `body.sql` canonico (A+B+C).
+2. `08_VALIDAR_COMPILACION_INCREMENTO_C_QA02.sql` (BODY `VALID`, 0 errores,
+   `lineas_helper = 7`, `lineas_flag = 10`).
+3. Ejecutar de forma controlada `PR.JOB_CARGA_PRECALIFICA_RD`
+   con `TRACK_PRECALIFICA_ACTIVO='S'`.
+4. `09_VALIDAR_RESULTADO_INCREMENTO_C_QA02.sql` con **F9 por query**:
+   Query 1 = resumen OK/REVISAR, Query 2 = bruto vs neto por flujo,
+   Query 3 = recorrido individual, Query 4 = duraciones.
+5. si el resultado no es satisfactorio: `../04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql`
+   (restaura el body B probado).
+
 La `spec.sql` no se ejecuta ni se modifica en ningun incremento.
 
 Guardar salidas y capturas en `../05_RESULTADOS/`.

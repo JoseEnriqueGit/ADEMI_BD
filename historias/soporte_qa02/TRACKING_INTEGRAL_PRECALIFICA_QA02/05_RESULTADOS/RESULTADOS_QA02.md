@@ -169,6 +169,44 @@ Conciliacion manual confirmada:
   `03_VALIDACION/07_RESUMEN_INCREMENTO_B_UNA_FILA_QA02.sql` (resumen en una
   fila + duraciones + comparativa de costo, para F9/Data Grid).
 
+## Incremento C - preparado en el repo (2026-06-09), PENDIENTE de prueba en QA02
+
+- Variante elegida: **procedures (diseno original)** — captura el BRUTO insertado
+  por cada flujo en el `FORALL INSERT`, no solo los sobrevivientes.
+- Cambios preparados (solo body; **sin DDL nuevo**):
+  - Estado package-private `g_track_cand_activo`/`g_track_id_ejecucion` + tipo
+    `t_track_ids` + helper autonomo `track_candidatos_flujo` (tope del body).
+  - Llamada tras el `FORALL INSERT` en las 5 procedures de flujo, con el nombre
+    de flujo identico al de la Capa B. Carga_Dirigida y Campana_Especiales NO
+    se instrumentan.
+  - Set/clear del estado en el job (init, fin OK y `WHEN OTHERS`).
+  - Hash body Incremento C:
+    `2254380E9C4D0CB81D139DD47860F9BD030258C415A0F8A9694FB4759531B7FA`.
+
+### Pasos exactos para probar en Toad (`AJEREZ@QADEMI02_19C`)
+
+1. Ejecutar como script (F5) el body canonico:
+   `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`.
+   No tocar la `spec.sql`.
+2. Ejecutar `03_VALIDACION/08_VALIDAR_COMPILACION_INCREMENTO_C_QA02.sql` (F5).
+   Esperado: BODY `VALID`, 0 errores, `lineas_helper = 7`, `lineas_flag = 10`.
+3. Ejecutar de forma controlada `PR.JOB_CARGA_PRECALIFICA_RD`.
+4. Ejecutar `03_VALIDACION/09_VALIDAR_RESULTADO_INCREMENTO_C_QA02.sql` con
+   **F9 por query**: Query 1 debe dar `RESULTADO = OK`; Query 2 muestra bruto
+   vs neto por flujo (los descartados intra-flujo, visibles por primera vez);
+   Query 4 las duraciones para medir overhead.
+5. Pegar aqui: ID de ejecucion y salidas de las queries 1, 2 y 4.
+6. Si algo falla: `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (vuelve al
+   body B probado).
+
+### Resultados de la prueba (completar al ejecutar)
+
+- Fecha: PENDIENTE
+- ID de ejecucion: PENDIENTE
+- Query 1 (resumen): PENDIENTE
+- Query 2 (bruto vs neto por flujo): PENDIENTE
+- Query 4 (duraciones / overhead): PENDIENTE
+
 ## Alcance validado y pendiente
 
 - **Incremento A:** aplicado y probado (2026-06-09,
@@ -176,7 +214,8 @@ Conciliacion manual confirmada:
 - **Incremento B:** aplicado y probado (2026-06-09,
   `53D8BBE0BA0E44D9E063140311AC6BC6`); cohorte individual del cierre
   conciliada al 100% con la Capa B.
-- **Incremento C:** pendiente; pertenencia individual a cada flujo.
+- **Incremento C:** preparado en el repo (body con variante procedures +
+  validaciones 08/09 + rollback); pendiente de compilar, ejecutar y conciliar.
 - **DIAGNOSTICA:** pendiente; desglose de filtros internos comparable con
   `trackers_precalifica_cursor`.
 - **Decision operativa (2026-06-09):** `LOTE_DE_CARAGA_REPRESTAMO` queda en
