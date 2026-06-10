@@ -93,7 +93,37 @@ La hipotesis queda confirmada si las Queries 4 y 5 muestran simultaneamente:
 La Query 1 es obligatoria: si el package compilado en PROD no contiene las mismas
 lineas, primero debe extraerse el body vivo antes de proponer una correccion.
 
+## Evidencia APEX de la carga dirigida del 2026-06-10
+
+El reporte APEX de la carga ejecutada el 2026-06-10 confirma la hipotesis en vivo
+con tres patrones:
+
+1. `CREADO` + `Cliente en clasificacion: A` + XCORE 0 — presente en DE08 con
+   clasificacion permitida (ruta sana).
+2. `CREADO` + `Cliente sin clasificacion, pero parametro deshabilitado` — presente
+   en DE08 con clasificacion NULA/no permitida; prueba que
+   `VALIDAR_CLASIFICACION_SIB_CARGADIRIGIDA = 'N'` en PROD.
+3. `RECHAZO POR CLIENTE NO EN A,B EN SB` (RSB) + `Cliente sin clasificacion` +
+   XCORE vacio — ausente del corte DE08; el loop sin compuerta de
+   `ACTUALIZA_XCORE_DIRIGIDA` lo marco RSB antes de consultar el XCORE (por eso
+   no recibio ni el 0).
+
+Inconsistencia de negocio visible: con la validacion SIB apagada por parametro,
+un cliente con clasificacion mala pasa, pero uno ausente de DE08 se rechaza,
+porque el loop RSB de XCORE_DIRIGIDA no consulta ese parametro.
+
+`02_RESULTADO_CARGA_DIRIGIDA_20260610.sql` cuantifica la carga completa:
+
+| Query | Respuesta |
+|---|---|
+| 1 | Resumen de la carga por estado y texto SIB de bitacora. |
+| 2 | Cruce estado vs existencia en DE08, clasificacion, fiador y XCORE. |
+| 3 | Detalle individual de los RSB de la carga (evidencia). |
+| 4 | Contraste: ausentes de DE08 rechazados vs clasificacion mala que paso. |
+
 ## Estado
 
 - 2026-06-10: diagnostico creado. Pendiente ejecutar en PROD y registrar resultados.
+- 2026-06-10: evidencia APEX de la carga del dia confirma la hipotesis; se agrego
+  `02_RESULTADO_CARGA_DIRIGIDA_20260610.sql` para cuantificarla en Toad.
 - No se modifico el package ni se propuso aun un cambio de logica de negocio.
