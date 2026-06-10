@@ -318,7 +318,7 @@ pasos_cursor AS (
     SELECT 4, 'PR_TIPO_CREDITO_REPRESTAMO.CARGA = S' FROM dual UNION ALL
     SELECT 5, 'DIAS_ATRASO <= PRECAL_MORA_MAYOR_PR' FROM dual UNION ALL
     SELECT 6, 'CALIFICA_CLIENTE en CLASIFICACION_SIB' FROM dual UNION ALL
-    SELECT 7, 'CAPITAL_PAGADO cumple parametro' FROM dual UNION ALL
+    SELECT 7, 'CAPITAL_PAGADO cumple parametro (proteccion denominador<>0: desviacion protectora vs cursor real)' FROM dual UNION ALL
     SELECT 8, 'CODIGO_EMPRESA = F_OBT_EMPRESA_REPRESTAMO' FROM dual UNION ALL
     SELECT 9, 'Sin otro prestamo desembolsado reciente' FROM dual UNION ALL
     SELECT 10, 'Sin otro credito estado E' FROM dual UNION ALL
@@ -396,12 +396,12 @@ resumen_cleanup AS (
            'POST_CLEANUP' tipo_medicion,
            98 orden,
            'DELETE PR_REPRESTAMOS WHERE ESTADO LIKE X%' filtro,
-           COUNT(*) candidatos_antes,
-           COUNT(CASE WHEN ps.paso_post_alcanzado >= 3 THEN 1 END) candidatos_pasan,
+           COUNT(CASE WHEN ps.paso_post_alcanzado IN (0, 1, 2, 5) THEN 1 END) candidatos_antes,
+           COUNT(CASE WHEN ps.paso_post_alcanzado = 5 THEN 1 END) candidatos_pasan,
            COUNT(CASE WHEN ps.paso_post_alcanzado IN (0, 1, 2) THEN 1 END) candidatos_descartados,
            COUNT(DISTINCT CASE WHEN ps.paso_post_alcanzado IN (0, 1, 2) THEN ps.no_credito END) creditos_descartados,
            COUNT(DISTINCT CASE WHEN ps.paso_post_alcanzado IN (0, 1, 2) THEN ps.codigo_cliente END) clientes_descartados,
-           'Limpieza fisica de registros marcados X3/X1/X2 ya contados arriba' observacion
+           'Limpieza X% ejecutada despues de los DELETE de mancomunado/edad: antes excluye esos casos (correccion seccion 7.1)' observacion
       FROM post_scored ps
 )
 SELECT tipo_medicion,

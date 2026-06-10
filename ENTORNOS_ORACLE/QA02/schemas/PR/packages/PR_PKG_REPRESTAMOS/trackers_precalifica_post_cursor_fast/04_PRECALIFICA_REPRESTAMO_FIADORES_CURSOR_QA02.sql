@@ -328,7 +328,7 @@ pasos_cursor AS (
     SELECT 4, 'PR_TIPO_CREDITO_REPRESTAMO.CARGA = S' FROM dual UNION ALL
     SELECT 5, 'DIAS_ATRASO <= PRECAL_MORA_MAYOR_PR' FROM dual UNION ALL
     SELECT 6, 'CALIFICA_CLIENTE en CLASIFICACION_SIB' FROM dual UNION ALL
-    SELECT 7, 'CAPITAL_PAGADO cumple parametro' FROM dual UNION ALL
+    SELECT 7, 'CAPITAL_PAGADO cumple parametro (proteccion denominador<>0: desviacion protectora vs cursor real)' FROM dual UNION ALL
     SELECT 8, 'CODIGO_EMPRESA = F_OBT_EMPRESA_REPRESTAMO' FROM dual UNION ALL
     SELECT 9, 'Sin otro prestamo desembolsado reciente' FROM dual UNION ALL
     SELECT 10, 'Sin otro credito estado E' FROM dual UNION ALL
