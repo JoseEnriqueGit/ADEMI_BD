@@ -1,6 +1,6 @@
 # Propuesta de instrumentacion del body - Tracking integral QA02
 
-Fecha: 2026-06-08 · Estado: **INCREMENTOS A Y B PROBADOS EN QA02 EL 2026-06-09** (B: ver seccion 4.8). **INCREMENTO C CODIFICADO EN EL REPO EL 2026-06-09, PENDIENTE DE COMPILAR Y PROBAR EN QA02** (ver seccion 4.9). Evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`.
+Fecha: 2026-06-08 · Estado: **INCREMENTOS A, B Y C PROBADOS EN QA02 EL 2026-06-09** (B: seccion 4.8; C: seccion 4.9). Falta solo la capa DIAGNOSTICA. Evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`.
 Revision adversarial multiagente aplicada (14 hallazgos confirmados incorporados): gating de COUNTs por flag,
 `FECHA_CORTE` poblada, desglose REAL de precalificacion (RSB/CLS/RCS/borrados), `FLUJO_RE_NETO` reetiquetado,
 bloque de cierre concreto, y notas de `ORDEN_FILTRO` y paso 14.
@@ -348,7 +348,7 @@ los borradores 3.4 y 4.7 al codigo REAL probado del Incremento A:
 6. **El Incremento B no agrega filas a la Capa B**: la corrida debe seguir produciendo
    31 metricas en `PR_JOB_PRECALIFICA_FILTRO_TRACK`.
 
-## 4.9 Incremento C tal como se implemento (2026-06-09, pendiente de prueba)
+## 4.9 Incremento C tal como se implemento (2026-06-09, PROBADO: `53DAC2820BDC0E55E063140311AC3EBA`)
 
 Variante elegida por el usuario: **procedures (diseno original de la seccion 5)** —
 capturar el BRUTO insertado por cada flujo en el momento del `FORALL INSERT`, no solo

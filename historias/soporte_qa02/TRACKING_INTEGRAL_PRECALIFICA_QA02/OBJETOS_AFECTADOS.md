@@ -41,11 +41,8 @@ Validacion QA02 (2026-06-08) completa: Oracle 19c (nombres largos validos), `PR_
   `53D8BBE0BA0E44D9E063140311AC6BC6`, 1302/1302 conciliado.
 - La `spec.sql` no cambio en ningun incremento.
 
-## Package body pendiente de aplicar (Incremento C)
-
-El body canonico del repo contiene ademas el Incremento C (2026-06-09, variante
-procedures): estado package-private `g_track_*` + helper `track_candidatos_flujo`
-+ captura del bruto insertado tras el `FORALL INSERT` de las 5 procedures de flujo
-(`Precalifica_Represtamo`, `_fiadores`, `_fiadores_hi`, `_Repre_Cancelado`,
-`_Repre_Cancelado_hi`). Carga_Dirigida y Campana_Especiales NO se instrumentan.
-**No esta compilado en QA02**; no requiere DDL nuevo. La `spec.sql` sigue sin cambios.
+- **Incremento C** (2026-06-09, variante procedures): estado package-private
+  `g_track_*` + helper `track_candidatos_flujo` + captura del bruto insertado tras
+  el `FORALL INSERT` de las 5 procedures de flujo (Carga_Dirigida y
+  Campana_Especiales NO se instrumentan). Sin DDL nuevo. Ejecucion
+  `53DAC2820BDC0E55E063140311AC3EBA`: 1834 filas de pertenencia, 0 huerfanos.

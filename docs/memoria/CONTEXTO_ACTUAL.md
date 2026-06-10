@@ -28,16 +28,15 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
 
 ## Abierto ahora
 
-- 🟡 **Tracking integral precalifica QA02:** Incrementos A y B aplicados y PROBADOS el
-  2026-06-09 en `PR.PR_PKG_REPRESTAMOS` (A: `53D427AF4F597DB0E063140311AC14C5`, 31/31
-  métricas; B: `53D8BBE0BA0E44D9E063140311AC6BC6`, cohorte individual del cierre en
-  `PR_JOB_PRECALIFICA_CANDIDATO_TRACK` conciliada 1302/1302, costo MERGE ~0.2 ms/candidato).
+- 🟡 **Tracking integral precalifica QA02:** Incrementos A, B y C aplicados y PROBADOS
+  (2026-06-09) en `PR.PR_PKG_REPRESTAMOS`. A: `53D427AF...` 31/31 métricas. B: `53D8BBE0...`
+  cohorte del cierre 1302/1302, costo MERGE ~0.2 ms/candidato. C: `53DAC282...` pertenencia
+  por flujo (1834 filas, 0 huérfanos, 317 descartados intra-flujo visibles), variante
+  procedures con helper package-private `track_candidatos_flujo`.
   📌 **Decisión: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (corridas de prueba
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
-  **Incremento C codificado en el repo (variante procedures: bruto por flujo tras el
-  `FORALL INSERT`, helper package-private `track_candidatos_flujo`), PENDIENTE de probar
-  en QA02** — pasos en `05_RESULTADOS/RESULTADOS_QA02.md`. Pendiente capa DIAGNOSTICA.
-  Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
+  **Pendiente solo la capa DIAGNOSTICA** (propuesta separada). No promover a PROD desde
+  esta historia. Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:
   OPT-017/018 (bulk collect) en DESARROLLO, pendiente de compilar en QA y monitorear en PROD.

@@ -19,13 +19,12 @@ Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (
 - **Decision operativa: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (a proposito,
   para corridas de prueba cortas). Subirlo a `130000` solo para corridas representativas o
   comparables con PROD; cada corrida registra su lote en `VALOR_LOTE`.
-- **Incremento C codificado en el body del repo el 2026-06-09 (variante procedures,
-  elegida por el usuario) — PENDIENTE de compilar, ejecutar y conciliar en QA02.**
-  Sin DDL nuevo. Estado package-private `g_track_*` + helper `track_candidatos_flujo`
-  + captura del bruto en las 5 procedures de flujo. Pasos de prueba en
-  `05_RESULTADOS/RESULTADOS_QA02.md`; validaciones `03_VALIDACION/08..09`;
-  reversa `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (vuelve al B probado).
-- Pendiente: prueba del C y capa DIAGNOSTICA.
+- **Incremento C aplicado y PROBADO el 2026-06-09 (variante procedures):**
+  `53DAC2820BDC0E55E063140311AC3EBA` — 1834 filas de pertenencia (4 flujos presentes;
+  fiadores_hi aporto 0 = su NETO), cierre 1166 con **0 huerfanos**, 317 descartados
+  intra-flujo visibles por primera vez, 0 nulos/repetidos, 31/31 metricas Capa B.
+  Sin DDL nuevo. Reversa disponible: `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql`.
+- Pendiente: capa DIAGNOSTICA.
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
 
@@ -64,7 +63,7 @@ Disenado contra el **codigo real** del body (no solo la propuesta). Todo vive en
   precalificacion, XCORE, solicitud, cierre) — PROBADO. **B** = cohorte final individual +
   `RESULTADO_ULTIMO` (estado observado) — PROBADO. **C** = pertenencia por flujo capturada
   tras el `FORALL INSERT` de las 5 procedures (helper package-private `track_candidatos_flujo`,
-  seccion 4.9) — codificado, pendiente de prueba. + DIAGNOSTICA (5 scripts externos).
+  seccion 4.9) — PROBADO. + DIAGNOSTICA (5 scripts externos, pendiente).
 
 ### Correcciones de la revision adversarial ya incorporadas (importantes)
 
@@ -82,23 +81,20 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. **Probar el Incremento C en QA02** (body -> script 08 -> job -> script 09);
-   no marcarlo como probado hasta tener los resultados reales.
-2. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
-   `trackers_precalifica_cursor`.
-3. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
+1. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
+   `trackers_precalifica_cursor` (unico incremento restante).
+2. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
+3. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida
+   `53DAC2820BDC0E55E063140311AC3EBA` (bruto/neto por flujo y duraciones).
 
-> Resueltas: B concilio al 100% (costo MERGE ~0.2 ms/candidato, sin variante bulk).
-> El lote queda en `1300` por decision (corridas cortas en QA02). El alcance del C
-> se decidio: variante procedures (bruto por flujo), elegida por el usuario.
+> Resueltas: A, B y C probados y conciliados al 100%. Costo MERGE ~0.2 ms/candidato
+> (sin variante bulk). Lote en `1300` por decision (corridas cortas en QA02).
 
 ## Proximos pasos (orden sugerido)
 
-1. Ejecutar en Toad los pasos del Incremento C (detalle en `05_RESULTADOS/RESULTADOS_QA02.md`).
-2. Registrar evidencia y conciliacion del C en `05_RESULTADOS/` y actualizar `ESTADO.md`.
-3. Diseñar la capa DIAGNOSTICA contra los scripts existentes.
-4. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
+1. Diseñar la capa DIAGNOSTICA contra los scripts existentes (propuesta separada).
+2. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
 
 ## Reglas duras (no negociables)
 

@@ -33,7 +33,7 @@ Los scripts de esta carpeta deben ejecutarse manualmente en Toad/QA02.
 > Nota Toad: no poner `;` dentro del texto de un `PROMPT` (rompe "execute as
 > script" con ORA-00900; incidencia vista en los scripts 00 y 05).
 
-## Incremento C (pendiente de ejecutar)
+## Incremento C (completado 2026-06-09, ejecucion `53DAC2820BDC0E55E063140311AC3EBA`)
 
 No requiere DDL nuevo. Orden:
 

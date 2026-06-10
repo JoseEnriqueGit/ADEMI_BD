@@ -1,6 +1,6 @@
 # Resultados QA02
 
-Estado: DDL auxiliar, Incremento A e Incremento B aplicados y probados en QA02.
+Estado: DDL auxiliar e Incrementos A, B y C aplicados y probados en QA02.
 
 ## Validacion base (script 00)
 
@@ -169,7 +169,7 @@ Conciliacion manual confirmada:
   `03_VALIDACION/07_RESUMEN_INCREMENTO_B_UNA_FILA_QA02.sql` (resumen en una
   fila + duraciones + comparativa de costo, para F9/Data Grid).
 
-## Incremento C - preparado en el repo (2026-06-09), PENDIENTE de prueba en QA02
+## Incremento C - APLICADO Y PROBADO en QA02 (2026-06-09)
 
 - Variante elegida: **procedures (diseno original)** — captura el BRUTO insertado
   por cada flujo en el `FORALL INSERT`, no solo los sobrevivientes.
@@ -199,13 +199,27 @@ Conciliacion manual confirmada:
 6. Si algo falla: `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (vuelve al
    body B probado).
 
-### Resultados de la prueba (completar al ejecutar)
+### Resultados de la prueba (corrida 2026-06-09, evidencia registrada 2026-06-10)
 
-- Fecha: PENDIENTE
-- ID de ejecucion: PENDIENTE
-- Query 1 (resumen): PENDIENTE
-- Query 2 (bruto vs neto por flujo): PENDIENTE
-- Query 4 (duraciones / overhead): PENDIENTE
+- Compilacion (script 08): BODY `VALID`, spec intacta (21-MAY-26), 0 errores,
+  `lineas_helper = 7`, `lineas_flag = 10`.
+- ID de ejecucion: `53DAC2820BDC0E55E063140311AC3EBA` (lote `1300`, corte `29/5/2026`).
+- **Query 1 (resumen): `OK`.**
+  - Pertenencia: `1834` filas en `4` flujos presentes (fiadores_hi aporto 0,
+    coherente con su `NETO=0` en Capa B).
+  - Cierre: `1166` filas, `0` huerfanos (todo candidato del cierre tiene fila de
+    pertenencia), linea base `INI_RE_DESPUES = 0`.
+  - Calidad: `0` nulos en NO_CREDITO/CODIGO_CLIENTE, `0` ids repetidos entre
+    flujos, `31/31` metricas Capa B.
+- Conciliacion con Capa B de la misma corrida:
+  - Netos por flujo `1051 + 321 + 0 + 100 + 45 = 1517` = `RE_CONSOLIDADO`.
+  - **Bruto C `1834` - neto `1517` = `317` descartados intra-flujo**, visibles
+    a nivel REAL por primera vez (antes solo estimables via DIAGNOSTICA).
+  - Precalificacion `87 RSB + 46 CLS/RCS + 218 borrados + 1166 salida = 1517`.
+  - Cierre `792 NP + 225 CP + 149 RXT + 0 AN + 0 OTRO = 1166 = FINAL_TOTAL`.
+- Queries 2 y 4 (detalle bruto/neto por flujo y duraciones): no capturadas en
+  esta evidencia; opcionales, re-ejecutables en cualquier momento por
+  `ID_EJECUCION` con el script 09.
 
 ## Alcance validado y pendiente
 
@@ -214,8 +228,9 @@ Conciliacion manual confirmada:
 - **Incremento B:** aplicado y probado (2026-06-09,
   `53D8BBE0BA0E44D9E063140311AC6BC6`); cohorte individual del cierre
   conciliada al 100% con la Capa B.
-- **Incremento C:** preparado en el repo (body con variante procedures +
-  validaciones 08/09 + rollback); pendiente de compilar, ejecutar y conciliar.
+- **Incremento C:** aplicado y probado (2026-06-09,
+  `53DAC2820BDC0E55E063140311AC3EBA`); pertenencia por flujo conciliada,
+  0 huerfanos en el cierre, 317 descartados intra-flujo visibles.
 - **DIAGNOSTICA:** pendiente; desglose de filtros internos comparable con
   `trackers_precalifica_cursor`.
 - **Decision operativa (2026-06-09):** `LOTE_DE_CARAGA_REPRESTAMO` queda en

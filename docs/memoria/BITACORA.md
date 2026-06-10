@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-10 - Claude - Incremento C tracking integral precalifica QA02 PROBADO
+
+- **Objetivo:** registrar la evidencia de la prueba del Incremento C (pertenencia por flujo, variante procedures) ejecutada en QA02.
+- **Resultado:** ejecucion `53DAC2820BDC0E55E063140311AC3EBA` (lote 1300, corte 29/5/2026), Query 1 del script 09 = **OK**: 1834 filas de pertenencia en 4 flujos presentes (fiadores_hi aporto 0 = su NETO), cierre 1166 con 0 huerfanos, 0 nulos, 0 ids repetidos, 31/31 metricas Capa B. Compilacion: BODY VALID, spec intacta, lineas_helper=7, lineas_flag=10.
+- **Hallazgo nuevo:** bruto C 1834 - neto 1517 = **317 descartados intra-flujo visibles a nivel REAL por primera vez** (antes solo estimables via DIAGNOSTICA). Conciliaciones de la corrida: netos 1051+321+0+100+45=1517=RE_CONSOLIDADO; precalificacion 87+46+218+1166=1517; cierre 792 NP + 225 CP + 149 RXT = 1166 = FINAL_TOTAL.
+- **Estado de la historia:** Incrementos A, B y C PROBADOS; queda solo la capa DIAGNOSTICA (propuesta separada). Queries 2/4 del script 09 (detalle por flujo y duraciones) quedaron opcionales, re-ejecutables por ID_EJECUCION.
+- **Archivos:** evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`; ESTADO/HANDOFF/READMEs/propuesta 4.9/INVENTARIO/CONTEXTO_ACTUAL actualizados a C probado.
+
 ## 2026-06-09 - Claude - Incremento B tracking integral precalifica QA02 (implementado Y PROBADO)
 
 - **Objetivo:** implementar en el repo el Incremento B (cohorte individual del cierre en `PR.PR_JOB_PRECALIFICA_CANDIDATO_TRACK`) sin tocar la logica funcional ni la `spec.sql`, y probarlo en QA02.
