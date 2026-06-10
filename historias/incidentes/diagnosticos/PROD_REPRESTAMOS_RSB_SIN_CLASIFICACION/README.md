@@ -73,6 +73,7 @@ con F9 en PROD.
 |---|---|
 | 1 | Confirma el codigo realmente compilado en PROD mediante `ALL_SOURCE`. |
 | 2 | Muestra parametros SIB/XCORE y fechas de corte vigentes. |
+| 2A | Muestra las ultimas 10 fechas de corte de `PA_DE08_SIB`, con filas, deudores y clasificaciones nulas. |
 | 3 | Mide la evolucion mensual de `RSB` por observacion desde noviembre de 2025. |
 | 4 | Confirma si `RSB` fue primera bitacora, si faltan `RE`/`CLS` previos y el origen. |
 | 5 | Prueba cuantos clientes existen o no en DE08 al `2026-06-01`. |

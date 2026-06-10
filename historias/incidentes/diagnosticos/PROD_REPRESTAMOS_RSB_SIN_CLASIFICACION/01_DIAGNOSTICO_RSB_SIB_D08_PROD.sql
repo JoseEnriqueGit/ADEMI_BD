@@ -81,6 +81,26 @@ SELECT 'MAX_FECHA_CORTE_PA_DETALLADO_DE08_PR',
   FROM PA.PA_DETALLADO_DE08
  WHERE fuente = 'PR';
 
+-- Query 2A: ultimas 10 fechas de corte disponibles en PA_DE08_SIB.
+-- Ejecutar esta antes de fijar una fecha en las Queries 5-8.
+SELECT fecha_corte,
+       total_filas,
+       total_deudores,
+       filas_clasificacion_nula
+  FROM (
+        SELECT d.fecha_corte,
+               COUNT(*) total_filas,
+               COUNT(DISTINCT d.id_deudor) total_deudores,
+               SUM(CASE
+                       WHEN d.clasificacion IS NULL THEN 1
+                       ELSE 0
+                   END) filas_clasificacion_nula
+          FROM PA.PA_DE08_SIB d
+         GROUP BY d.fecha_corte
+         ORDER BY d.fecha_corte DESC
+       )
+ WHERE ROWNUM <= 10;
+
 -- Query 3: evolucion mensual de RSB por observacion.
 SELECT TRUNC(b.fecha_adicion, 'MM') mes,
        b.observaciones,
