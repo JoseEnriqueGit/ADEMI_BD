@@ -9,6 +9,15 @@
 
 ---
 
+## 2026-06-10 - Codex - Diagnostico PROD de RSB sin clasificacion SIB
+
+- **Objetivo:** investigar por que represtamos de PROD muestran `RSB` como primera/ultima bitacora y validar la hipotesis de ausencia en DE08 al corte 2026-06-01.
+- **Hecho:** mapeado el flujo completo en el body PROD; carga dirigida/campana insertan `RE` sin bitacora, `CUR_DE08_SIB` solo genera `CLS` si existe coincidencia y las rutinas XCORE convierten todo `RE` sin `CLS` a `RSB` antes de escribir `RE`.
+- **Hallazgo:** los cursores XCORE no filtran por origen, por lo que una ejecucion dirigida/campana puede barrer registros `RE` de otros flujos. La observacion exacta `Cliente sin clasificacion` nace en esas rutinas, no en el cursor DE08.
+- **Entregable:** nuevo incidente `PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION` con script PROD de solo lectura para confirmar `ALL_SOURCE`, secuencia de bitacora, presencia en `PA_DE08_SIB` al 2026-06-01, historico previo y universo expuesto.
+- **Pendientes:** ejecutar las 8 queries en PROD y registrar resultados antes de proponer cambios al package.
+- **Archivos tocados:** historia nueva, `historias/INVENTARIO.md`, `docs/memoria/CONTEXTO_ACTUAL.md` y esta bitacora.
+
 ## 2026-06-10 - Claude - Incremento C tracking integral precalifica QA02 PROBADO
 
 - **Objetivo:** registrar la evidencia de la prueba del Incremento C (pertenencia por flujo, variante procedures) ejecutada en QA02.

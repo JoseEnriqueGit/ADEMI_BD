@@ -1,7 +1,7 @@
 # INVENTARIO MAESTRO DE HISTORIAS
 
 > Tabla viva con el estado de cada caso del repositorio. Mantener al dia con cada cambio de estado.
-> Ultima actualizacion: 2026-05-27.
+> Ultima actualizacion: 2026-06-10.
 
 ## Convencion de estados
 
@@ -60,6 +60,8 @@
 |---|---|---|---|---|
 | INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA | INCIDENTE_ABIERTO | PROD reportado, OPT-017/018 en DESARROLLO | 2026-05-01 | `incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/` |
 | QA02_RXT_REPRESTAMOS_LOTE_10000 | DIAGNOSTICO | QA02 | 2026-05-13 | `incidentes/diagnosticos/QA02_RXT_REPRESTAMOS_LOTE_10000/` |
+| PROD_REPRESTAMOS_ESTADO_AN | DIAGNOSTICO | PROD | 2026-06-10 | `incidentes/diagnosticos/PROD_REPRESTAMOS_ESTADO_AN/` |
+| PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION | DIAGNOSTICO | PROD | 2026-06-10 | `incidentes/diagnosticos/PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION/` |
 
 ## Soporte QA02 (no son incidentes ni OPT)
 

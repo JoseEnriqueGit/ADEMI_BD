@@ -1,0 +1,98 @@
+# Diagnostico PROD: RSB sin estados previos por clasificacion SIB
+
+## Pregunta
+
+Por que los represtamos aparecen en la bitacora directamente en `RSB`, con
+observacion `Cliente sin clasificacion`, sin registrar los estados anteriores, y por
+que el volumen comenzo a crecer desde marzo de 2026.
+
+Hipotesis operativa recibida: esos clientes no existen en `PA.PA_DE08_SIB` para el
+corte del **1 de junio de 2026**.
+
+## Hallazgo del codigo
+
+La hipotesis es compatible con el flujo, pero la ausencia en DE08 no genera `RSB`
+directamente:
+
+1. Carga dirigida y campana insertan `PR_REPRESTAMOS` con estado tecnico `RE`, sin
+   crear bitacora en ese momento:
+   `body.sql:1875-1903` y `body.sql:2234-2262`.
+2. Los cursores `CUR_DE08_SIB` usan un `INNER JOIN` con `PA_DE08_SIB`. Si el cliente
+   no existe en el ultimo corte, no pasa por el cursor y no recibe `CLS`:
+   `body.sql:2922-2930` y `body.sql:3123-3130`.
+3. `ACTUALIZA_XCORE_DIRIGIDA` busca todo registro `RE` que no tenga bitacora `CLS`;
+   no filtra por `ID_CARGA_DIRIGIDA`. A cada fila le genera `RSB` con
+   `Cliente sin clasificacion`: `body.sql:3474-3506`.
+4. `ACTUALIZA_XCORE_CAMPANA_ESPECIAL` repite el patron, tambien sin limitar el
+   origen: `body.sql:3544-3576`.
+5. En carga dirigida, XCORE se ejecuta antes de registrar la bitacora `RE`:
+   `body.sql:8181-8183` frente a `body.sql:8202-8204`.
+6. En campana ocurre lo mismo:
+   `body.sql:8295-8298` frente a `body.sql:8314-8318`.
+7. `P_Generar_Bitacora` primero cambia el estado principal y despues inserta la
+   fila de bitacora: `body.sql:5993-6005`.
+
+Resultado: un cliente ausente de DE08 no obtiene `CLS`; la rutina XCORE lo toma
+antes del cierre, lo cambia a `RSB` y lo saca de los cursores posteriores
+`WHERE ESTADO = 'RE'`. Por eso `RSB` puede quedar como primera y unica bitacora.
+
+## Riesgo adicional
+
+Los cursores `VALIDACION_CLASIFICACION` de las dos rutinas XCORE no filtran por
+origen. Una ejecucion de carga dirigida o campana puede marcar como `RSB` registros
+`RE` creados por otro flujo concurrente, siempre que aun no tengan `CLS`.
+
+Tambien existen dos mecanismos SIB distintos:
+
+- `UPDATE PR_REPRESTAMOS SET ESTADO = 'RSB'` sin bitacora:
+  `body.sql:2980-2988` y `body.sql:3179-3186`.
+- `P_Generar_Bitacora(..., 'RSB', ...)` con bitacora:
+  `body.sql:3031-3064`, `body.sql:3227-3269`,
+  `body.sql:3504-3506` y `body.sql:3574-3576`.
+
+Esto puede producir trazabilidades diferentes para condiciones relacionadas.
+
+## Lectura temporal
+
+La misma llamada `P_Generar_Bitacora(..., 'RSB', ..., 'Cliente sin
+clasificacion', ...)` ya aparece en snapshots versionados del 26 de marzo de
+2026. Con la evidencia disponible, el crecimiento mensual no debe atribuirse
+todavia a una linea agregada en mayo. Las causas temporales a contrastar son:
+
+- cambio en la cobertura del corte mensual de `PA_DE08_SIB`;
+- activacion/cambio de parametros SIB o XCORE;
+- mayor frecuencia o nuevo horario de carga dirigida/campana;
+- solapamiento entre esos procesos y el flujo regular.
+
+## Script
+
+`01_DIAGNOSTICO_RSB_SIB_D08_PROD.sql` es solo lectura y debe ejecutarse por query
+con F9 en PROD.
+
+| Query | Respuesta |
+|---|---|
+| 1 | Confirma el codigo realmente compilado en PROD mediante `ALL_SOURCE`. |
+| 2 | Muestra parametros SIB/XCORE y fechas de corte vigentes. |
+| 3 | Mide la evolucion mensual de `RSB` por observacion desde noviembre de 2025. |
+| 4 | Confirma si `RSB` fue primera bitacora, si faltan `RE`/`CLS` previos y el origen. |
+| 5 | Prueba cuantos clientes existen o no en DE08 al `2026-06-01`. |
+| 6 | Entrega detalle individual de hasta 200 casos. |
+| 7 | Distingue clientes que desaparecieron en junio de los que nunca estuvieron. |
+| 8 | Mide el universo `RE` actualmente expuesto al mismo salto. |
+
+## Criterio de confirmacion
+
+La hipotesis queda confirmada si las Queries 4 y 5 muestran simultaneamente:
+
+- `RSB_ES_PRIMERA_BITACORA > 0`;
+- `SIN_RE_PREVIO > 0`;
+- `SIN_CLS_PREVIO > 0`;
+- mayoria o volumen relevante en `1_NO_EXISTE_EN_DE08_2026_06_01`.
+
+La Query 1 es obligatoria: si el package compilado en PROD no contiene las mismas
+lineas, primero debe extraerse el body vivo antes de proponer una correccion.
+
+## Estado
+
+- 2026-06-10: diagnostico creado. Pendiente ejecutar en PROD y registrar resultados.
+- No se modifico el package ni se propuso aun un cambio de logica de negocio.

@@ -37,6 +37,12 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
   **Pendiente solo la capa DIAGNOSTICA** (propuesta separada). No promover a PROD desde
   esta historia. Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
+- **Diagnostico PROD RSB/SIB:** clientes aparecen directamente en bitacora `RSB`
+  con `Cliente sin clasificacion`. El body versionado muestra que las rutinas XCORE de
+  carga dirigida/campana convierten todo `RE` sin bitacora `CLS` a `RSB` antes de escribir
+  la bitacora `RE`, y sus cursores no filtran por origen. Hipotesis pendiente de validar:
+  ausencia de los clientes en `PA.PA_DE08_SIB` al corte 2026-06-01. Script solo lectura en
+  `historias/incidentes/diagnosticos/PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:
   OPT-017/018 (bulk collect) en DESARROLLO, pendiente de compilar en QA y monitorear en PROD.
