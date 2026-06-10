@@ -3,8 +3,11 @@
 Fecha: 2026-06-08.
 Ambiente objetivo inicial: QA02.
 Objeto principal: `PR.PR_PKG_REPRESTAMOS`.
-Estado: Incremento A implementado y probado en QA02 el 2026-06-09.
-Incrementos B/C y capa DIAGNOSTICA pendientes.
+Estado: Incrementos A, B y C implementados y probados en QA02 el 2026-06-09.
+Capa DIAGNOSTICA preparada el 2026-06-10 (wrappers en la historia,
+`07_DIAGNOSTICA/`), pendiente de prueba. Correcciones de la seccion 7
+aplicadas a los trackers canonicos (7.1 y 7.2; 7.3 ya era correcto;
+7.4 resuelta por el Incremento C).
 
 Ruta de implementacion y pruebas:
 `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.

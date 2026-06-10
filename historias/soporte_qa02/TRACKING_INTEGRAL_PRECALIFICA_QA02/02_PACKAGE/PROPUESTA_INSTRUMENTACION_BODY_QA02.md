@@ -1,6 +1,6 @@
 # Propuesta de instrumentacion del body - Tracking integral QA02
 
-Fecha: 2026-06-08 · Estado: **INCREMENTOS A, B Y C PROBADOS EN QA02 EL 2026-06-09** (B: seccion 4.8; C: seccion 4.9). Falta solo la capa DIAGNOSTICA. Evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`.
+Fecha: 2026-06-08 · Estado: **INCREMENTOS A, B Y C PROBADOS EN QA02 EL 2026-06-09** (B: seccion 4.8; C: seccion 4.9). **Capa DIAGNOSTICA preparada el 2026-06-10 en `../07_DIAGNOSTICA/`, pendiente de prueba.** Evidencia en `../05_RESULTADOS/RESULTADOS_QA02.md`.
 Revision adversarial multiagente aplicada (14 hallazgos confirmados incorporados): gating de COUNTs por flag,
 `FECHA_CORTE` poblada, desglose REAL de precalificacion (RSB/CLS/RCS/borrados), `FLUJO_RE_NETO` reetiquetado,
 bloque de cierre concreto, y notas de `ORDEN_FILTRO` y paso 14.

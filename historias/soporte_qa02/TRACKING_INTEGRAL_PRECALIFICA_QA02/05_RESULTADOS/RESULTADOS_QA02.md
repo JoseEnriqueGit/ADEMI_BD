@@ -221,6 +221,40 @@ Conciliacion manual confirmada:
   esta evidencia; opcionales, re-ejecutables en cualquier momento por
   `ID_EJECUCION` con el script 09.
 
+## Capa DIAGNOSTICA - preparada en el repo (2026-06-10), PENDIENTE de prueba en QA02
+
+- Carpeta nueva: `07_DIAGNOSTICA/` con 5 wrappers `INSERT` (uno por flujo),
+  **generados** desde los trackers canonicos de
+  `trackers_precalifica_post_cursor_fast/`, mas validacion (06) y reversa (07).
+- Cada wrapper inserta el desglose por filtro interno (cursor 18 pasos, lote,
+  post-cursor X3/X1/X2/mancomunado/edad, cleanup) en
+  `PR_JOB_PRECALIFICA_FILTRO_TRACK` con `TIPO_MEDICION='DIAGNOSTICA'`,
+  asociado a la ULTIMA ejecucion del job, con gating por
+  `TRACK_PRECALIFICA_DETALLE_CURSOR='S'` y advertencia de no-simultaneidad
+  en `PARAMETROS`.
+- Correcciones seccion 7 de la propuesta aplicadas a los trackers canonicos:
+  7.1 `POST_CLEANUP` (tracker 01), 7.2 nota del denominador (trackers 01 y 04),
+  7.3 sin cleanup en Cancelado (ya era correcto), 7.4 resuelta por el
+  Incremento C (pertenencia real en el FETCH).
+
+### Pasos exactos para probar en Toad (`AJEREZ@QADEMI02_19C`)
+
+1. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD`.
+2. Inmediatamente despues, F5 a `07_DIAGNOSTICA/01..05_DIAG_*.sql` (cada uno
+   reporta su conteo de filas insertadas; pueden tardar varios minutos c/u).
+3. `07_DIAGNOSTICA/06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query:
+   Query 1 cobertura (5 flujos DIAGNOSTICA + 31 REAL), Query 2 funnel por
+   flujo, Query 3 cruce `DIAG_LOTE` vs bruto C vs neto B.
+4. Pegar aqui: salidas de las queries 1 y 3.
+5. Si la corrida diagnostica no sirve: `07_ROLLBACK_DIAGNOSTICA_QA02.sql`.
+
+### Resultados de la prueba (completar al ejecutar)
+
+- Fecha: PENDIENTE
+- ID de ejecucion: PENDIENTE
+- Cobertura por flujo: PENDIENTE
+- Cruce DIAG_LOTE vs bruto C: PENDIENTE
+
 ## Alcance validado y pendiente
 
 - **Incremento A:** aplicado y probado (2026-06-09,
@@ -231,8 +265,8 @@ Conciliacion manual confirmada:
 - **Incremento C:** aplicado y probado (2026-06-09,
   `53DAC2820BDC0E55E063140311AC3EBA`); pertenencia por flujo conciliada,
   0 huerfanos en el cierre, 317 descartados intra-flujo visibles.
-- **DIAGNOSTICA:** pendiente; desglose de filtros internos comparable con
-  `trackers_precalifica_cursor`.
+- **DIAGNOSTICA:** preparada en el repo (2026-06-10, `07_DIAGNOSTICA/`);
+  pendiente de ejecutar y conciliar en QA02.
 - **Decision operativa (2026-06-09):** `LOTE_DE_CARAGA_REPRESTAMO` queda en
   `1300` en QA02 a proposito (corridas de prueba mas cortas). Subirlo a
   `130000` solo para corridas representativas o comparables con PROD.

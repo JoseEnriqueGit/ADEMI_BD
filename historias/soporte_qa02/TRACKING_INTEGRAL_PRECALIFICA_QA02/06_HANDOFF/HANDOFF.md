@@ -24,7 +24,9 @@ Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (
   fiadores_hi aporto 0 = su NETO), cierre 1166 con **0 huerfanos**, 317 descartados
   intra-flujo visibles por primera vez, 0 nulos/repetidos, 31/31 metricas Capa B.
   Sin DDL nuevo. Reversa disponible: `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql`.
-- Pendiente: capa DIAGNOSTICA.
+- **Capa DIAGNOSTICA preparada en el repo (2026-06-10):** `07_DIAGNOSTICA/` con 5 wrappers
+  INSERT generados desde los trackers canonicos + validacion + reversa. PENDIENTE de
+  ejecutar en QA02 (gating `TRACK_PRECALIFICA_DETALLE_CURSOR='S'`).
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
 
@@ -81,8 +83,9 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. Integrar o asociar la capa DIAGNOSTICA para igualar el desglose de
-   `trackers_precalifica_cursor` (unico incremento restante).
+1. **Probar la capa DIAGNOSTICA en QA02** (preparada en `07_DIAGNOSTICA/` el
+   2026-06-10): job -> wrappers 01..05 (F5) -> validacion 06 (F9). No marcarla
+   probada sin resultados reales.
 2. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 3. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida
@@ -90,10 +93,12 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 > Resueltas: A, B y C probados y conciliados al 100%. Costo MERGE ~0.2 ms/candidato
 > (sin variante bulk). Lote en `1300` por decision (corridas cortas en QA02).
+> Correcciones seccion 7 aplicadas a los trackers canonicos (7.1, 7.2; 7.3 ya
+> era correcto; 7.4 resuelta por el Incremento C).
 
 ## Proximos pasos (orden sugerido)
 
-1. Diseñar la capa DIAGNOSTICA contra los scripts existentes (propuesta separada).
+1. Ejecutar y conciliar la capa DIAGNOSTICA (ver `07_DIAGNOSTICA/README.md`).
 2. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
 
 ## Reglas duras (no negociables)
@@ -107,6 +112,7 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 - Propuesta de diseno: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/diagnosticos_precalifica/PROPUESTA_TRACKING_INTEGRAL_PRECALIFICA_QA02.md`
 - Diseno e historial: `02_PACKAGE/PROPUESTA_INSTRUMENTACION_BODY_QA02.md`
+- Capa DIAGNOSTICA: `07_DIAGNOSTICA/` (wrappers generados, validacion, reversa, README)
 - Body canonico instrumentado: `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/body.sql`
 - DDL creado: `01_DDL/00..04` (todos aplicados; el C no requiere DDL)
 - Rollbacks de body: `ROLLBACK_INCREMENTO_C_BODY_QA02.sql` (C -> B probado),
