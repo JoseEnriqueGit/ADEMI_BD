@@ -121,9 +121,32 @@ porque el loop RSB de XCORE_DIRIGIDA no consulta ese parametro.
 | 3 | Detalle individual de los RSB de la carga (evidencia). |
 | 4 | Contraste: ausentes de DE08 rechazados vs clasificacion mala que paso. |
 
+## Reproduccion en QA02
+
+El body de QA02 tiene el mismo patron que PROD: loop RSB activo en
+`ACTUALIZA_XCORE_DIRIGIDA` (body QA02 3642-3643) y campana (3712-3713), comentado
+en `Actualiza_XCORE_CUSTOM` (3518-3519).
+
+`03_DIAGNOSTICO_RSB_SIB_QA02.sql` reproduce el salto de forma controlada:
+
+| Momento | Query | Respuesta |
+|---|---|---|
+| Antes | 1 | Codigo compilado en QA02 (loop activo/comentado). |
+| Antes | 2 | Parametros QA02, ultimo corte DE08 y pendientes `T` en carga. |
+| Antes | 3 | PREDICCION: pendientes cruzados con DE08 (grupo 1 caera RSB). |
+| — | — | Correr la carga dirigida en QA02. |
+| Despues | 4 | Resumen de la corrida por estado y texto SIB. |
+| Despues | 5 | Firma del salto por RSB: primera bitacora, sin CLS, sin XCORE, ausente DE08 (o fiador). |
+| Despues | 6 | Contraste de negocio: ausentes rechazados vs clasificacion mala que paso. |
+
+La reproduccion queda confirmada si la prediccion (Query 3, grupo 1) coincide con
+los RSB observados (Queries 4 y 5).
+
 ## Estado
 
 - 2026-06-10: diagnostico creado. Pendiente ejecutar en PROD y registrar resultados.
 - 2026-06-10: evidencia APEX de la carga del dia confirma la hipotesis; se agrego
   `02_RESULTADO_CARGA_DIRIGIDA_20260610.sql` para cuantificarla en Toad.
+- 2026-06-10: se agrego `03_DIAGNOSTICO_RSB_SIB_QA02.sql` para reproducir el salto
+  en QA02 con prediccion previa y validacion posterior. Pendiente de ejecutar.
 - No se modifico el package ni se propuso aun un cambio de logica de negocio.
