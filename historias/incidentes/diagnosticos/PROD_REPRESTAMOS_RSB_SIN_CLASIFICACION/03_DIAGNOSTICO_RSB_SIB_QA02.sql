@@ -235,3 +235,20 @@ SELECT CASE
           END,
           PR.PR_PKG_REPRESTAMOS.F_OBT_DESCRIPCION_ESTADO(c.estado)
  ORDER BY grupo, total DESC;
+
+-- Query 7: embudo completo de PR_CARGA_DIRECCIONADA - los descartes
+--          PREVIOS a PR_REPRESTAMOS quedan aqui con estado 'E' y el
+--          motivo en OBSERVACIONES (no tipo de credito valido, no es
+--          fisico, represtamo activo...); 'T' = pendiente, 'F' =
+--          procesado (incluye los que el loop RSB marco F).
+--          Estos 'E' nunca llegan a la bitacora: completan el panorama
+--          de "cuantos se quedan en el camino" de cada carga.
+SELECT cd.estado,
+       NVL(cd.observaciones, '(sin observacion)') observaciones,
+       COUNT(*) total,
+       MIN(cd.fecha_modificacion) primera_modificacion,
+       MAX(cd.fecha_modificacion) ultima_modificacion
+  FROM PR.PR_CARGA_DIRECCIONADA cd
+ GROUP BY cd.estado,
+          NVL(cd.observaciones, '(sin observacion)')
+ ORDER BY cd.estado, total DESC;

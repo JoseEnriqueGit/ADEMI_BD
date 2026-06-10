@@ -37,11 +37,13 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
   **Pendiente solo la capa DIAGNOSTICA** (propuesta separada). No promover a PROD desde
   esta historia. Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
-- **Diagnostico PROD RSB/SIB:** clientes aparecen directamente en bitacora `RSB`
-  con `Cliente sin clasificacion`. El body versionado muestra que las rutinas XCORE de
-  carga dirigida/campana convierten todo `RE` sin bitacora `CLS` a `RSB` antes de escribir
-  la bitacora `RE`, y sus cursores no filtran por origen. Hipotesis pendiente de validar:
-  ausencia de los clientes en `PA.PA_DE08_SIB` al corte 2026-06-01. Script solo lectura en
+- **Diagnostico RSB/SIB — CONFIRMADO Y REPRODUCIDO (2026-06-10):** el rechazo
+  `RSB Cliente sin clasificacion` corresponde 1:1 con la ausencia del cliente en el
+  ultimo corte de `PA.PA_DE08_SIB`; el loop sin compuerta de `ACTUALIZA_XCORE_DIRIGIDA`
+  lo marca antes de la bitacora `RE` (por eso RSB sale como primera bitacora, sin XCORE).
+  Reproducido en QA02 (corrida 425: 217 RSB ausentes del corte 2023-11-30; los 17 con
+  clasificacion mala pasaron por `VALIDAR_CLASIFICACION_SIB_CARGADIRIGIDA='N'`).
+  Evidencia PROD (APEX) y QA02 + 4 opciones de correccion PROPUESTAS (sin aplicar) en
   `historias/incidentes/diagnosticos/PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION/`.
 - 🔴 **Incidente abierto:** `INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA` (ORA-01555, reportado 2026-05-01).
   Ruta: `historias/incidentes/abiertos/INC_SNAPSHOT_TOO_OLD_JOB_PRECALIFICA/`. Mitigación propuesta:

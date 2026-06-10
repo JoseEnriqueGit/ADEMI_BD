@@ -148,5 +148,10 @@ los RSB observados (Queries 4 y 5).
 - 2026-06-10: evidencia APEX de la carga del dia confirma la hipotesis; se agrego
   `02_RESULTADO_CARGA_DIRIGIDA_20260610.sql` para cuantificarla en Toad.
 - 2026-06-10: se agrego `03_DIAGNOSTICO_RSB_SIB_QA02.sql` para reproducir el salto
-  en QA02 con prediccion previa y validacion posterior. Pendiente de ejecutar.
-- No se modifico el package ni se propuso aun un cambio de logica de negocio.
+  en QA02 con prediccion previa y validacion posterior.
+- 2026-06-10: **HIPOTESIS CONFIRMADA Y REPRODUCIDA EN QA02.** Corrida de 425
+  candidatos: 217 RSB, todos ausentes del corte DE08 vigente en QA02 (2023-11-30) y
+  todos con la firma completa (primera bitacora RSB, sin CLS, sin XCORE); los 17 con
+  clasificacion mala/nula PASARON por parametro apagado. Correspondencia 1:1 en la
+  Query 6. Evidencia y opciones de correccion en `04_RESULTADOS_QA02_20260610.md`.
+- No se modifico el package. Las opciones de correccion estan PROPUESTAS, sin aplicar.

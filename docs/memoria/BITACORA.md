@@ -9,6 +9,17 @@
 
 ---
 
+## 2026-06-10 - Claude - Confirmacion y reproduccion QA02 del salto RSB/SIB + diagnostico AN
+
+- **Objetivo:** validar la hipotesis del diagnostico RSB/SIB de Codex con evidencia real y entregar los scripts de diagnostico para PROD y QA02; ademas, crear el diagnostico de por que candidatos quedan en `AN` en PROD.
+- **Diagnostico AN (PROD):** mapeadas las 4 rutas que marcan `AN` en el body PROD (cierre sin solicitud, link vencido por `P_Anular_Represtamos_Inactivos`, salto de tipo credito, nuevo link). Script de 7 queries en `historias/incidentes/diagnosticos/PROD_REPRESTAMOS_ESTADO_AN/` (pendiente de ejecutar).
+- **Evidencia PROD (APEX, carga dirigida del dia):** tres patrones confirman la cadena: CREADO+clasificacion A (sana), CREADO+`parametro deshabilitado` (prueba `VALIDAR_CLASIFICACION_SIB_CARGADIRIGIDA='N'`), RSB+`Cliente sin clasificacion`+XCORE vacio (ausente de DE08, marcado antes de consultar XCORE). Script `02_RESULTADO_CARGA_DIRIGIDA_20260610.sql`.
+- **REPRODUCIDO EN QA02 (script 03):** corrida de 425 candidatos: 217 RSB todos ausentes del corte DE08 vigente en QA02 (**2023-11-30**, corte de ~2.5 anos) y todos con firma completa (RSB primera bitacora, sin CLS, sin XCORE, es_fiador=N); 188+3 CREADO con clasificacion A/B; 17 con clasificacion mala/nula PASARON por parametro apagado. Query 6: correspondencia 1:1 sin excepciones. Evidencia en `04_RESULTADOS_QA02_20260610.md`.
+- **Hallazgos clave:** (1) el loop RSB esta comentado en `Actualiza_XCORE_CUSTOM` (flujo regular) y activo solo en dirigida/campana -> solo esas corridas generan el patron; (2) el loop no consulta el parametro SIB -> inconsistencia: clasificacion mala pasa, ausente se rechaza; (3) el mecanismo es sensible a la frescura del corte DE08.
+- **Propuestas (sin aplicar):** compuertar el loop con `VALIDAR_CLASIFICACION_SIB_*`; tratar ausencia como clasificacion nula; frescura operacional del corte; filtrar el cursor por origen.
+- **Pendientes:** ejecutar en PROD los scripts 01 (Queries 4-7) y 02; decidir opcion de correccion con aprobacion; falta query para el RSB "silencioso" (UPDATE sin bitacora via `PA_DETALLADO_DE08`).
+- **Archivos tocados:** `historias/incidentes/diagnosticos/PROD_REPRESTAMOS_ESTADO_AN/`, `historias/incidentes/diagnosticos/PROD_REPRESTAMOS_RSB_SIN_CLASIFICACION/` (scripts 02/03, README, `04_RESULTADOS_QA02_20260610.md`), `docs/memoria/CONTEXTO_ACTUAL.md` y esta bitacora.
+
 ## 2026-06-10 - Codex - Diagnostico PROD de RSB sin clasificacion SIB
 
 - **Objetivo:** investigar por que represtamos de PROD muestran `RSB` como primera/ultima bitacora y validar la hipotesis de ausencia en DE08 al corte 2026-06-01.
