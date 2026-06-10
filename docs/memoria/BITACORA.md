@@ -9,6 +9,13 @@
 
 ---
 
+## 2026-06-10 - Claude - Capa DIAGNOSTICA preparada (tracking integral precalifica QA02)
+
+- **Objetivo:** ultima capa del tracking integral: desglose por filtro interno del cursor, asociado al `ID_EJECUCION` real.
+- **Hecho:** carpeta nueva `historias/.../TRACKING_INTEGRAL_PRECALIFICA_QA02/07_DIAGNOSTICA/` con 5 wrappers `INSERT...SELECT` (uno por flujo) **generados mecanicamente** desde los trackers canonicos de `trackers_precalifica_post_cursor_fast/` (fidelidad literal, regenerables), que insertan en `PR_JOB_PRECALIFICA_FILTRO_TRACK` con `TIPO_MEDICION='DIAGNOSTICA'`, gating por `TRACK_PRECALIFICA_DETALLE_CURSOR='S'`, asociacion a la ultima ejecucion y advertencia de no-simultaneidad en `PARAMETROS`. Mas `06_VALIDAR` (cobertura, funnel, cruce DIAG_LOTE vs bruto C vs neto B) y `07_ROLLBACK` (borra solo filas DIAGNOSTICA).
+- **Correcciones seccion 7 de la propuesta aplicadas a los trackers canonicos:** 7.1 `POST_CLEANUP` corregido (tracker 01), 7.2 nota de desviacion del denominador (trackers 01 y 04), 7.3 verificado que Cancelado no tiene cleanup (el `DELETE X%` esta comentado en el package), 7.4 resuelta por el Incremento C.
+- **PENDIENTE:** ejecutar en QA02 (job -> wrappers F5 -> validacion F9) y registrar evidencia; no marcar probada sin resultados reales.
+
 ## 2026-06-10 - Claude - Confirmacion y reproduccion QA02 del salto RSB/SIB + diagnostico AN
 
 - **Objetivo:** validar la hipotesis del diagnostico RSB/SIB de Codex con evidencia real y entregar los scripts de diagnostico para PROD y QA02; ademas, crear el diagnostico de por que candidatos quedan en `AN` en PROD.

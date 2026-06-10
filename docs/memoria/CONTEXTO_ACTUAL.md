@@ -35,8 +35,10 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   procedures con helper package-private `track_candidatos_flujo`.
   📌 **Decisión: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (corridas de prueba
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
-  **Pendiente solo la capa DIAGNOSTICA** (propuesta separada). No promover a PROD desde
-  esta historia. Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
+  **Capa DIAGNOSTICA preparada el 2026-06-10** (`07_DIAGNOSTICA/`: 5 wrappers INSERT
+  generados de los trackers canónicos + validación + reversa), **pendiente de prueba en
+  QA02**. No promover a PROD desde esta historia.
+  Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - **Diagnostico RSB/SIB — CONFIRMADO Y REPRODUCIDO (2026-06-10):** el rechazo
   `RSB Cliente sin clasificacion` corresponde 1:1 con la ausencia del cliente en el
   ultimo corte de `PA.PA_DE08_SIB`; el loop sin compuerta de `ACTUALIZA_XCORE_DIRIGIDA`
