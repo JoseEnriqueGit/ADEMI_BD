@@ -9,6 +9,46 @@
 
 ---
 
+## 2026-06-11 - Claude - Sincronizacion de tipos de credito APLICADA en QA02
+
+- **Objetivo:** ejecutar la carga en QA02 y validar 9/9 `OK_IGUAL_QA`.
+- **Hecho:** INSERT de los 8 faltantes (`857, 752, 753, 883, 972, 854, 855, 751`) aplicado con las 11 columnas iguales a QA y `FECHA_ADICION` 2025 preservada (trigger deshabilitado). El UPDATE del PASO 4 sobre el 164 dio `0 rows updated` porque su `WHERE` exigia `CREDITO_CAMPANA_ESPECIAL IS NULL` y la columna ya estaba en `'N'`; se corrigio con un UPDATE puntual por PK (guarda sobre la `FECHA_MODIFICACION` anterior) que dejo `FECHA_MODIFICACION = 2025-09-30 22:48:31`. Trigger reactivado (`Last DDL 11:03:55`).
+- **Decisiones:** la captura previa que reportaba `CAMPANA = NULL` en el 164 estaba desactualizada; el unico campo realmente pendiente era `FECHA_MODIFICACION`.
+- **Resultado:** 9/9 `OK_IGUAL_QA`, 0 padres faltantes, trigger `ENABLED`.
+- **Archivos tocados:** `RESULTADOS.md` y `ESTADO.md` de la historia `SINCRONIZAR_TIPOS_CREDITO_QA_QA02`, y esta bitacora.
+
+## 2026-06-11 - Codex - Sincronizacion QA02 dividida en SQL directo
+
+- **Objetivo:** resolver que Toad procesaba los `PROMPT` pero no ejecutaba el bloque anonimo de sincronizacion.
+- **Hecho:** reemplazado el bloque por pasos SQL directos ejecutables con F9 en la misma sesion: deshabilitar trigger, lock, update del 164, insert set-based de 8 filas, validacion y enable con commit implicito.
+- **Decisiones:** no repetir el bloque anonimo; confirmar solamente despues de obtener 9/9 `OK_IGUAL_QA`.
+- **Rollback:** antes del enable usar `ROLLBACK` y reactivar el trigger; despues del commit permanece el script formal de reversa.
+- **Pendientes:** ejecutar los pasos directos en QA02 y registrar resultados.
+
+## 2026-06-11 - Codex - Resultado QA02 y sincronizacion exacta de tipos de credito
+
+- **Objetivo:** incorporar la evidencia QA02 y ajustar la carga al estado real.
+- **Hecho:** QA02 tiene 8 tipos faltantes; el 164 existe y difiere en `FECHA_MODIFICACION` (`2026-06-11 09:25:22` vs QA `2025-09-30 22:48:31`) y `CREDITO_CAMPANA_ESPECIAL` (`NULL` vs QA `'N'`); no faltan padres y el trigger esta `ENABLED`.
+- **Decisiones:** la carga insertara los 8 faltantes y actualizara esos dos campos del 164 solo si mantiene exactamente el estado observado; cualquier diferencia nueva bloquea la ejecucion.
+- **Rollback:** elimina la lista realmente insertada y restaura la fecha previa del 164.
+- **Pendientes:** ejecutar sincronizacion en QA02 y validar 9/9 `OK_IGUAL_QA`.
+
+## 2026-06-11 - Codex - Validacion QA de tipos de credito y ajuste de ejecucion Toad
+
+- **Objetivo:** aclarar por que la validacion QA02 parecia no devolver filas.
+- **Hecho:** confirmado por evidencia Toad que QA devuelve 9/9 `OK_IGUAL_CAPTURA`; documentado ejecutar cada `SELECT` con F9 o revisar `Data Grid` cuando se usa F5.
+- **Decisiones:** el baseline QA queda confirmado; QA02 sigue pendiente de ejecutar y no se interpreta la salida de `PROMPT` como ausencia de datos.
+- **Pendientes:** ejecutar las tres consultas de validacion en QA02 y registrar resultados.
+- **Archivos tocados:** historia `SINCRONIZAR_TIPOS_CREDITO_QA_QA02` y esta bitacora.
+
+## 2026-06-11 - Codex - Sincronizacion de tipos de credito QA hacia QA02
+
+- **Objetivo:** preparar la comparacion de `PR.PR_TIPO_CREDITO_REPRESTAMO` entre QA y QA02 y la carga controlada de los registros faltantes.
+- **Hecho:** creada historia de soporte con prerrequisitos, validacion de los tipos `164, 857, 752, 753, 883, 972, 854, 855, 751`, insercion, validacion posterior y rollback.
+- **Decisiones:** se preservan las once columnas exactas de QA; como el trigger reemplaza `FECHA_ADICION`, la carga lo deshabilita/reactiva de forma controlada y queda confirmada por el commit implicito del DDL.
+- **Pendientes:** validar el origen en QA, ejecutar la carga en Toad/QA02 y registrar evidencia.
+- **Archivos tocados:** `historias/soporte_qa02/SINCRONIZAR_TIPOS_CREDITO_QA_QA02/`, `historias/INVENTARIO.md` y esta bitacora.
+
 ## 2026-06-10 - Claude - Capa DIAGNOSTICA preparada (tracking integral precalifica QA02)
 
 - **Objetivo:** ultima capa del tracking integral: desglose por filtro interno del cursor, asociado al `ID_EJECUCION` real.
