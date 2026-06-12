@@ -9,6 +9,15 @@
 
 ---
 
+## 2026-06-12 - Claude - Caso bypass SIB DE08 en QA02 documentado y body fusionado
+
+- **Objetivo:** organizar y documentar las versiones del body de `PR.PR_PKG_REPRESTAMOS` con el bypass de la validacion SIB (DE08), y generar un body QA02 completo (tracking + bypass).
+- **Hecho:** creada la carpeta `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/bypass_sib_de08_qa02/` con: `01_body_BASELINE_PROD.sql` (antes `PROD.sql`, body vigente en PROD al 2026-06-11), `02_body_QA02_BYPASS_SIB_DE08.sql` (antes `body copy 2.sql`, PROD + bypass DE08 + stub Xcore 745 + filtro celular relajado) y `03_body_QA02_TRACKING_BYPASS_SIB_DE08.sql` (generado con `git merge-file`, 0 conflictos: body.sql canonico + bypass; es el body a compilar en QA02). README del caso con la tabla de cambios y razones.
+- **Decisiones:** el `body.sql` canonico NO se toco (sigue siendo PROD + tracking sin bypass); `body copy.sql` quedo intacto; el bypass NUNCA se promueve a PROD (aprueba clasificacion por defecto `CLS` y fija Xcore 745).
+- **Validacion:** marcadores en el 03: `track_candidatos_flujo=7`, `ReprestamosAProcesarCLS=4`, `xcore := 745` x2, filtro celular comentado x2, sin marcadores de merge.
+- **Pendientes:** compilar el 03 en QA02 y correr el flujo de prueba completo; probar la capa DIAGNOSTICA.
+- **Archivos tocados:** `bypass_sib_de08_qa02/` (4 archivos), `docs/memoria/CONTEXTO_ACTUAL.md`, esta bitacora.
+
 ## 2026-06-11 - Claude - Sincronizacion de tipos de credito APLICADA en QA02
 
 - **Objetivo:** ejecutar la carga en QA02 y validar 9/9 `OK_IGUAL_QA`.

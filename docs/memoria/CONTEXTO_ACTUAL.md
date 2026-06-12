@@ -4,7 +4,7 @@
 > web, Codex, editor local), **lee este archivo primero**. Es la "memoria de trabajo": un snapshot
 > vivo que se sobrescribe. El detalle cronológico vive en `docs/memoria/BITACORA.md`.
 >
-> Última actualización: 2026-06-09 · Mantener al día con cada cambio de estado relevante.
+> Última actualización: 2026-06-12 · Mantener al día con cada cambio de estado relevante.
 
 ---
 
@@ -39,6 +39,13 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   generados de los trackers canónicos + validación + reversa), **pendiente de prueba en
   QA02**. No promover a PROD desde esta historia.
   Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
+- 🟡 **Bypass SIB DE08 en QA02 (2026-06-12):** caso documentado en
+  `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/bypass_sib_de08_qa02/`.
+  `01` = baseline PROD vigente (antes `PROD.sql`); `02` = PROD + bypass DE08/Xcore 745
+  (antes `body copy 2.sql`); `03` = body canonico (tracking) + bypass, **generado y
+  pendiente de compilar/probar en QA02**. El bypass aprueba clasificacion `CLS` por
+  defecto y stubea Xcore=745: **prohibido promover 02/03 a PROD**. `body.sql` canonico
+  sin tocar.
 - **Diagnostico RSB/SIB — CONFIRMADO Y REPRODUCIDO (2026-06-10):** el rechazo
   `RSB Cliente sin clasificacion` corresponde 1:1 con la ausencia del cliente en el
   ultimo corte de `PA.PA_DE08_SIB`; el loop sin compuerta de `ACTUALIZA_XCORE_DIRIGIDA`
