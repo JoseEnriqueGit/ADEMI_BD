@@ -1,6 +1,6 @@
 # Handoff - Tracking integral precalifica QA02
 
-Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (`AJEREZ@QADEMI02_19C`).
+Ultima actualizacion: 2026-06-15 (Claude Code). Entorno: **QA02 = Oracle 19c** (`AJEREZ@QADEMI02_19C`).
 
 ## Estado actual
 
@@ -24,9 +24,11 @@ Ultima actualizacion: 2026-06-09 (Claude Code). Entorno: **QA02 = Oracle 19c** (
   fiadores_hi aporto 0 = su NETO), cierre 1166 con **0 huerfanos**, 317 descartados
   intra-flujo visibles por primera vez, 0 nulos/repetidos, 31/31 metricas Capa B.
   Sin DDL nuevo. Reversa disponible: `04_ROLLBACK/ROLLBACK_INCREMENTO_C_BODY_QA02.sql`.
-- **Capa DIAGNOSTICA preparada en el repo (2026-06-10):** `07_DIAGNOSTICA/` con 5 wrappers
-  INSERT generados desde los trackers canonicos + validacion + reversa. PENDIENTE de
-  ejecutar en QA02 (gating `TRACK_PRECALIFICA_DETALLE_CURSOR='S'`).
+- **Capa DIAGNOSTICA APLICADA Y PROBADA el 2026-06-15:** `5414C315EE2373B7E063140311ACD22C`.
+  Los 5 wrappers de `07_DIAGNOSTICA/` cargados via F9 (INSERT->COUNT->COMMIT por sentencia;
+  F5/08 descartado). Cobertura `26/22/23/27/24` + `TOTAL=1`, REAL intactas (30). Cruce Query 3:
+  Represtamo topa el lote (DIAG=BRUTO=1300, 1129 sobreviven); derivas de Cancelado (+743) y
+  fiadores (-150) = brecha standalone-vs-secuenciado esperada. **Tracking integral COMPLETO.**
 
 ## Lo validado en QA02 (script 00, evidencia en `05_RESULTADOS/RESULTADOS_QA02.md`)
 
@@ -65,7 +67,8 @@ Disenado contra el **codigo real** del body (no solo la propuesta). Todo vive en
   precalificacion, XCORE, solicitud, cierre) — PROBADO. **B** = cohorte final individual +
   `RESULTADO_ULTIMO` (estado observado) — PROBADO. **C** = pertenencia por flujo capturada
   tras el `FORALL INSERT` de las 5 procedures (helper package-private `track_candidatos_flujo`,
-  seccion 4.9) — PROBADO. + DIAGNOSTICA (5 scripts externos, pendiente).
+  seccion 4.9) — PROBADO. **DIAGNOSTICA** = desglose por filtro interno del cursor (5 wrappers
+  generados de los trackers canonicos, insertan con TIPO_MEDICION='DIAGNOSTICA') — PROBADO 2026-06-15.
 
 ### Correcciones de la revision adversarial ya incorporadas (importantes)
 
@@ -83,28 +86,26 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 
 ## Pendientes / decisiones abiertas
 
-1. **Probar la capa DIAGNOSTICA en QA02** (preparada en `07_DIAGNOSTICA/` el
-   2026-06-10): precheck 00 (F9) -> job -> wrappers 01..05, ejecutando
-   `INSERT`, verificacion y `COMMIT` por separado con F9 -> validacion 06
-   (F9). El metodo F5 fue descartado el 2026-06-15 porque Toad no retornaba
-   resultados de forma confiable. Avance 2026-06-15: precheck OK para
-   `5414C315EE2373B7E063140311ACD22C`; wrapper 01 inserto 26 filas en 44 s,
-   pendiente `SELECT COUNT(*)` + `COMMIT`. No marcarla probada sin completar
-   los cinco flujos y la validacion 06.
-2. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
+1. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
-3. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida
+2. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida C
    `53DAC2820BDC0E55E063140311AC3EBA` (bruto/neto por flujo y duraciones).
+3. Decidir si alguna parte del tracking se propone para PROD (propuesta separada;
+   no promover desde esta historia).
 
-> Resueltas: A, B y C probados y conciliados al 100%. Costo MERGE ~0.2 ms/candidato
-> (sin variante bulk). Lote en `1300` por decision (corridas cortas en QA02).
-> Correcciones seccion 7 aplicadas a los trackers canonicos (7.1, 7.2; 7.3 ya
-> era correcto; 7.4 resuelta por el Incremento C).
+> RESUELTO: tracking integral COMPLETO (A+B+C+DIAGNOSTICA) probado y conciliado en
+> QA02. A 31/31; B 1302/1302 (~0.2 ms/cand, sin bulk); C 1834 pertenencia, 0
+> huerfanos; DIAGNOSTICA `5414C315...` cobertura limpia + cruce con derivas
+> esperadas por secuenciacion. Lote en `1300` por decision. Wrappers se corren
+> con F9 sentencia por sentencia (F5/08 descartado). Correcciones seccion 7
+> aplicadas a los trackers canonicos.
 
 ## Proximos pasos (orden sugerido)
 
-1. Ejecutar y conciliar la capa DIAGNOSTICA (ver `07_DIAGNOSTICA/README.md`).
-2. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
+1. Mantener la historia en QA02; no promover a PROD sin propuesta separada.
+2. Si se requiere re-correr la DIAGNOSTICA en otra corrida: job -> wrappers
+   01..05 con F9 (INSERT->COUNT->COMMIT) inmediatamente despues -> validacion 06.
+   Ver `07_DIAGNOSTICA/README.md`.
 
 ## Reglas duras (no negociables)
 

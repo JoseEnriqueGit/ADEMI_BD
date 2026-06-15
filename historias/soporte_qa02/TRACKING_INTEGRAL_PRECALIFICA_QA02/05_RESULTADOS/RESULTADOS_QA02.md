@@ -221,7 +221,7 @@ Conciliacion manual confirmada:
   esta evidencia; opcionales, re-ejecutables en cualquier momento por
   `ID_EJECUCION` con el script 09.
 
-## Capa DIAGNOSTICA - preparada en el repo (2026-06-10), PENDIENTE de prueba en QA02
+## Capa DIAGNOSTICA - APLICADA Y PROBADA en QA02 (2026-06-15)
 
 - Carpeta nueva: `07_DIAGNOSTICA/` con 5 wrappers `INSERT` (uno por flujo),
   **generados** desde los trackers canonicos de
@@ -250,18 +250,60 @@ Conciliacion manual confirmada:
 4. Pegar aqui: salidas de las queries 1 y 3.
 5. Si la corrida diagnostica no sirve: `07_ROLLBACK_DIAGNOSTICA_QA02.sql`.
 
-### Resultados de la prueba (completar al ejecutar)
+### Resultados de la prueba (2026-06-15, `AJEREZ@QADEMI02_19C`)
 
-- Fecha: 2026-06-15 (prueba parcial en curso).
-- Precheck F9: `QADEMI02`, usuario `AJEREZ`, gate detalle `S`, lote `1300`,
-  package body `VALID`.
+- Precheck F9: base `QADEMI02`, usuario `AJEREZ`, gate `TRACK_PRECALIFICA_DETALLE_CURSOR='S'`,
+  lote `1300`, package body `VALID`.
 - ID de ejecucion: `5414C315EE2373B7E063140311ACD22C`.
-- Wrapper 01 `Precalifica_Represtamo`: `26 rows inserted` en `44 s`.
-  El INSERT termino correctamente; pendiente ejecutar el `SELECT COUNT(*)`
-  del paso 2 y el `COMMIT` del paso 3. No se considera confirmado aun.
-- Cobertura por flujo: 1/5 con INSERT ejecutado; pendiente confirmar 01 y
-  ejecutar 02..05.
-- Cruce DIAG_LOTE vs bruto C: PENDIENTE
+- **Metodo F5 descartado:** Toad no retornaba resultados de forma confiable con
+  "Execute as Script" en los wrappers grandes; se ejecuto **sentencia por
+  sentencia con F9** (INSERT -> `SELECT COUNT(*)` de verificacion -> `COMMIT`).
+  El intento consolidado `08_DIAG_TODO_EN_UNO` quedo como WIP (no usar).
+- Los 5 wrappers se cargaron y commitearon. Verificacion de cada INSERT
+  coincide con el esperado:
+
+| Wrapper (flujo) | Filas DIAGNOSTICA | Duracion aprox |
+|---|---:|---|
+| `Precalifica_Represtamo` | 26 | ~44 s |
+| `Precalifica_Repre_Cancelado` | 22 | rapido |
+| `Precalifica_Repre_Cancelado_hi` | 23 | ~12 s |
+| `Precalifica_Represtamo_fiadores` | 27 | ~15 s |
+| `Precalifica_Represtamo_fiadores_hi` | 24 | rapido |
+
+- **Incidencia resuelta:** el flujo `fiadores_hi` salio en `72` (3x24) por
+  corridas de prueba previas contra la misma ejecucion. Se limpio con un
+  `DELETE` puntual de ese flujo + `COMMIT` y se reinserto una sola vez -> `24`.
+- **Query 1 (cobertura): `OK`.** DIAGNOSTICA = `26/22/23/27/24` + `TOTAL=1`
+  (la fila `XCORE_RECHAZADOS` del propio job, que es DIAGNOSTICA). REAL = `30`
+  filas (las 31 metricas A/B menos esa de XCORE) -> metricas REAL intactas, sin
+  duplicados.
+- **Query 3 (cruce DIAG_LOTE vs bruto C vs neto B):**
+
+| Flujo | DIAG_LOTE | BRUTO_C | NETO_B | Deriva |
+|---|---:|---:|---:|---:|
+| `Precalifica_Represtamo` | 1300 | 1300 | 1129 | 0 |
+| `Precalifica_Repre_Cancelado` | 843 | 100 | 100 | +743 |
+| `Precalifica_Represtamo_fiadores` | 239 | 389 | 321 | -150 |
+| `Precalifica_Repre_Cancelado_hi` | 45 | 45 | 45 | 0 |
+| `Precalifica_Represtamo_fiadores_hi` | 0 | 0 | 0 | 0 |
+
+- **Lectura:**
+  - `Precalifica_Represtamo` es el flujo que **consume el lote**: `DIAG_LOTE =
+    BRUTO_C = 1300` (= el tope `LOTE_DE_CARAGA_REPRESTAMO`); de esos 1300
+    sobreviven `1129` -> `171` se caen en los filtros post-cursor
+    (X1/X2/X3/mancomunado/edad). Cuadra exacto (deriva 0).
+  - Las derivas de `Cancelado` (+743) y `fiadores` (-150) son la **desviacion
+    esperada, no un error**: el diagnostico corre *standalone* despues del job y
+    no modela que los 5 flujos corren EN SECUENCIA (cuando Cancelado corre de
+    paso 5, sus candidatos ya fueron tomados por flujos previos y el filtro
+    "sin represtamo en proceso" los excluye -> standalone ve 843, el job real
+    inserto 100) ni los datos vivos. Es exactamente la limitacion documentada
+    (propuesta seccion 4.2 y 7.4); por eso cada fila lleva la ADVERTENCIA en
+    `PARAMETROS`. Los flujos chicos (Cancelado_hi, fiadores_hi) cuadran al cero.
+- **Conclusion:** DIAGNOSTICA PROBADA. El embudo por filtro interno queda
+  registrado y asociado al `ID_EJECUCION`; el flujo dominante (Represtamo, que
+  topa el lote) reconcilia perfecto, y los secundarios muestran la brecha
+  standalone-vs-secuenciado prevista. **Tracking integral completo: A+B+C+DIAGNOSTICA.**
 
 ## Alcance validado y pendiente
 
@@ -273,8 +315,10 @@ Conciliacion manual confirmada:
 - **Incremento C:** aplicado y probado (2026-06-09,
   `53DAC2820BDC0E55E063140311AC3EBA`); pertenencia por flujo conciliada,
   0 huerfanos en el cierre, 317 descartados intra-flujo visibles.
-- **DIAGNOSTICA:** preparada en el repo (2026-06-10, `07_DIAGNOSTICA/`);
-  pendiente de ejecutar y conciliar en QA02.
+- **DIAGNOSTICA:** aplicada y probada (2026-06-15,
+  `5414C315EE2373B7E063140311ACD22C`); cobertura limpia (5 flujos + TOTAL),
+  metricas REAL intactas (30), cruce con derivas esperadas por secuenciacion.
+  **Tracking integral completo (A+B+C+DIAGNOSTICA).**
 - **Decision operativa (2026-06-09):** `LOTE_DE_CARAGA_REPRESTAMO` queda en
   `1300` en QA02 a proposito (corridas de prueba mas cortas). Subirlo a
   `130000` solo para corridas representativas o comparables con PROD.
