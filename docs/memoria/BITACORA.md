@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-15 - Codex - Precheck DIAGNOSTICA dividido por dependencia
+
+- **Objetivo:** localizar la espera observada en el `SELECT` combinado del precheck QA02.
+- **Hecho:** la evidencia Toad confirmo que F5 y `Script Output` funcionan, pero la consulta no alcanzaba el `PROMPT` final; el precheck se dividio en cinco consultas con marcas de inicio/fin.
+- **Decisiones:** probar por separado DUAL, `PA_PARAMETROS_MVP`, `PR_JOB_PRECALIFICA_TRACK` y `F_OBT_PARAMETRO_REPRESTAMO`; no se cambio ningun conteo diagnostico.
+- **Pendientes:** ejecutar nuevamente el `00` y reportar el ultimo `PASO N` visible.
+- **Archivos tocados:** `07_DIAGNOSTICA/00_PRECHECK_DIAGNOSTICA_QA02.sql`, `README.md` y esta bitacora.
+
 ## 2026-06-15 - Codex - Precheck y salida temprana para DIAGNOSTICA QA02
 
 - **Objetivo:** distinguir entre un problema de ejecucion F5/Script Output y la lentitud del wrapper 01, que no mostraba salida en Toad.

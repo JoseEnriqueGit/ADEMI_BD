@@ -28,10 +28,10 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
 
 ## Orden de ejecucion en Toad (`AJEREZ@QADEMI02_19C`)
 
-1. Ejecutar con F5 `00_PRECHECK_DIAGNOSTICA_QA02.sql`. Debe terminar en
-   segundos y mostrar conexion, gate, lote y ultima ejecucion. Si no imprime
-   nada, el problema esta en la ejecucion o visualizacion de `Script Output`
-   de Toad, antes de entrar al SQL diagnostico.
+1. Ejecutar con F5 `00_PRECHECK_DIAGNOSTICA_QA02.sql`. Muestra cinco pasos
+   independientes: conexion, gate, lote directo, ultima ejecucion y lectura
+   del lote mediante `F_OBT_PARAMETRO_REPRESTAMO`. El ultimo `PASO N`
+   mostrado identifica exactamente la consulta que queda esperando.
 2. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD` (los wrappers se asocian a la
    ULTIMA ejecucion registrada en `PR_JOB_PRECALIFICA_TRACK`).
 3. Inmediatamente despues, ejecutar como script (F5) los wrappers `01..05`
