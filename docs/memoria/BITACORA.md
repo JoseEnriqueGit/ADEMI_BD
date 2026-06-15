@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-15 - Codex - Wrapper DIAGNOSTICA 01 ejecutado con F9
+
+- **Objetivo:** comprobar el nuevo metodo F9 y determinar si el wrapper 01 tenia un problema de parseo o rendimiento.
+- **Hecho:** precheck OK en `QADEMI02` con usuario `AJEREZ`, gate `S`, lote `1300`, package body `VALID` e ID `5414C315EE2373B7E063140311ACD22C`; el INSERT del wrapper 01 termino con 26 filas en 44 segundos.
+- **Decisiones:** queda descartado el bloqueo por F5 y la lentitud severa del wrapper 01; no confirmar la prueba hasta ejecutar su conteo y COMMIT.
+- **Pendientes:** paso 2 del wrapper 01 debe devolver 26; luego COMMIT y continuar con wrappers 02..05 y validacion 06.
+- **Archivos tocados:** wrapper 01, `05_RESULTADOS/RESULTADOS_QA02.md`, `06_HANDOFF/HANDOFF.md` y esta bitacora.
+
 ## 2026-06-15 - Codex - DIAGNOSTICA cambia de F5 a F9
 
 - **Objetivo:** abandonar `Execute as Script`, que no devuelve resultados de forma confiable en Toad QA02.

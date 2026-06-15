@@ -252,9 +252,15 @@ Conciliacion manual confirmada:
 
 ### Resultados de la prueba (completar al ejecutar)
 
-- Fecha: PENDIENTE
-- ID de ejecucion: PENDIENTE
-- Cobertura por flujo: PENDIENTE
+- Fecha: 2026-06-15 (prueba parcial en curso).
+- Precheck F9: `QADEMI02`, usuario `AJEREZ`, gate detalle `S`, lote `1300`,
+  package body `VALID`.
+- ID de ejecucion: `5414C315EE2373B7E063140311ACD22C`.
+- Wrapper 01 `Precalifica_Represtamo`: `26 rows inserted` en `44 s`.
+  El INSERT termino correctamente; pendiente ejecutar el `SELECT COUNT(*)`
+  del paso 2 y el `COMMIT` del paso 3. No se considera confirmado aun.
+- Cobertura por flujo: 1/5 con INSERT ejecutado; pendiente confirmar 01 y
+  ejecutar 02..05.
 - Cruce DIAG_LOTE vs bruto C: PENDIENTE
 
 ## Alcance validado y pendiente

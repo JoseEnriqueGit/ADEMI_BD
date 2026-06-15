@@ -87,7 +87,10 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
    2026-06-10): precheck 00 (F9) -> job -> wrappers 01..05, ejecutando
    `INSERT`, verificacion y `COMMIT` por separado con F9 -> validacion 06
    (F9). El metodo F5 fue descartado el 2026-06-15 porque Toad no retornaba
-   resultados de forma confiable. No marcarla probada sin resultados reales.
+   resultados de forma confiable. Avance 2026-06-15: precheck OK para
+   `5414C315EE2373B7E063140311ACD22C`; wrapper 01 inserto 26 filas en 44 s,
+   pendiente `SELECT COUNT(*)` + `COMMIT`. No marcarla probada sin completar
+   los cinco flujos y la validacion 06.
 2. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 3. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida
