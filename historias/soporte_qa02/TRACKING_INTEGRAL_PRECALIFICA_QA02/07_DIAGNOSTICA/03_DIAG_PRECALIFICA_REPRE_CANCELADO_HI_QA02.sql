@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Capa DIAGNOSTICA - Precalifica_Repre_Cancelado_hi
--- Entorno: QA02. Ejecutar como script (F5) en Toad DESPUES del job.
+-- Entorno: QA02. Ejecutar cada sentencia con F9 DESPUES del job.
 -- GENERADO desde trackers_precalifica_post_cursor_fast/03_PRECALIFICA_REPRE_CANCELADO_HI_CURSOR_QA02.sql:
 --   no editar el SQL interno aqui; si el tracker canonico cambia,
 --   regenerar este wrapper.
@@ -15,6 +15,7 @@
 -- Reversa: ./07_ROLLBACK_DIAGNOSTICA_QA02.sql
 -- =====================================================================
 
+-- PASO 1 (F9): colocar el cursor dentro del INSERT y ejecutar.
 INSERT INTO PR.PR_JOB_PRECALIFICA_FILTRO_TRACK
     (ID_EJECUCION, ID_DETALLE, FLUJO, FASE, ORDEN_FILTRO, CODIGO_FILTRO,
      DESCRIPCION, TIPO_MEDICION, CANDIDATOS_ANTES, CANDIDATOS_PASAN,
@@ -467,10 +468,7 @@ SELECT tipo_medicion,
           AND valor = 'S'
        ) g;
 
-COMMIT;
-
-PROMPT Filas DIAGNOSTICA insertadas para Precalifica_Repre_Cancelado_hi (ultima ejecucion)
-
+-- PASO 2 (F9): verificar las filas sin confirmar la transaccion.
 SELECT COUNT(*) filas_diagnostica
   FROM PR.PR_JOB_PRECALIFICA_FILTRO_TRACK f
  WHERE f.tipo_medicion = 'DIAGNOSTICA'
@@ -481,3 +479,6 @@ SELECT COUNT(*) filas_diagnostica
                                   WHERE id_paso = 0
                                   ORDER BY fecha_inicio DESC)
                           WHERE ROWNUM = 1);
+
+-- PASO 3 (F9): confirmar solo si el conteo anterior es correcto.
+COMMIT;

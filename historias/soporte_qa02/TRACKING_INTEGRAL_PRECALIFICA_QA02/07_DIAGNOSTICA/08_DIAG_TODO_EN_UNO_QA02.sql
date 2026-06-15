@@ -1,6 +1,8 @@
 -- =====================================================================
 -- DIAGNOSTICA - TODO EN UNO (limpieza + 5 INSERT + verificacion)
--- Entorno: QA02. Ejecutar como SCRIPT (F5) DESPUES del job, una sola vez.
+-- NO USAR: este WIP depende de F5, metodo descartado en Toad QA02.
+-- Usar 00 con F9 y luego 01..05, cada sentencia con F9.
+-- Se conserva solo como evidencia del intento de consolidacion.
 -- Idempotente: la limpieza inicial borra las filas de wrappers de la
 -- ultima ejecucion (deja intacta la fila TOTAL del job), asi que puede
 -- re-ejecutarse sin duplicar.

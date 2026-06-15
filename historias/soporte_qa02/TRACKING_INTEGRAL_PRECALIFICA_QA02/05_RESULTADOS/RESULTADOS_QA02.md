@@ -240,8 +240,10 @@ Conciliacion manual confirmada:
 ### Pasos exactos para probar en Toad (`AJEREZ@QADEMI02_19C`)
 
 1. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD`.
-2. Inmediatamente despues, F5 a `07_DIAGNOSTICA/01..05_DIAG_*.sql` (cada uno
-   reporta su conteo de filas insertadas; pueden tardar varios minutos c/u).
+2. Inmediatamente despues, abrir `07_DIAGNOSTICA/01..05_DIAG_*.sql` y
+   ejecutar cada sentencia con F9: `INSERT`, `SELECT COUNT(*)` y `COMMIT`.
+   Ver el resultado del conteo en `Data Grid`; pueden tardar varios minutos.
+   Si el conteo no es correcto, ejecutar `ROLLBACK` en vez de `COMMIT`.
 3. `07_DIAGNOSTICA/06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query:
    Query 1 cobertura (5 flujos DIAGNOSTICA + 31 REAL), Query 2 funnel por
    flujo, Query 3 cruce `DIAG_LOTE` vs bruto C vs neto B.

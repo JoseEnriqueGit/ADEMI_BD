@@ -84,8 +84,10 @@ Validado en QA02: delta de `SOL_CREADA`, manejo de XCORE y conciliacion del cier
 ## Pendientes / decisiones abiertas
 
 1. **Probar la capa DIAGNOSTICA en QA02** (preparada en `07_DIAGNOSTICA/` el
-   2026-06-10): job -> wrappers 01..05 (F5) -> validacion 06 (F9). No marcarla
-   probada sin resultados reales.
+   2026-06-10): precheck 00 (F9) -> job -> wrappers 01..05, ejecutando
+   `INSERT`, verificacion y `COMMIT` por separado con F9 -> validacion 06
+   (F9). El metodo F5 fue descartado el 2026-06-15 porque Toad no retornaba
+   resultados de forma confiable. No marcarla probada sin resultados reales.
 2. Medir una corrida con `TRACK_PRECALIFICA_ACTIVO='N'` si se necesita
    cuantificar formalmente el costo del tracking.
 3. Capturar (opcional) las queries 2 y 4 del script 09 para la corrida

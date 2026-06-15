@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-15 - Codex - DIAGNOSTICA cambia de F5 a F9
+
+- **Objetivo:** abandonar `Execute as Script`, que no devuelve resultados de forma confiable en Toad QA02.
+- **Hecho:** convertido el precheck a un unico SELECT F9/Data Grid; wrappers 01..05 y rollback divididos en sentencia DML, verificacion y COMMIT manual; `08 TODO_EN_UNO` marcado como WIP descartado.
+- **Decisiones:** verificar antes de confirmar; ante conteo incorrecto usar `ROLLBACK`. No se modifico el SQL interno de los filtros ni el package.
+- **Pendientes:** ejecutar `00` con F9 y probar el INSERT del wrapper 01 con F9 para medir si persiste la lentitud.
+- **Archivos tocados:** `07_DIAGNOSTICA/00..05`, `07_ROLLBACK`, `08_DIAG_TODO_EN_UNO`, `README.md`, `05_RESULTADOS/RESULTADOS_QA02.md`, `06_HANDOFF/HANDOFF.md` y esta bitacora.
+
 ## 2026-06-15 - Codex - Precheck DIAGNOSTICA dividido por dependencia
 
 - **Objetivo:** localizar la espera observada en el `SELECT` combinado del precheck QA02.

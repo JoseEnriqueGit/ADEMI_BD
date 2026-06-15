@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Capa DIAGNOSTICA - Precalifica_Represtamo
--- Entorno: QA02. Ejecutar como script (F5) en Toad DESPUES del job.
+-- Entorno: QA02. Ejecutar cada sentencia con F9 DESPUES del job.
 -- GENERADO desde trackers_precalifica_post_cursor_fast/01_PRECALIFICA_REPRESTAMO_POST_CURSOR_FAST_QA02.sql:
 --   no editar el SQL interno aqui; si el tracker canonico cambia,
 --   regenerar este wrapper.
@@ -15,14 +15,7 @@
 -- Reversa: ./07_ROLLBACK_DIAGNOSTICA_QA02.sql
 -- =====================================================================
 
-SET ECHO ON
-SET FEEDBACK ON
-SET TIMING ON
-
-PROMPT ===== INICIO wrapper 01 Precalifica_Represtamo =====
-PROMPT Ejecutando INSERT diagnostico pesado
-PROMPT La siguiente salida aparecera cuando finalice el INSERT
-
+-- PASO 1 (F9): colocar el cursor dentro del INSERT y ejecutar.
 INSERT INTO PR.PR_JOB_PRECALIFICA_FILTRO_TRACK
     (ID_EJECUCION, ID_DETALLE, FLUJO, FASE, ORDEN_FILTRO, CODIGO_FILTRO,
      DESCRIPCION, TIPO_MEDICION, CANDIDATOS_ANTES, CANDIDATOS_PASAN,
@@ -503,11 +496,7 @@ SELECT tipo_medicion,
           AND valor = 'S'
        ) g;
 
-COMMIT;
-
-PROMPT ===== FIN INSERT wrapper 01 Precalifica_Represtamo =====
-PROMPT Filas DIAGNOSTICA insertadas para Precalifica_Represtamo (ultima ejecucion)
-
+-- PASO 2 (F9): verificar las filas sin confirmar la transaccion.
 SELECT COUNT(*) filas_diagnostica
   FROM PR.PR_JOB_PRECALIFICA_FILTRO_TRACK f
  WHERE f.tipo_medicion = 'DIAGNOSTICA'
@@ -518,3 +507,6 @@ SELECT COUNT(*) filas_diagnostica
                                   WHERE id_paso = 0
                                   ORDER BY fecha_inicio DESC)
                           WHERE ROWNUM = 1);
+
+-- PASO 3 (F9): confirmar solo si el conteo anterior es correcto.
+COMMIT;

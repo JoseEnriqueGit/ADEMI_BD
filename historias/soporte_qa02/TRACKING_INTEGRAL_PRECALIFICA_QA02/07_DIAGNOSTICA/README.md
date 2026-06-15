@@ -21,36 +21,34 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
 
 | Archivo | Que hace |
 |---|---|
-| `00_PRECHECK_DIAGNOSTICA_QA02.sql` | Precheck rapido de conexion, gate, lote y ultima ejecucion. No inserta datos. |
-| `01..05_DIAG_*.sql` | Un wrapper INSERT por flujo. **Generados** desde los trackers canonicos de `ENTORNOS_ORACLE/.../trackers_precalifica_post_cursor_fast/`; no editar el SQL interno aqui. |
+| `00_PRECHECK_DIAGNOSTICA_QA02.sql` | Unico SELECT para F9/Data Grid: conexion, gate, lote, ultima ejecucion y estado del package. |
+| `01..05_DIAG_*.sql` | Un wrapper por flujo, dividido en INSERT, verificacion y COMMIT para ejecutar con F9. |
 | `06_VALIDAR_DIAGNOSTICA_QA02.sql` | Validacion F9: cobertura, funnel por flujo y cruce DIAG_LOTE vs bruto real (Incremento C) vs neto (Capa B). |
-| `07_ROLLBACK_DIAGNOSTICA_QA02.sql` | Borra SOLO las filas DIAGNOSTICA de la ultima ejecucion. |
+| `07_ROLLBACK_DIAGNOSTICA_QA02.sql` | Reversa con SELECT, DELETE, verificacion y COMMIT separados para F9. |
+| `08_DIAG_TODO_EN_UNO_QA02.sql` | WIP F5 descartado. No ejecutar. |
 
 ## Orden de ejecucion en Toad (`AJEREZ@QADEMI02_19C`)
 
-1. Ejecutar con F5 `00_PRECHECK_DIAGNOSTICA_QA02.sql`. Muestra cinco pasos
-   independientes: conexion, gate, lote directo, ultima ejecucion y lectura
-   del lote mediante `F_OBT_PARAMETRO_REPRESTAMO`. El ultimo `PASO N`
-   mostrado identifica exactamente la consulta que queda esperando.
+1. En `00_PRECHECK_DIAGNOSTICA_QA02.sql`, colocar el cursor dentro del unico
+   `SELECT` y ejecutar con F9. Revisar en `Data Grid`: base QA02, gate `S`,
+   lote `1300`, ultima ejecucion no nula y package body `VALID`.
 2. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD` (los wrappers se asocian a la
    ULTIMA ejecucion registrada en `PR_JOB_PRECALIFICA_TRACK`).
-3. Inmediatamente despues, ejecutar como script (F5) los wrappers `01..05`
-   (cada uno termina con su propio COMMIT y un conteo de verificacion).
-   Pueden tardar varios minutos cada uno (evaluan PEP/lista negra/garantia
-   por candidato).
-   El wrapper 01 ahora imprime un aviso antes de iniciar su `INSERT`; si el
-   aviso aparece y no hay salida posterior, Oracle sigue ejecutando el
-   conteo pesado.
+3. Inmediatamente despues, abrir cada wrapper `01..05` y ejecutar con F9:
+   primero el `INSERT`, luego el `SELECT COUNT(*)` de verificacion y por
+   ultimo el `COMMIT`. Colocar el cursor dentro de la sentencia exacta antes
+   de presionar F9. Si el conteo no es correcto, ejecutar `ROLLBACK` en vez
+   de `COMMIT`.
 4. Ejecutar `06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query.
 5. Si la corrida diagnostica no sirve (p. ej. se corrio muy tarde):
-   `07_ROLLBACK_DIAGNOSTICA_QA02.sql` y repetir.
+   ejecutar `07_ROLLBACK_DIAGNOSTICA_QA02.sql` sentencia por sentencia con F9.
 
 ## Reglas y notas
 
 - Gating: los wrappers solo insertan si `TRACK_PRECALIFICA_DETALLE_CURSOR='S'`
   (ya esta en `'S'` en QA02). Con `'N'` no insertan nada.
-- Solo INSERT a la tabla de tracking + COMMIT propio; no tocan tablas
-  funcionales ni el package.
+- Solo INSERT a la tabla de tracking; no tocan tablas funcionales ni el
+  package. El COMMIT es manual y separado para permitir verificar primero.
 - `ORDEN_FILTRO` DIAGNOSTICA: cursor `100-117`, lote `299`, post-cursor
   `300-305`, cleanup `498` (no choca con los `1..31` de las metricas REAL).
 - Correcciones de la seccion 7 de la propuesta aplicadas a los trackers
