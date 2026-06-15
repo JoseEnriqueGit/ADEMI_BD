@@ -35,9 +35,11 @@ la memoria vive en el repo (git)** y se reconstruye clonando.
   procedures con helper package-private `track_candidatos_flujo`.
   📌 **Decisión: `LOTE_DE_CARAGA_REPRESTAMO` queda en `1300` en QA02** (corridas de prueba
   cortas; subir a 130000 solo para corridas representativas/comparables con PROD).
-  **Capa DIAGNOSTICA preparada el 2026-06-10** (`07_DIAGNOSTICA/`: 5 wrappers INSERT
-  generados de los trackers canónicos + validación + reversa), **pendiente de prueba en
-  QA02**. No promover a PROD desde esta historia.
+  **Capa DIAGNOSTICA PROBADA el 2026-06-15** (`5414C315...`): los 5 wrappers de
+  `07_DIAGNOSTICA/` cargados via F9 (INSERT→COUNT→COMMIT por sentencia; F5/08 descartado),
+  cobertura 26/22/23/27/24 + TOTAL, REAL intactas (30), cruce Query 3 con derivas esperadas
+  por secuenciación (Represtamo topa el lote 1300, deriva 0). **Tracking integral COMPLETO
+  (A+B+C+DIAGNOSTICA).** No promover a PROD desde esta historia.
   Ruta: `historias/soporte_qa02/TRACKING_INTEGRAL_PRECALIFICA_QA02/`.
 - 🟡 **Bypass SIB DE08 en QA02 (2026-06-12):** caso documentado en
   `ENTORNOS_ORACLE/QA02/schemas/PR/packages/PR_PKG_REPRESTAMOS/bypass_sib_de08_qa02/`.

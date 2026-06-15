@@ -9,6 +9,15 @@
 
 ---
 
+## 2026-06-15 - Claude - DIAGNOSTICA PROBADA en QA02: tracking integral COMPLETO
+
+- **Objetivo:** ejecutar y conciliar la ultima capa (DIAGNOSTICA) y cerrar el tracking integral.
+- **Ejecucion:** `5414C315EE2373B7E063140311ACD22C` (lote 1300). Metodo F5/"Execute as Script" descartado (Toad no retornaba resultados confiables en los wrappers grandes; el consolidado `08_DIAG_TODO_EN_UNO` no arrancaba); se corrio **sentencia por sentencia con F9** (INSERT -> `SELECT COUNT(*)` -> `COMMIT`). El "bloqueo" de 01/04 era **lentitud** (01 = 44 s; cuentan PEP/garantia/lista negra sobre toda la base sin el tope del lote), no un error.
+- **Carga:** 5 wrappers OK con sus conteos esperados: 26/22/23/27/24. Incidencia: `fiadores_hi` salio en 72 (3x24) por corridas de prueba previas contra la misma ejecucion; se limpio con DELETE puntual del flujo + COMMIT y se reinserto una vez -> 24.
+- **Validacion (06):** Query 1 cobertura OK (5 flujos + TOTAL=1 DIAGNOSTICA; REAL=30 intactas, sin duplicados). Query 3 cruce: `Precalifica_Represtamo` topa el lote (DIAG_LOTE=BRUTO_C=1300, 1129 sobreviven, 171 caen en post-cursor, deriva 0); derivas de Cancelado (+743) y fiadores (-150) = brecha standalone-vs-secuenciado **esperada** (el diagnostico no modela el orden de los 5 flujos ni los datos vivos; documentado, advertencia en PARAMETROS). Flujos chicos cuadran al cero.
+- **Estado:** **tracking integral COMPLETO (A+B+C+DIAGNOSTICA) probado y conciliado en QA02.** No promovido a PROD. Lote sigue en 1300 por decision.
+- **Archivos:** RESULTADOS, ESTADO, HANDOFF de la historia; INVENTARIO; CONTEXTO_ACTUAL; esta bitacora.
+
 ## 2026-06-15 - Codex - Conteos esperados por wrapper DIAGNOSTICA
 
 - **Objetivo:** evitar validar un wrapper usando por error el `SELECT COUNT(*)` de otro flujo.
