@@ -509,7 +509,7 @@ SELECT tipo_medicion,
           AND valor = 'S'
        ) g;
 
--- PASO 2 (F9): verificar las filas sin confirmar la transaccion.
+-- PASO 2 (F9): verificar sin confirmar. Esperado para este flujo: 27.
 SELECT COUNT(*) filas_diagnostica
   FROM PR.PR_JOB_PRECALIFICA_FILTRO_TRACK f
  WHERE f.tipo_medicion = 'DIAGNOSTICA'
@@ -521,5 +521,5 @@ SELECT COUNT(*) filas_diagnostica
                                   ORDER BY fecha_inicio DESC)
                           WHERE ROWNUM = 1);
 
--- PASO 3 (F9): confirmar solo si el conteo anterior es correcto.
+-- PASO 3 (F9): confirmar solo si el conteo anterior devuelve 27.
 COMMIT;

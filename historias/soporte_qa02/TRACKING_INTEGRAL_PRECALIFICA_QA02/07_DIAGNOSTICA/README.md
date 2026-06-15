@@ -38,7 +38,8 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
    primero el `INSERT`, luego el `SELECT COUNT(*)` de verificacion y por
    ultimo el `COMMIT`. Colocar el cursor dentro de la sentencia exacta antes
    de presionar F9. Si el conteo no es correcto, ejecutar `ROLLBACK` en vez
-   de `COMMIT`.
+   de `COMMIT`. Conteos esperados: `01=26`, `02=22`, `03=23`, `04=27`,
+   `05=24`.
 4. Ejecutar `06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query.
 5. Si la corrida diagnostica no sirve (p. ej. se corrio muy tarde):
    ejecutar `07_ROLLBACK_DIAGNOSTICA_QA02.sql` sentencia por sentencia con F9.

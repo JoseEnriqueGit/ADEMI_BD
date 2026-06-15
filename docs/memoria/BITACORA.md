@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-15 - Codex - Conteos esperados por wrapper DIAGNOSTICA
+
+- **Objetivo:** evitar validar un wrapper usando por error el `SELECT COUNT(*)` de otro flujo.
+- **Hecho:** la captura del wrapper 02 seguia filtrando `Precalifica_Represtamo` y devolvia las 26 filas del wrapper 01; se documentaron los esperados `01=26`, `02=22`, `03=23`, `04=27`, `05=24`.
+- **Decisiones:** el wrapper 02 no queda validado hasta consultar `FLUJO='Precalifica_Repre_Cancelado'` y obtener 22.
+- **Pendientes:** ejecutar el conteo correcto del 02; confirmar solo si devuelve 22.
+- **Archivos tocados:** wrappers 02..05, `07_DIAGNOSTICA/README.md` y esta bitacora.
+
 ## 2026-06-15 - Codex - Wrapper DIAGNOSTICA 01 ejecutado con F9
 
 - **Objetivo:** comprobar el nuevo metodo F9 y determinar si el wrapper 01 tenia un problema de parseo o rendimiento.
