@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-06-15 - Codex - Precheck y salida temprana para DIAGNOSTICA QA02
+
+- **Objetivo:** distinguir entre un problema de ejecucion F5/Script Output y la lentitud del wrapper 01, que no mostraba salida en Toad.
+- **Hecho:** agregado `00_PRECHECK_DIAGNOSTICA_QA02.sql`, de solo lectura y ejecucion rapida, para mostrar conexion, gate, lote y ultima ejecucion; el wrapper 01 ahora imprime avisos antes y despues del `INSERT` pesado y activa timing.
+- **Decisiones:** no se alteraron filtros, conteos, package ni logica funcional; DIAGNOSTICA permanece pendiente de prueba.
+- **Pendientes:** ejecutar el precheck con F5 y luego repetir el wrapper 01; si el aviso inicial aparece y no llega el final, optimizar el conteo pesado.
+- **Archivos tocados:** `07_DIAGNOSTICA/00_PRECHECK_DIAGNOSTICA_QA02.sql`, `01_DIAG_PRECALIFICA_REPRESTAMO_QA02.sql`, `README.md` y esta bitacora.
+
 ## 2026-06-12 - Claude - Caso bypass SIB DE08 en QA02 documentado y body fusionado
 
 - **Objetivo:** organizar y documentar las versiones del body de `PR.PR_PKG_REPRESTAMOS` con el bypass de la validacion SIB (DE08), y generar un body QA02 completo (tracking + bypass).

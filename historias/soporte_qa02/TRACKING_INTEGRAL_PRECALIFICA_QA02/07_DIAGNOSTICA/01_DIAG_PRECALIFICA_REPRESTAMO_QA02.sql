@@ -15,6 +15,14 @@
 -- Reversa: ./07_ROLLBACK_DIAGNOSTICA_QA02.sql
 -- =====================================================================
 
+SET ECHO ON
+SET FEEDBACK ON
+SET TIMING ON
+
+PROMPT ===== INICIO wrapper 01 Precalifica_Represtamo =====
+PROMPT Ejecutando INSERT diagnostico pesado
+PROMPT La siguiente salida aparecera cuando finalice el INSERT
+
 INSERT INTO PR.PR_JOB_PRECALIFICA_FILTRO_TRACK
     (ID_EJECUCION, ID_DETALLE, FLUJO, FASE, ORDEN_FILTRO, CODIGO_FILTRO,
      DESCRIPCION, TIPO_MEDICION, CANDIDATOS_ANTES, CANDIDATOS_PASAN,
@@ -497,6 +505,7 @@ SELECT tipo_medicion,
 
 COMMIT;
 
+PROMPT ===== FIN INSERT wrapper 01 Precalifica_Represtamo =====
 PROMPT Filas DIAGNOSTICA insertadas para Precalifica_Represtamo (ultima ejecucion)
 
 SELECT COUNT(*) filas_diagnostica

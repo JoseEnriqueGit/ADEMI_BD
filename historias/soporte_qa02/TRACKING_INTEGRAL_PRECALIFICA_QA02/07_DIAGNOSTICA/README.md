@@ -21,20 +21,28 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
 
 | Archivo | Que hace |
 |---|---|
+| `00_PRECHECK_DIAGNOSTICA_QA02.sql` | Precheck rapido de conexion, gate, lote y ultima ejecucion. No inserta datos. |
 | `01..05_DIAG_*.sql` | Un wrapper INSERT por flujo. **Generados** desde los trackers canonicos de `ENTORNOS_ORACLE/.../trackers_precalifica_post_cursor_fast/`; no editar el SQL interno aqui. |
 | `06_VALIDAR_DIAGNOSTICA_QA02.sql` | Validacion F9: cobertura, funnel por flujo y cruce DIAG_LOTE vs bruto real (Incremento C) vs neto (Capa B). |
 | `07_ROLLBACK_DIAGNOSTICA_QA02.sql` | Borra SOLO las filas DIAGNOSTICA de la ultima ejecucion. |
 
 ## Orden de ejecucion en Toad (`AJEREZ@QADEMI02_19C`)
 
-1. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD` (los wrappers se asocian a la
+1. Ejecutar con F5 `00_PRECHECK_DIAGNOSTICA_QA02.sql`. Debe terminar en
+   segundos y mostrar conexion, gate, lote y ultima ejecucion. Si no imprime
+   nada, el problema esta en la ejecucion o visualizacion de `Script Output`
+   de Toad, antes de entrar al SQL diagnostico.
+2. Correr el job `PR.JOB_CARGA_PRECALIFICA_RD` (los wrappers se asocian a la
    ULTIMA ejecucion registrada en `PR_JOB_PRECALIFICA_TRACK`).
-2. Inmediatamente despues, ejecutar como script (F5) los wrappers `01..05`
+3. Inmediatamente despues, ejecutar como script (F5) los wrappers `01..05`
    (cada uno termina con su propio COMMIT y un conteo de verificacion).
    Pueden tardar varios minutos cada uno (evaluan PEP/lista negra/garantia
    por candidato).
-3. Ejecutar `06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query.
-4. Si la corrida diagnostica no sirve (p. ej. se corrio muy tarde):
+   El wrapper 01 ahora imprime un aviso antes de iniciar su `INSERT`; si el
+   aviso aparece y no hay salida posterior, Oracle sigue ejecutando el
+   conteo pesado.
+4. Ejecutar `06_VALIDAR_DIAGNOSTICA_QA02.sql` con F9 por query.
+5. Si la corrida diagnostica no sirve (p. ej. se corrio muy tarde):
    `07_ROLLBACK_DIAGNOSTICA_QA02.sql` y repetir.
 
 ## Reglas y notas
