@@ -17,6 +17,41 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
   lleva la advertencia en `PARAMETROS` y debe correrse **inmediatamente
   despues del job, sin cargas paralelas**.
 
+## REAL vs DIAGNOSTICA - como leer cada `TIPO_MEDICION`
+
+La tabla `PR_JOB_PRECALIFICA_FILTRO_TRACK` mezcla dos clases de numero y la
+columna `TIPO_MEDICION` los separa. **No se deben leer igual:**
+
+| | `REAL` | `DIAGNOSTICA` |
+|---|---|---|
+| Quien lo escribe | El **job mismo**, mientras corre | Los **wrappers**, despues del job |
+| De donde sale | Conteos de los cambios de estado reales de esa corrida | Reconstruccion del embudo del cursor re-ejecutando los filtros |
+| Exactitud | **Exacto e inmutable** (evidencia de la corrida) | **Exacto en el "por que", aproximado en los totales** de los flujos secundarios |
+| Para que sirve | "Cuantos entraron / sobrevivieron / terminaron NP/CP/RXT" | "**Por que filtro interno** se cae el volumen" |
+
+**Por que la DIAGNOSTICA no calza 1:1 con el job** (no es un error, es de diseno):
+
+1. La calcula **standalone**: cuenta el embudo de cada procedimiento por
+   separado, sin modelar que los 5 flujos corren EN SECUENCIA y se quitan
+   candidatos entre si (ej.: Cancelado standalone "ve" 843 elegibles, pero como
+   corre despues de los otros, el job real solo inserto 100).
+2. Se corre **despues** del job, con datos VIGENTES, no congelados en la corrida.
+
+**Como usarla bien:**
+
+- Para responder *"por que de N creditos solo entran 1300"* -> impecable, y
+  verificable credito por credito (ver `09_..._QA02.sql`, query de muestra).
+- Para afirmar *"el flujo X aporto exactamente N"* -> usar las metricas **REAL**
+  (Incrementos A/B) o la **pertenencia exacta** del Incremento C (la captura en
+  el `FETCH`, no despues), NO la DIAGNOSTICA.
+
+> Resumen en una linea: **DIAGNOSTICA = renglones que desglosan el embudo del
+> cursor filtro por filtro (cuantos caen y por que), reconstruidos despues del
+> job para explicar el descarte. Son la respuesta al "por que", no un contador
+> exacto de la corrida.** Hay UNA fila DIAGNOSTICA que si escribe el job:
+> `XCORE_RECHAZADOS` (flujo `TOTAL`), un centinela `NO_EJECUTADO` porque
+> `PVALIDA_XCORE` esta comentado en QA02.
+
 ## Archivos
 
 | Archivo | Que hace |
@@ -26,6 +61,8 @@ desglose filtro a filtro de los cursores de los 5 flujos (lo que las metricas
 | `06_VALIDAR_DIAGNOSTICA_QA02.sql` | Validacion F9: cobertura, funnel por flujo y cruce DIAG_LOTE vs bruto real (Incremento C) vs neto (Capa B). |
 | `07_ROLLBACK_DIAGNOSTICA_QA02.sql` | Reversa con SELECT, DELETE, verificacion y COMMIT separados para F9. |
 | `08_DIAG_TODO_EN_UNO_QA02.sql` | WIP F5 descartado. No ejecutar. |
+| `09_VERIFICAR_EMBUDO_REPRESTAMO_QA02.sql` | Read-only: embudo persistido (todos los flujos / solo Represtamo) + recalculo en vivo de los filtros baratos + muestra de hasta 100 creditos descartados con el valor real de DE08. |
+| `10_VER_TABLA_FILTRO_TRACK_QA02.sql` | Read-only: lectura directa de la tabla (lista de ejecuciones, desglose por procedimiento, por ID concreto, y en el orden real de ejecucion del job). |
 
 ## Orden de ejecucion en Toad (`AJEREZ@QADEMI02_19C`)
 
